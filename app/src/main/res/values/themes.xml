@@ -1,3 +1,9 @@
 <resources>
-    <style name="Theme.AppBuilder" parent="Theme.Material3.DayNight.NoActionBar" />
+    <!-- Tema dell'app che eredita dal tema Material3 DayNight senza ActionBar -->
+    <style name="Theme.AppBuilder" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Esempio: status bar trasparente -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- Se vuoi forzare la light/dark bar, puoi aggiungere windowLightStatusBar/NavigationBar -->
+        <!-- <item name="android:windowLightStatusBar">true</item> -->
+    </style>
 </resources>
