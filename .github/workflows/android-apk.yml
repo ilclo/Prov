@@ -1,0 +1,40 @@
+name: Android APK (debug)
+
+on:
+  # lo vedi e lo puoi far partire a mano dalla tab Actions
+  workflow_dispatch:
+  # facoltativo: lo esegue anche ad ogni push su main
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17 (AGP 8+ richiede Java 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle (cache)
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make gradlew executable (solo se serve)
+        run: chmod +x ./gradlew
+
+      # Se il progetto è multi‑modulo, cambia :app:assembleDebug col tuo modulo (es. :mobile:assembleDebug)
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            **/build/outputs/apk/**/debug/*.apk
