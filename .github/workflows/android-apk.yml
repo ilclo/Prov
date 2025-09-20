@@ -1,37 +1,39 @@
-name: Android APK (no wrapper)
+name: Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-          cache: gradle
+          java-version: 17
 
-      - name: Setup Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          # Scegli la versione coerente con il tuo progetto
-          gradle-version: 8.8
+      - name: Install SDK packages
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
-      - name: Build Debug APK
-        run: gradle :app:assembleDebug
+      # Usa Gradle senza wrapper: il build-action installerà Gradle 8.7
+      - name: Gradle assembleDebug
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: "8.7"
+          arguments: assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
