@@ -1,11 +1,7 @@
 <resources>
-    <!-- Tema app Compose: niente ActionBar, status bar trasparente -->
-    <style name="Theme.AppBuilder" parent="Theme.Material3.DayNight">
-        <!-- Disattiva ActionBar/titolo finestra -->
-        <item name="windowNoTitle">true</item>
-        <item name="windowActionBar">false</item>
-
-        <!-- Aspetto di sistema (opzionale) -->
+    <!-- Tema dell’app: eredita un M3 DayNight con NoActionBar già integrato -->
+    <style name="Theme.AppBuilder" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Esempi opzionali, non essenziali per il linking -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/black</item>
     </style>
