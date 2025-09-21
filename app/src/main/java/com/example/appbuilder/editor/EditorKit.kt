@@ -1,5 +1,44 @@
 package com.example.appbuilder.editor
 
+// Kotlin & Android
+import android.net.Uri
+import java.util.UUID
+import kotlin.math.max
+import kotlin.math.min
+
+// Compose runtime
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+
+// Compose UI (grafica, unità, testo, forme)
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
+
+// Foundation (layout, gesture, canvas)
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+// Material3
+import androidx.compose.material3.*    // Surface, Button, Text, Icon, FilterChip, ElevatedFilterChip, ecc.
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedCard
+
+// Icone Material
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -12,7 +51,13 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.BorderColor
+import androidx.compose.material.icons.filled.Collections
+
+// Activity result (picker immagini)
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+
 
 /* ==========================================================
  *  # MODEL — document / nodes / styles (minimal v0)
