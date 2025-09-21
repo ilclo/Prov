@@ -49,16 +49,19 @@ android {
 }
 
 dependencies {
+    // Compose BOM + Compose UI
     implementation(platform("androidx.compose:compose-bom:2024.09.02"))
-
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.9.3")
-
-    // per le Icone (ColorLens, Crop, Image, TextFields, Tune, ContentCopy, Delete, etc.)
     implementation("androidx.compose.material:material-icons-extended")
-
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // ✅ Material Components (porta i temi Theme.Material3.* per il View system)
+    implementation("com.google.android.material:material:1.12.0")
+
+    // (FACOLTATIVO) AppCompat, se volessi usare attributi tipo windowActionBar
+    // implementation("androidx.appcompat:appcompat:1.7.0")
 }
