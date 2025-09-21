@@ -1,48 +1,23 @@
 package com.example.appbuilder.editor
 
-// Kotlin & Android
 import android.net.Uri
-import java.util.UUID
-import kotlin.math.max
-import kotlin.math.min
-
-// Compose runtime
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-
-// Compose UI (grafica, unità, testo, forme)
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.input.pointer.pointerInput
-
-// Foundation (layout, gesture, canvas)
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-
-// Material3
-import androidx.compose.material3.*    // Surface, Button, Text, Icon, FilterChip, ElevatedFilterChip, ecc.
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedCard
-
-// Icone Material
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Delete
@@ -50,14 +25,26 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.BorderColor
-import androidx.compose.material.icons.filled.Collections
-
-// Activity result (picker immagini)
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.sp
+import kotlin.math.max
+import kotlin.math.min
+import java.util.UUID
 
 /* ==========================================================
  *  # MODEL — document / nodes / styles (minimal v0)
@@ -391,7 +378,10 @@ private fun EditorCanvas(
             Box(
                 Modifier
                     .offset { IntOffset(rectPx.left, rectPx.top) }
-                    .size(with(density) { (rectPx.width).toDp() }, with(density) { (rectPx.height).toDp() })
+                    .size(
+                        with(density) { rectPx.width().toDp() },
+                        with(density) { rectPx.height().toDp() }
+                    )
                     .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
             )
@@ -459,8 +449,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(cols: Int,
 
 @Composable
 private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected: Boolean) {
-    val width = with(LocalDensity.current) { (rect.width()).toDp() }
-    val height = with(LocalDensity.current) { (rect.height()).toDp() }
+    val density = LocalDensity.current
+    val width = with(density) { rect.width().toDp() }
+    val height = with(density) { rect.height().toDp() }
     val offset = IntOffset(rect.left, rect.top)
 
     Box(
@@ -488,30 +479,36 @@ private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected:
                         Brush.linearGradient(listOf(Color(0xFF2C2C2C), Color(0xFF111111))) // placeholder
                 }
 
-                val cardColors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                val base = when (node.style.variant) {
+                    Variant.Text -> Modifier
+                    Variant.TopBottom -> Modifier.drawBehind {
+                        val h = size.height * 0.12f
+                        drawRect(
+                            color = node.style.color1,
+                            size = androidx.compose.ui.geometry.Size(size.width, h)
+                        )
+                        drawRect(
+                            color = node.style.color2,
+                            topLeft = Offset(0f, size.height - h),
+                            size = androidx.compose.ui.geometry.Size(size.width, h)
+                        )
+                    }
+                    else -> Modifier.background(bg, shape)
+                }
 
                 val borderModifier =
                     if (node.style.variant == Variant.Outlined || node.style.border.width > 0.dp)
                         Modifier.border(node.style.border.width, node.style.border.color, shape)
                     else Modifier
 
-                val base = when (node.style.variant) {
-                    Variant.Text -> Modifier // solo contenuto, niente fondo
-                    Variant.TopBottom -> Modifier.drawBehind {
-                        // top e bottom band (placeholder)
-                        val h = size.height * 0.12f
-                        drawRect(node.style.color1, size = androidx.compose.ui.geometry.Size(size.width, h))
-                        drawRect(node.style.color2, topLeft = Offset(0f, size.height - h), size = androidx.compose.ui.geometry.Size(size.width, h))
-                    }
-                    else -> Modifier.background(bg, shape)
-                }
+                val cardColors = CardDefaults.cardColors(containerColor = Color.Transparent)
 
                 OutlinedCard(
                     shape = shape,
                     colors = cardColors,
                     modifier = base.then(borderModifier).fillMaxSize()
                 ) {
-                    // (placeholder) contenuti annidati non disegnati in questa demo
+                    // contenuti annidati (placeholder)
                 }
             }
 
@@ -526,14 +523,13 @@ private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected:
                     Text(
                         text = node.text,
                         color = if (node.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else node.color,
-                        fontSize = androidx.compose.ui.unit.sp(node.sizeSp),
+                        fontSize = node.sizeSp.sp,
                         fontWeight = node.weight
                     )
                 }
             }
 
             is ImageNode -> {
-                // placeholder: solo riquadro immagine
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -552,12 +548,15 @@ private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected:
                         .background(Color.Transparent),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Settings, contentDescription = null, tint = if (node.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else node.color)
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = null,
+                        tint = if (node.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else node.color
+                    )
                 }
             }
         }
 
-        // Evidenziazione selezione
         if (selected) {
             Box(
                 Modifier
