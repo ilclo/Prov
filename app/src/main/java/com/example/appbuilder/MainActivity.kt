@@ -12,7 +12,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 // ⬇️ Editor “zero tocco” con griglia e resize
-                AppEditorScreen()
+                EditorDemoScreen()
             }
         }
     }
