@@ -6,14 +6,14 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.example.appbuilder.ui.theme.AppBuilderTheme
-import com.example.appbuilder.editor.EditorMenuOnly
+import com.example.appbuilder.editor.EditorMenusOnly
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme { // il tuo tema Material3
-                com.example.appbuilder.editor.EditorMenuOnly()
+                com.example.appbuilder.editor.EditorMenusOnly()
             }
         }
     }
