@@ -12,11 +12,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            AppBuilderTheme {
-                Surface(color = MaterialTheme.colorScheme.background) {
-                    // Demo: Editor con sfondo bianco e le due barre “menu estetica”
-                    EditorDemoScreen()
-                }
+            MaterialTheme { // il tuo tema Material3
+                com.example.appbuilder.editor.EditorMenuOnlyDemo()
             }
         }
     }
