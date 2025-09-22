@@ -1,5 +1,6 @@
 <resources>
     <style name="Theme.AppBuilder" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Colori di base; il resto lo gestiamo con MaterialTheme in Compose -->
         <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
 </resources>

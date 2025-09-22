@@ -3,8 +3,19 @@ package com.example.appbuilder
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.example.appbuilder.editor.AppEditorScreen
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import com.example.appbuilder.editor.EditorDemoScreen // <-- dal tuo EditorKit
 
-setContent {
-    MenusOnlyScreen()
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MaterialTheme {
+                Surface {
+                    EditorDemoScreen()
+                }
+            }
+        }
+    }
 }

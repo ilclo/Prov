@@ -1,10 +1,10 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Un semplice logo “A” -->
     <path
-        android:fillColor="#58A6FF"
-        android:pathData="M54,18a36,36 0 1,0 0,72a36,36 0 1,0 0,-72z"/>
-    <path
-        android:fillColor="#0D1117"
-        android:pathData="M34,62h40v6h-40zM34,48h40v6h-40z"/>
+        android:fillColor="@android:color/white"
+        android:pathData="M54,18 L86,90 L74,90 L66,72 L42,72 L34,90 L22,90 L54,18 Z M60,60 L54,46 L48,60 Z"/>
 </vector>
