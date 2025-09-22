@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.example.appbuilder.ui.theme.AppBuilderTheme
-import com.example.appbuilder.editor.EditorDemoScreen
+import com.example.appbuilder.editor.EditorMenuOnlyDemo
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
