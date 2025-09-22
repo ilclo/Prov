@@ -3,8 +3,12 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Un semplice logo “A” -->
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M54,18 L86,90 L74,90 L66,72 L42,72 L34,90 L22,90 L54,18 Z M60,60 L54,46 L48,60 Z"/>
+    <group android:scaleX="0.6" android:scaleY="0.6" android:translateX="21.6" android:translateY="21.6">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M10,70 L30,10 L50,70 L42,70 L37,55 L23,55 L18,70 Z M25,48 L35,48 L30,33 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M60,10 L80,10 Q95,10 95,25 Q95,35 85,38 Q98,41 98,55 Q98,70 80,70 L60,70 Z M68,18 L80,18 Q88,18 88,25 Q88,32 80,32 L68,32 Z M68,40 L80,40 Q90,40 90,55 Q90,62 80,62 L68,62 Z" />
+    </group>
 </vector>
