@@ -1,42 +1,37 @@
-package com.example.appbuilder.editor.icons
+package com.example.appbuilder.icons
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
-/**
- * Pacchetto icone per l’editor.
- * Mappate su Material Icons per evitare dipendenze extra.
- */
 object EditorIcons {
-    // Macro categorie
-    val Page: ImageVector = Icons.Filled.Article          // Layout
-    val Text: ImageVector = Icons.Filled.TextFields       // Testo
-    val Container: ImageVector = Icons.Filled.Widgets     // Contenitore (quadrato + cerchio, concetto)
-    val Image: ImageVector = Icons.Filled.Image           // Immagine
-    val Add: ImageVector = Icons.Filled.Add               // Inserisci
+    // Barre / Navigazione
+    val Page: ImageVector = Icons.Filled.Article
 
     // Testo
-    val Underline: ImageVector = Icons.Filled.FormatUnderlined   // "T" sottolineata
-    val Italic: ImageVector = Icons.Filled.FormatItalic          // "T" corsivo
-    val Highlight: ImageVector = Icons.Filled.BorderColor        // tratto evidenziatore
-    val Font: ImageVector = Icons.Filled.FontDownload            // "F" font
-    val Weight: ImageVector = Icons.Filled.FormatBold            // grassetto (G spessa)
-    val Size: ImageVector = Icons.Filled.FormatSize              // T piccola + T grande
-    val TextColor: ImageVector = Icons.Filled.Brush              // pennello
+    val TextUnderline: ImageVector = Icons.Filled.FormatUnderlined
+    val TextItalic: ImageVector     = Icons.Filled.FormatItalic
+    val TextHighlight: ImageVector  = Icons.Filled.BorderTop     // “tratto” orizzontale spesso (appross.)
+    val Font: ImageVector           = Icons.Filled.FontDownload
+    val Weight: ImageVector         = Icons.Filled.FormatBold
+    val Size: ImageVector           = Icons.Filled.FormatSize
+    val TextColor: ImageVector      = Icons.Filled.Brush          // colore testo (nuova opzione)
+
+    // Contenitore
+    val Container: ImageVector      = Icons.Filled.Widgets        // “quadrato + cerchio” (appross.)
+    val Palette1: ImageVector       = Icons.Filled.ColorLens      // “tavolozza + 1” (appross.)
+    val Palette2: ImageVector       = Icons.Filled.ColorLens      // “tavolozza + 2” (appross.)
+    val ShapeSquare: ImageVector    = Icons.Filled.CropSquare     // quadrato vuoto
+    val Variant: ImageVector        = Icons.Filled.TextFields     // “S corsiva” (appross.)
+    val BorderThick: ImageVector    = Icons.Filled.BorderStyle    // bordo spesso (appross.)
+    val Type: ImageVector           = Icons.Filled.TextFields     // “Ty corsivo” (appross.)
 
     // Layout
-    val Gradient: ImageVector = Icons.Filled.SwapVert            // freccia su/giù
-    val FX: ImageVector = Icons.Filled.AutoAwesome               // "FX" concettuale
+    val Gradient: ImageVector       = Icons.Filled.SwapVert       // frecce su/giù
+    val Fx: ImageVector             = Icons.Filled.Tune           // FX (appross.)
 
-    // Contenitore (per futuri sottomenu)
-    val Palette1: ImageVector = Icons.Filled.Palette             // Colore 1
-    val Palette2: ImageVector = Icons.Filled.Palette             // Colore 2
-    val ShapeSquare: ImageVector = Icons.Filled.CropSquare       // Shape quadrato vuoto
-    val ThickBorder: ImageVector = Icons.Filled.CropDin          // bordo spesso
-    val Variant: ImageVector = Icons.Filled.Style                // variante (S stilizzata) – fallback generico
-
-    // Inserisci
-    val Toggle: ImageVector = Icons.Filled.ToggleOn
-    val Slider: ImageVector = Icons.Filled.LinearScale
+    // Aggiungi
+    val IconMenu: ImageVector       = Icons.Filled.SwapVert       // freccia su/giù (appross.) + pennello richiesto
+    val Toggle: ImageVector         = Icons.Filled.ToggleOn
+    val Slider: ImageVector         = Icons.Filled.LinearScale
 }
