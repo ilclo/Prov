@@ -1,119 +1,87 @@
 package com.example.appbuilder.icons
 
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.ImageVector.Builder
-import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.unit.dp
 
 /**
- * EditorIcons: alias a Material Icons + poche icone vettoriali semplici.
- * Nessun uso di Color.* / addOval / cubicTo per massima compatibilità.
+ * Pacchetto icone centralizzato per l'editor.
+ * Mappa nomi semantici → Material Icons (Compose).
+ * Alcune voci usano un fallback Compose quando il nome web non esiste identico su Android.
  */
 object EditorIcons {
-    // --- Azioni progetto/file
-    val Save = Icons.Filled.Save
-    val Delete = Icons.Filled.Delete
-    val Duplicate = Icons.Filled.ContentCopy
-    val Settings = Icons.Filled.Tune
-    val Insert = Icons.Filled.BookmarkAdd
-    val FolderOpen = Icons.Filled.FolderOpen
-    val CreateNewFolder = Icons.Filled.CreateNewFolder
 
-    // --- Categorie
-    val Layout = Icons.Filled.Article  // icona pagina
-    val Text = Icons.Filled.TextFields
-    val Image = Icons.Filled.Image
-    val Album = Icons.Filled.Album
-    val Crop = Icons.Filled.Crop
-    val Color = Icons.Filled.Palette
+    /* — Azioni generali / global — */
+    val Undo: ImageVector       = Icons.Filled.Undo
+    val Redo: ImageVector       = Icons.Filled.Redo
+    val Save: ImageVector       = Icons.Filled.Save
+    val Delete: ImageVector     = Icons.Filled.Delete
+    val Duplicate: ImageVector  = Icons.Filled.ContentCopy
+    val Settings: ImageVector   = Icons.Filled.Settings
+    val Ok: ImageVector         = Icons.Filled.Check
+    val Cancel: ImageVector     = Icons.Filled.Close
+    val Back: ImageVector       = Icons.Filled.ArrowBack
 
-    // --- Conferma
-    val Cancel = Icons.Filled.Cancel
-    val Ok = Icons.Filled.Check
+    /* — Categorie di menù (barra superiore) — */
+    // Richiesti: testo=title, contenitore=add_box, layout=news
+    val Text: ImageVector       = Icons.Filled.Title        // "title"
+    val Container: ImageVector  = Icons.Filled.AddBox       // "add_box"
+    val Layout: ImageVector     = Icons.Filled.Article      // "news" → fallback (Article)
 
-    // --- Testo (icone specifiche richieste)
-    val TextUnderline = Icons.Filled.FormatUnderlined   // T sottolineata
-    val TextItalic = Icons.Filled.FormatItalic          // T corsiva
-    val HighlightStroke = Icons.Filled.Remove           // tratto orizzontale spesso
-    val Font = Icons.Filled.FontDownload                // F di font
-    val Weight = Icons.Filled.FormatBold                // G spessa (concettuale)
-    val Size = Icons.Filled.FormatSize                  // T piccola + T grande
-    val TextColor = Icons.Filled.Brush                  // pennello
+    // Generici
+    val Image: ImageVector      = Icons.Filled.Image
+    val Insert: ImageVector     = Icons.Filled.Add
 
-    // --- Contenitore (categoria: quadrato + cerchio)
-    val Container: ImageVector by lazy {
-        Builder("EditorContainer", 24.dp, 24.dp, 24f, 24f).apply {
-            // Quadrato sinistro
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(3f, 7f); lineTo(11f, 7f); lineTo(11f, 15f); lineTo(3f, 15f); close()
-            }
-            // Cerchio destro ~ poligono
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(21.000f, 11.000f)
-                lineTo(20.464f, 13.000f)
-                lineTo(19.000f, 14.464f)
-                lineTo(17.000f, 15.000f)
-                lineTo(15.000f, 14.464f)
-                lineTo(13.536f, 13.000f)
-                lineTo(13.000f, 11.000f)
-                lineTo(13.536f, 9.000f)
-                lineTo(15.000f, 7.536f)
-                lineTo(17.000f, 7.000f)
-                lineTo(19.000f, 7.536f)
-                lineTo(20.464f, 9.000f)
-                close()
-            }
-        }.build()
-    }
+    /* — Testo (menù) — */
+    // Sottolinea: format_color_text
+    val Underline: ImageVector         = Icons.Filled.FormatColorText
+    // Corsivo: format_italic
+    val Italic: ImageVector            = Icons.Filled.FormatItalic
+    // Evidenzia: format_ink_highlighter → fallback "Highlight"
+    val Highlight: ImageVector         = Icons.Filled.Highlight
+    // Font: custom_typography → fallback "FontDownload"
+    val CustomTypography: ImageVector  = Icons.Filled.FontDownload
+    // Weight: format_bold
+    val Bold: ImageVector              = Icons.Filled.FormatBold
+    // Size: format_size
+    val Size: ImageVector              = Icons.Filled.FormatSize
+    // Colore (menù testo): brush
+    val Brush: ImageVector             = Icons.Filled.Brush
 
-    // --- Contenitore (voci)
-    val Shape = Icons.Filled.CropSquare         // quadrato vuoto
-    val Variant = Icons.Filled.FormatItalic     // S corsiva (concettuale)
-    val Type = Icons.Filled.TextFields          // Ty corsivo (concettuale)
+    /* — Colore (contenitore/layout) — */
+    // Entry "Colore": format_paint
+    val Color: ImageVector             = Icons.Filled.FormatPaint
+    // "Colore 1/2": colors → fallback "Palette"
+    val Colors: ImageVector            = Icons.Filled.Palette
+    // Gradiente: transition_fade → fallback "LinearScale"
+    val Gradient: ImageVector          = Icons.Filled.LinearScale
+    // fx: function
+    val Functions: ImageVector         = Icons.Filled.Functions
 
-    // --- Layout (voci)
-    val Gradient = Icons.Filled.SwapVert        // freccia su e giù
+    /* — Contenitore (altre opzioni) — */
+    // scroll: swipe_vertical → fallback "SwapVert"
+    val SwipeVertical: ImageVector     = Icons.Filled.SwapVert
+    // Shape: square → fallback "CropSquare"
+    val Square: ImageVector            = Icons.Filled.CropSquare
+    // Variant: variables → fallback "ViewModule"
+    val Variant: ImageVector           = Icons.Filled.ViewModule
+    // b_tick: line_weight
+    val LineWeight: ImageVector        = Icons.Filled.LineWeight
+    // Tipo: swipe_right → fallback "SwapHoriz"
+    val SwipeRight: ImageVector        = Icons.Filled.SwapHoriz
 
-    // FX con lettere "FX" disegnate a poligoni
-    val FX: ImageVector by lazy {
-        Builder("FX", 24.dp, 24.dp, 24f, 24f).apply {
-            // Lettera F
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(3f,7f); lineTo(5f,7f); lineTo(5f,17f); lineTo(3f,17f); close()
-                moveTo(5f,7f); lineTo(10f,7f); lineTo(10f,9f); lineTo(5f,9f); close()
-                moveTo(5f,11f); lineTo(9f,11f); lineTo(9f,13f); lineTo(5f,13f); close()
-            }
-            // Lettera X (due losanghe sottili)
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(12f,7f); lineTo(14f,7f); lineTo(21f,17f); lineTo(19f,17f); close()
-            }
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(19f,7f); lineTo(21f,7f); lineTo(14f,17f); lineTo(12f,17f); close()
-            }
-        }.build()
-    }
+    /* — Immagini — */
+    // aggiungi immagine: add_photo_alternate
+    val AddPhotoAlternate: ImageVector = Icons.Filled.AddPhotoAlternate
+    // aggiungi album: perm_media
+    val PermMedia: ImageVector         = Icons.Filled.PermMedia
+    val Crop: ImageVector              = Icons.Filled.Crop
 
-    // --- Menù icona: frecce su/giù + pennello semplice
-    val IconMenu: ImageVector by lazy {
-        Builder("IconMenu", 24.dp, 24.dp, 24f, 24f).apply {
-            // Freccia su
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(4f,14f); lineTo(6f,14f); lineTo(6f,10f); lineTo(8f,10f); lineTo(5f,7f); lineTo(2f,10f); lineTo(4f,10f); close()
-            }
-            // Freccia giù
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(10f,10f); lineTo(12f,10f); lineTo(12f,14f); lineTo(14f,14f); lineTo(11f,17f); lineTo(8f,14f); lineTo(10f,14f); close()
-            }
-            // Pennello stilizzato (manico + punta)
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(16f,8f); lineTo(20f,8f); lineTo(20f,10f); lineTo(16f,10f); close()  // manico
-            }
-            path(pathFillType = PathFillType.NonZero) {
-                moveTo(20f,10f); lineTo(22f,12f); lineTo(18f,12f); close()                 // punta
-            }
-        }.build()
-    }
+    /* — Menù "Aggiungi" — */
+    // icona: cruelty_free → fallback "Pets"
+    val Icon: ImageVector              = Icons.Filled.Pets
+    // toggle: toggle_on
+    val Toggle: ImageVector            = Icons.Filled.ToggleOn
+    // slider: switches → fallback "Tune"
+    val Slider: ImageVector            = Icons.Filled.Tune
 }
