@@ -1,14 +1,11 @@
 package com.example.appbuilder.editor
 
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.material.icons.filled.AutoAwesome // sostituisce Radiology
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -16,8 +13,31 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BorderColor
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedFilterChip
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,19 +49,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.max
 import kotlin.math.min
 import java.util.UUID
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
 
-/* ===========================
- *  MODEL (minimo editor)
- * =========================== */
+/* ==========================================================
+ *  MODEL — document / nodes / styles (minimal v0)
+ * ========================================================== */
 
 enum class BgMode { Color, Gradient, Image, Album }
 enum class Variant { Full, Outlined, Text, TopBottom }
@@ -128,7 +147,9 @@ data class TextNode(
 data class IconNode(
     override val id: String = "icon_" + UUID.randomUUID().toString().take(8),
     override val frame: GridRect,
-    val color: Color = Color.Unspecified
+    val color: Color = Color.Unspecified,
+    val shadow: Dp = 0.dp,
+    val border: BorderStyle = BorderStyle(color = Color.Transparent, width = 0.dp, shadow = 0.dp)
 ): Node
 
 data class ImageNode(
@@ -152,43 +173,9 @@ data class EditorState(
     val isEditor: Boolean = true
 )
 
-/* ===========================
- *  DEMO ENTRY
- * =========================== */
-
-@Composable
-fun ToolbarIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    selected: Boolean = false,          // se vuoi evidenziare uno stato ON/OFF
-    onClick: () -> Unit
-) {
-    val container = when {
-        selected -> MaterialTheme.colorScheme.primary
-        else    -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    val content   = Color.White
-    val containerDisabled = container.copy(alpha = 0.5f)
-    val contentDisabled   = content.copy(alpha = 0.5f)
-
-    FilledIconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.size(44.dp), // pulsante più “importante” di una icon button base
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = container,
-            contentColor = content,
-            disabledContainerColor = containerDisabled,
-            disabledContentColor = contentDisabled
-        )
-    ) {
-        Icon(imageVector = icon, contentDescription = contentDescription)
-    }
-}
-
-
+/* ==========================================================
+ *  ENTRY DEMO — collega per provare
+ * ========================================================== */
 
 @Composable
 fun EditorDemoScreen() {
@@ -197,9 +184,28 @@ fun EditorDemoScreen() {
             EditorState(
                 doc = PageDocument(
                     nodes = listOf(
-                        ContainerNode(frame = GridRect(1, 1, 12, 6)),
-                        TextNode(frame = GridRect(2, 2, 6, 3), text = "Titolo", sizeSp = 22f, weight = FontWeight.SemiBold),
-                        ContainerNode(frame = GridRect(2, 7, 11, 13))
+                        ContainerNode(
+                            frame = GridRect(1, 1, 12, 6),
+                            style = ContainerStyle(name = "Hero", variant = Variant.Full)
+                        ),
+                        TextNode(
+                            frame = GridRect(2, 2, 6, 3),
+                            text = "Titolo pagina",
+                            sizeSp = 22f,
+                            weight = FontWeight.SemiBold
+                        ),
+                        ContainerNode(
+                            frame = GridRect(2, 7, 11, 13),
+                            style = ContainerStyle(
+                                name = "Card base",
+                                variant = Variant.Outlined,
+                                scroll = ScrollMode.Vertical
+                            ),
+                            children = listOf(
+                                TextNode(frame = GridRect(1, 1, 5, 2), text = "Sezione", weight = FontWeight.Bold),
+                                ImageNode(frame = GridRect(7, 1, 10, 4))
+                            )
+                        )
                     )
                 )
             )
@@ -208,36 +214,26 @@ fun EditorDemoScreen() {
     EditorRoot(state = state, onStateChange = { state = it })
 }
 
-/* ===========================
- *  ROOT: tela + menù
- * =========================== */
+/* ==========================================================
+ *  ROOT — tela + menù
+ * ========================================================== */
 
 @Composable
 fun EditorRoot(
     state: EditorState,
     onStateChange: (EditorState) -> Unit
 ) {
-    // Path menù e working styles
-    var menuPath by remember { mutableStateOf<List<String>>(emptyList()) }
+    var menuPath by remember { mutableStateOf<List<String>>(emptyList()) } // es. ["Layout","Immagini"]
     var workingPageStyle by remember { mutableStateOf(state.doc.style) }
     var workingContainerStyle by remember { mutableStateOf<ContainerStyle?>(null) }
-
-    // “Ultima modifica” per il path
-    var lastChanged by remember { mutableStateOf<String?>(null) }
-    var dirty by remember { mutableStateOf(false) }
-    var showConfirm by remember { mutableStateOf(false) }
 
     fun setSelection(id: String?) {
         onStateChange(state.copy(selection = id))
         workingContainerStyle = selectedContainer(state)?.style
     }
 
-    val barBg = Color(0xFF0F172A)    // slate-900
-    val barBg2 = Color(0xFF111827)   // slate-800
-    val iconTint = Color.White
-
     Box(Modifier.fillMaxSize()) {
-        // Tela (sfondo bianco per ora) con griglia e hit test
+        // Tela + griglia + selezione + creazione via tap‑tap
         EditorCanvas(
             doc = state.doc,
             selection = state.selection,
@@ -253,33 +249,52 @@ fun EditorRoot(
                 )
                 workingContainerStyle = newNode.style
                 menuPath = listOf("Contenitore")
-            },
+            }
         )
 
-        // BOTTOM UI
-        EditorBottomArea(
-            isInMenu = menuPath.isNotEmpty(),
+        // Due barre inferiori (menù/categorie + comandi) con spaziatura dinamica
+        EditorBottomBars(
+            state = state,
             menuPath = menuPath,
-            lastChanged = lastChanged,
-            onExitMenu = {
-                if (dirty) showConfirm = true
-                else menuPath = emptyList()
+            onMenuPath = { menuPath = it },
+
+            workingPageStyle = workingPageStyle,
+            onWorkingPageStyle = { workingPageStyle = it },
+
+            workingContainerStyle = workingContainerStyle,
+            onWorkingContainerStyle = { workingContainerStyle = it },
+
+            onApply = {
+                val selectionId = state.selection
+                if (menuPath.firstOrNull() == "Layout") {
+                    onStateChange(state.copy(doc = state.doc.copy(style = workingPageStyle)))
+                } else if (menuPath.firstOrNull() == "Contenitore" && selectionId != null && workingContainerStyle != null) {
+                    val updated = state.doc.nodes.map {
+                        if (it.id == selectionId && it is ContainerNode) it.copy(style = workingContainerStyle!!)
+                        else it
+                    }
+                    onStateChange(state.copy(doc = state.doc.copy(nodes = updated)))
+                }
+                menuPath = emptyList()
             },
-            barBg = barBg,
-            barBg2 = barBg2,
-            iconTint = iconTint,
-
-            // categorie (icone solo)
-            onOpenLayout = { menuPath = listOf("Layout") },
-            onOpenContainer = { menuPath = listOf("Contenitore") },
-            onOpenText = { menuPath = listOf("Testo") },
-            onOpenImage = { menuPath = listOf("Immagine") },
-            onOpenInsert = { menuPath = listOf("Inserisci") },
-
-            // azioni (solo UI, nessuna logica per ora)
-            onUndo = { /* no-op */ },
-            onRedo = { /* no-op */ },
-            onSavePage = { /* no-op */ },
+            onCancel = {
+                workingPageStyle = state.doc.style
+                workingContainerStyle = selectedContainer(state)?.style
+                menuPath = emptyList()
+            },
+            onDuplicate = {
+                state.selection?.let { sel ->
+                    state.doc.nodes.find { it.id == sel }?.let { n ->
+                        val clone = when (n) {
+                            is ContainerNode -> n.copy(id = "cont_" + UUID.randomUUID().toString().take(8))
+                            is TextNode      -> n.copy(id = "text_" + UUID.randomUUID().toString().take(8))
+                            is ImageNode     -> n.copy(id = "img_" + UUID.randomUUID().toString().take(8))
+                            is IconNode      -> n.copy(id = "icon_" + UUID.randomUUID().toString().take(8))
+                        }
+                        onStateChange(state.copy(doc = state.doc.copy(nodes = state.doc.nodes + clone)))
+                    }
+                }
+            },
             onDelete = {
                 state.selection?.let { sel ->
                     onStateChange(
@@ -289,110 +304,14 @@ fun EditorRoot(
                         )
                     )
                 }
-            },
-            onDuplicate = {
-                state.selection?.let { sel ->
-                    state.doc.nodes.find { it.id == sel }?.let { n ->
-                        val clone = when (n) {
-                            is ContainerNode -> n.copy(id = "cont_" + UUID.randomUUID().toString().take(8))
-                            is TextNode -> n.copy(id = "text_" + UUID.randomUUID().toString().take(8))
-                            is ImageNode -> n.copy(id = "img_" + UUID.randomUUID().toString().take(8))
-                            is IconNode -> n.copy(id = "icon_" + UUID.randomUUID().toString().take(8))
-                        }
-                        onStateChange(state.copy(doc = state.doc.copy(nodes = state.doc.nodes + clone)))
-                    }
-                }
-            },
-            onProps = { /* no-op */ },
-            onPageLayout = { menuPath = listOf("Layout") },
-            onCreate = { /* dropdown handled inside bar */ },
-            onList = { /* no-op */ },
-            onSaveProject = { /* no-op */ },
-            onOpen = { /* no-op */ },
-            onNew = { /* no-op */ },
-
-            // Pannello contenuti del menù corrente
-            menuContent = {
-                when (menuPath.firstOrNull()) {
-                    "Layout" -> LayoutMenu(
-                        path = menuPath,
-                        onPath = { menuPath = it },
-                        working = workingPageStyle,
-                        onWorking = {
-                            dirty = true
-                            workingPageStyle = it
-                        },
-                        onChanged = { lastChanged = it }
-                    )
-
-                    "Contenitore" -> ContainerMenu(
-                        path = menuPath,
-                        onPath = { menuPath = it },
-                        working = workingContainerStyle,
-                        onWorking = {
-                            dirty = true
-                            workingContainerStyle = it
-                        },
-                        onChanged = { lastChanged = it }
-                    )
-
-                    "Testo" -> TextMenu(
-                        path = menuPath,
-                        onPath = { menuPath = it },
-                        onChanged = { lastChanged = it; dirty = true }
-                    )
-
-                    "Immagine" -> ImageMenu(
-                        path = menuPath,
-                        onPath = { menuPath = it },
-                        onChanged = { lastChanged = it; dirty = true }
-                    )
-
-                    "Inserisci" -> InsertMenu()
-                }
             }
         )
-
-        // Barra conferma (se esco con modifiche)
-        if (showConfirm) {
-            ConfirmBar(
-                onCancel = {
-                    // annulla: scarta working e chiudi conferma
-                    workingPageStyle = state.doc.style
-                    workingContainerStyle = selectedContainer(state)?.style
-                    dirty = false
-                    showConfirm = false
-                    menuPath = emptyList()
-                },
-                onOk = {
-                    // conferma: applica working
-                    if (menuPath.firstOrNull() == "Layout") {
-                        onStateChange(state.copy(doc = state.doc.copy(style = workingPageStyle)))
-                    } else if (menuPath.firstOrNull() == "Contenitore" && state.selection != null && workingContainerStyle != null) {
-                        val updated = state.doc.nodes.map {
-                            if (it.id == state.selection && it is ContainerNode) it.copy(style = workingContainerStyle!!) else it
-                        }
-                        onStateChange(state.copy(doc = state.doc.copy(nodes = updated)))
-                    }
-                    dirty = false
-                    showConfirm = false
-                    menuPath = emptyList()
-                },
-                onSavePreset = {
-                    // solo UI/placeholder
-                    // mostreremo un dialog “salva come stile…”
-                    dirty = false
-                    showConfirm = false
-                    menuPath = emptyList()
-                }
-            )
-        }
     }
 }
 
-/* ===========================
- *  CANVAS
- * =========================== */
+/* ==========================================================
+ *  CANVAS — disegno pagina + griglia + nodi + selezione
+ * ========================================================== */
 
 @Composable
 private fun EditorCanvas(
@@ -400,7 +319,7 @@ private fun EditorCanvas(
     selection: String?,
     isEditor: Boolean,
     onSelect: (String?) -> Unit,
-    onAddContainerViaGrid: (GridRect) -> Unit
+    onAddContainerViaGrid: (GridRect) -> Unit,
 ) {
     val density = LocalDensity.current
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
@@ -435,17 +354,19 @@ private fun EditorCanvas(
                 )
             }
     ) {
-        // griglia
-        Canvas(Modifier.fillMaxSize()) { drawGrid(doc.gridCols, doc.gridRows, sizePx) }
+        // Griglia di layout
+        Canvas(Modifier.fillMaxSize()) {
+            drawGrid(doc.gridCols, doc.gridRows, sizePx)
+        }
 
-        // nodi
+        // Nodi presenti
         doc.nodes.forEach { node ->
             val rectPx = cellRectPx(node.frame, sizePx, doc.gridCols, doc.gridRows)
             val sel = selection == node.id
             NodeView(node, rectPx, sel)
         }
 
-        // overlay sizing
+        // Overlay sizing (tap‑tap)
         if (startCell != null) {
             val from = startCell!!
             val to = hoveringCell ?: from
@@ -453,7 +374,10 @@ private fun EditorCanvas(
             Box(
                 Modifier
                     .offset { IntOffset(rectPx.left, rectPx.top) }
-                    .size(with(density) { rectPx.width().toDp() }, with(density) { rectPx.height().toDp() })
+                    .size(
+                        with(density) { rectPx.width().toDp() },
+                        with(density) { rectPx.height().toDp() }
+                    )
                     .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
             )
@@ -467,13 +391,14 @@ private fun pageBrush(style: PageStyle): Brush =
         BgMode.Gradient -> {
             val colors = listOf(style.color1, style.color2)
             when ((style.gradientAngleDeg.toInt() % 360 + 360) % 360) {
-                90 -> Brush.verticalGradient(colors)
+                90  -> Brush.verticalGradient(colors)
                 180 -> Brush.horizontalGradient(colors.reversed())
                 270 -> Brush.verticalGradient(colors.reversed())
-                else -> Brush.horizontalGradient(colors)
+                else-> Brush.horizontalGradient(colors)
             }
         }
-        BgMode.Image, BgMode.Album -> Brush.linearGradient(listOf(Color(0xFF101010), Color(0xFF202020)))
+        BgMode.Image, BgMode.Album ->
+            Brush.linearGradient(listOf(Color(0xFF101010), Color(0xFF202020))) // placeholder
     }
 
 private fun hitTest(doc: PageDocument, size: IntSize, x: Float, y: Float): Node? =
@@ -485,9 +410,9 @@ private fun hitTest(doc: PageDocument, size: IntSize, x: Float, y: Float): Node?
 private fun cellRectPx(frame: GridRect, size: IntSize, cols: Int, rows: Int): android.graphics.Rect {
     val cw = size.width / cols.toFloat()
     val rh = size.height / rows.toFloat()
-    val left = ((frame.left - 1) * cw).toInt()
-    val top = ((frame.top - 1) * rh).toInt()
-    val right = (frame.right * cw).toInt()
+    val left   = ((frame.left - 1) * cw).toInt()
+    val top    = ((frame.top - 1) * rh).toInt()
+    val right  = (frame.right * cw).toInt()
     val bottom = (frame.bottom * rh).toInt()
     return android.graphics.Rect(left, top, right, bottom)
 }
@@ -505,6 +430,10 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(cols: Int,
         drawLine(gridColor, Offset(0f, y), Offset(size.width.toFloat(), y), strokeWidth = 1f)
     }
 }
+
+/* ==========================================================
+ *  NODE VIEW — rendering minimo editor‑like
+ * ========================================================== */
 
 @Composable
 private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected: Boolean) {
@@ -527,9 +456,9 @@ private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected:
                     ShapeKind.Circle -> CircleShape
                 }
                 val bg = when (node.style.bgMode) {
-                    BgMode.Color -> Brush.linearGradient(listOf(node.style.color1, node.style.color1))
+                    BgMode.Color    -> Brush.linearGradient(listOf(node.style.color1, node.style.color1))
                     BgMode.Gradient -> Brush.horizontalGradient(listOf(node.style.color1, node.style.color2))
-                    else -> Brush.linearGradient(listOf(Color(0xFF2C2C2C), Color(0xFF111111)))
+                    else            -> Brush.linearGradient(listOf(Color(0xFF2C2C2C), Color(0xFF111111)))
                 }
                 val base = when (node.style.variant) {
                     Variant.Text -> Modifier
@@ -573,13 +502,18 @@ private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected:
                         .border(1.dp, Color(0x33000000), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Image, , contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Icon(Icons.Filled.Image, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
             }
 
             is IconNode -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Settings, , contentDescription = null, tint = if (node.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else node.color)
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = null,
+                        tint = if (node.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else node.color
+                    )
                 }
             }
         }
@@ -590,418 +524,331 @@ private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected:
     }
 }
 
-/* ===========================
- *  BOTTOM AREA (barre)
- * =========================== */
+/* ==========================================================
+ *  BOTTOM BARS — breadcrumb + menù corrente + azioni + OK/Annulla
+ * ========================================================== */
 
 @Composable
-private fun BoxScope.EditorBottomArea(
-    isInMenu: Boolean,
+private fun BoxScope.EditorBottomBars(
+    state: EditorState,
     menuPath: List<String>,
-    lastChanged: String?,
-    onExitMenu: () -> Unit,
-    barBg: Color,
-    barBg2: Color,
-    iconTint: Color,
+    onMenuPath: (List<String>) -> Unit,
 
-    onOpenLayout: () -> Unit,
-    onOpenContainer: () -> Unit,
-    onOpenText: () -> Unit,
-    onOpenImage: () -> Unit,
-    onOpenInsert: () -> Unit,
+    workingPageStyle: PageStyle,
+    onWorkingPageStyle: (PageStyle) -> Unit,
 
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onSavePage: () -> Unit,
-    onDelete: () -> Unit,
-    onDuplicate: () -> Unit,
-    onProps: () -> Unit,
-    onPageLayout: () -> Unit,
-    onCreate: () -> Unit,
-    onList: () -> Unit,
-    onSaveProject: () -> Unit,
-    onOpen: () -> Unit,
-    onNew: () -> Unit,
+    workingContainerStyle: ContainerStyle?,
+    onWorkingContainerStyle: (ContainerStyle?) -> Unit,
 
-    menuContent: @Composable () -> Unit
-) {
-    var actionsHeightPx by remember { mutableStateOf(0) }
-
-    // ——— Quando NON sono nei sottomenu: due barre sempre visibili (categorie + azioni)
-    if (!isInMenu) {
-        // Barra AZIONI (in basso)
-        Surface(
-            color = barBg,
-            tonalElevation = 8.dp,
-            shadowElevation = 8.dp,
-            shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .onGloballyPositioned { actionsHeightPx = it.size.height }
-                .windowInsetsPadding(WindowInsets.ime)
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ToolbarIconButton(onClick = onUndo) { Icon(Icons.Filled.Undo, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onRedo) { Icon(Icons.Filled.Redo, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onSavePage) { Icon(Icons.Filled.Save, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onDuplicate) { Icon(Icons.Filled.ContentCopy, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onProps) { Icon(Icons.Filled.Settings, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onPageLayout) { Icon(Icons.Filled.Tune, , contentDescription = null, tint = iconTint) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // “Crea” con dropdown stub
-                    var openCreate by remember { mutableStateOf(false) }
-                    Box {
-                        ToolbarIconButton(onClick = { openCreate = true }) { Icon(Icons.Filled.Add, , contentDescription = null, tint = iconTint) }
-                        DropdownMenu(expanded = openCreate, onDismissRequest = { openCreate = false }) {
-                            DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { openCreate = false })
-                            DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { openCreate = false })
-                            DropdownMenuItem(text = { Text("Menù laterale") }, onClick = { openCreate = false })
-                            DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { openCreate = false })
-                        }
-                    }
-                    ToolbarIconButton(onClick = onList) { Icon(Icons.Filled.List, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onSaveProject) { Icon(Icons.Filled.SaveAs, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onOpen) { Icon(Icons.Filled.FolderOpen, , contentDescription = null, tint = iconTint) }
-                    ToolbarIconButton(onClick = onNew) { Icon(Icons.Filled.CreateNewFolder, , contentDescription = null, tint = iconTint) }
-                }
-            }
-        }
-
-        // Barra CATEGORIE (sopra)
-        Surface(
-            color = barBg2,
-            tonalElevation = 6.dp,
-            shadowElevation = 6.dp,
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.ime)
-                .padding(
-                    start = 12.dp, end = 12.dp,
-                    bottom = with(LocalDensity.current) { actionsHeightPx.toDp() + 8.dp }
-                )
-        ) {
-            val s = rememberScrollState()
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(s)
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ToolbarIconButton(onClick = onOpenLayout) { Icon(Icons.Filled.Tune, , contentDescription = null, tint = iconTint) }
-                ToolbarIconButton(onClick = onOpenContainer) { Icon(Icons.Filled.Widgets, , contentDescription = null, tint = iconTint) }
-                ToolbarIconButton(onClick = onOpenText) { Icon(Icons.Filled.TextFields, , contentDescription = null, tint = iconTint) }
-                ToolbarIconButton(onClick = onOpenImage) { Icon(Icons.Filled.Image, , contentDescription = null, tint = iconTint) }
-                ToolbarIconButton(onClick = onOpenInsert) { Icon(Icons.Filled.Add, , contentDescription = null, tint = iconTint) }
-            }
-        }
-    } else {
-        // ——— Nei sottomenu: compare PATH + pannello menu
-        val bread = buildString {
-            append(menuPath.joinToString(" → "))
-            lastChanged?.let { append("  •  "); append(it) }
-        }
-
-        // Path bar
-        Surface(
-            color = barBg2,
-            tonalElevation = 6.dp,
-            shadowElevation = 6.dp,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.ime)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ToolbarIconButton(onClick = onExitMenu) { Icon(Icons.Filled.ArrowBack, , contentDescription = null, tint = Color.White) }
-                Text(bread, color = Color.White, style = MaterialTheme.typography.labelLarge)
-            }
-        }
-
-        // Menu panel (sopra la path bar)
-        Surface(
-            color = barBg,
-            tonalElevation = 8.dp,
-            shadowElevation = 8.dp,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.ime)
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 60.dp)
-        ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                menuContent()
-            }
-        }
-    }
-}
-
-/* ===========================
- *  MINI CONFIRM BAR
- * =========================== */
-
-@Composable
-private fun BoxScope.ConfirmBar(
+    onApply: () -> Unit,
     onCancel: () -> Unit,
-    onOk: () -> Unit,
-    onSavePreset: () -> Unit
+    onDuplicate: () -> Unit,
+    onDelete: () -> Unit,
 ) {
+    var mainBarHeightPx by remember { mutableStateOf(0) }
+
+    // Barra comandi (sotto)
     Surface(
-        color = Color(0xFF0B1220),
-        tonalElevation = 10.dp,
-        shadowElevation = 10.dp,
-        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 8.dp,
+        shadowElevation = 8.dp,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(12.dp)
+            .windowInsetsPadding(WindowInsets.ime)
+            .onGloballyPositioned { mainBarHeightPx = it.size.height }
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(
             Modifier.fillMaxWidth().padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Salvare le modifiche?", color = Color.White, modifier = Modifier.weight(1f))
-            TextButton(onClick = onCancel) { Icon(Icons.Filled.Close, , contentDescription = null, tint = Color.White) }
-            TextButton(onClick = onSavePreset) { Icon(Icons.Filled.BookmarkAdd, , contentDescription = null, tint = Color.White) }
-            Button(onClick = onOk) { Icon(Icons.Filled.Check, , contentDescription = null,) }
+            val bread = if (menuPath.isEmpty())
+                "Seleziona un menù (Layout / Contenitore / Testo / Immagine / Inserisci)"
+            else
+                menuPath.joinToString("  →  ")
+            Text(bread, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onDuplicate, enabled = state.selection != null) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "Duplica")
+                }
+                IconButton(onClick = onDelete, enabled = state.selection != null) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Elimina")
+                }
+                TextButton(onClick = onCancel) {
+                    Icon(Icons.Filled.Close, contentDescription = "Annulla")
+                    Spacer(Modifier.width(4.dp)); Text("Annulla")
+                }
+                Button(onClick = onApply) {
+                    Icon(Icons.Filled.Check, contentDescription = "OK")
+                    Spacer(Modifier.width(4.dp)); Text("OK")
+                }
+            }
+        }
+    }
+
+    // Barra categorie/menù (sopra) — spaziata dinamicamente rispetto alla barra comandi
+    val bottomPad = with(LocalDensity.current) { mainBarHeightPx.toDp() + 8.dp }
+    Surface(
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.ime)
+            .padding(horizontal = 12.dp)
+            .padding(bottom = bottomPad)
+    ) {
+        val scroll = rememberScrollState()
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scroll)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (menuPath.isEmpty()) {
+                ElevatedFilterChip(
+                    selected = false,
+                    onClick = { onMenuPath(listOf("Layout")) },
+                    label = { Text("Layout") },
+                    leadingIcon = { Icon(Icons.Filled.Tune, contentDescription = null) }
+                )
+                ElevatedFilterChip(
+                    selected = false,
+                    onClick = { onMenuPath(listOf("Contenitore")) },
+                    label = { Text("Contenitore") },
+                    leadingIcon = { Icon(Icons.Filled.BorderColor, contentDescription = null) }
+                )
+                ElevatedFilterChip(
+                    selected = false,
+                    onClick = { onMenuPath(listOf("Testo")) },
+                    label = { Text("Testo") },
+                    leadingIcon = { Icon(Icons.Filled.TextFields, contentDescription = null) }
+                )
+                ElevatedFilterChip(
+                    selected = false,
+                    onClick = { onMenuPath(listOf("Immagine")) },
+                    label = { Text("Immagine") },
+                    leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) }
+                )
+                ElevatedFilterChip(
+                    selected = false,
+                    onClick = { onMenuPath(listOf("Inserisci")) },
+                    label = { Text("Inserisci") },
+                    leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) }
+                )
+            } else {
+                when (menuPath.first()) {
+                    "Layout"      -> LayoutMenu(menuPath, onMenuPath, workingPageStyle, onWorkingPageStyle)
+                    "Contenitore" -> ContainerMenu(menuPath, onMenuPath, workingContainerStyle, onWorkingContainerStyle)
+                    "Testo"       -> TextMenu(menuPath, onMenuPath)
+                    "Immagine"    -> ImageMenu(menuPath, onMenuPath)
+                    "Inserisci"   -> InsertMenu(onMenuPath)
+                }
+            }
         }
     }
 }
 
-/* ===========================
- *  MENU: Layout / Container / Text / Image / Insert
- * =========================== */
+/* -------------------------
+ *  LAYOUT MENU (pagina)
+ * ------------------------- */
 
 @Composable
 private fun LayoutMenu(
     path: List<String>,
     onPath: (List<String>) -> Unit,
     working: PageStyle,
-    onWorking: (PageStyle) -> Unit,
-    onChanged: (String) -> Unit
+    onWorking: (PageStyle) -> Unit
 ) {
     when (path.getOrNull(1)) {
         null -> {
-            ToolbarIconButton(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, , contentDescription = null, tint = Color.White) }
-            ToolbarIconButton(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, , contentDescription = null, tint = Color.White) }
+            FilterChip(
+                selected = false,
+                onClick = { onPath(path + "Colore") },
+                label = { Text("Colore") },
+                leadingIcon = { Icon(Icons.Filled.ColorLens, contentDescription = null) }
+            )
+            FilterChip(
+                selected = false,
+                onClick = { onPath(path + "Immagini") },
+                label = { Text("Immagini") },
+                leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) }
+            )
         }
-
         "Colore" -> {
-            // Colore singolo / gradiente
-            ToggleIcon(
+            FilterChip(
                 selected = working.mode == BgMode.Color,
-                onClick = {
-                    onWorking(working.copy(mode = BgMode.Color))
-                    onChanged("Layout → Colore: singolo")
-                },
-                icon = Icons.Filled.Lens
+                onClick = { onWorking(working.copy(mode = BgMode.Color)) },
+                label = { Text("Colore singolo") }
             )
-            ToggleIcon(
+            FilterChip(
                 selected = working.mode == BgMode.Gradient,
-                onClick = {
-                    onWorking(working.copy(mode = BgMode.Gradient))
-                    onChanged("Layout → Colore: gradiente")
-                },
-                icon = Icons.Filled.LinearScale
+                onClick = { onWorking(working.copy(mode = BgMode.Gradient)) },
+                label = { Text("Gradiente") }
             )
-            // palette rapida (aggiorna color1)
-            listOf(Color(0xFF0EA5E9), Color(0xFF9333EA), Color(0xFFEF4444), Color(0xFF10B981)).forEach { c ->
-                ColorDot(c) {
-                    onWorking(working.copy(color1 = c))
-                    onChanged("Layout → Colore1")
-                }
-            }
-            // seconda tinta
-            Spacer(Modifier.width(8.dp))
-            listOf(Color(0xFF94A3B8), Color(0xFFF59E0B), Color(0xFF22C55E), Color(0xFF3B82F6)).forEach { c ->
-                ColorDot(c) {
-                    onWorking(working.copy(color2 = c, mode = BgMode.Gradient))
-                    onChanged("Layout → Colore2")
-                }
+            listOf(Color(0xFF0EA5E9), Color(0xFF9333EA), Color(0xFFEF4444), Color(0xFF10B981)).forEach {
+                ColorDot(it) { c -> onWorking(working.copy(color1 = c)) }
             }
         }
-
         "Immagini" -> {
             val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-                if (uri != null) {
-                    onWorking(working.copy(mode = BgMode.Image, image = uri))
-                    onChanged("Layout → Immagine: selezionata")
-                }
+                if (uri != null) onWorking(working.copy(mode = BgMode.Image, image = uri))
             }
             val pickAlbum = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-                if (uris.isNotEmpty()) {
-                    onWorking(working.copy(mode = BgMode.Album, album = uris))
-                    onChanged("Layout → Album: ${uris.size} foto")
-                }
+                if (uris.isNotEmpty()) onWorking(working.copy(mode = BgMode.Album, album = uris))
             }
-            OutlinedButton(onClick = { pickImage.launch("image/*") }) { Icon(Icons.Filled.Crop, , contentDescription = null,); Spacer(Modifier.width(6.dp)); Text("Foto") }
-            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) { Icon(Icons.Filled.Collections, , contentDescription = null,); Spacer(Modifier.width(6.dp)); Text("Album") }
+            OutlinedButton(onClick = { pickImage.launch("image/*") }) {
+                Icon(Icons.Filled.Crop, contentDescription = null)
+                Spacer(Modifier.width(6.dp)); Text("Seleziona immagine (crop in step 2)")
+            }
+            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) {
+                Icon(Icons.Filled.Collections, contentDescription = null)
+                Spacer(Modifier.width(6.dp)); Text("Album (multi‑selezione)")
+            }
         }
     }
 }
+
+/* -------------------------
+ *  CONTAINER MENU
+ * ------------------------- */
 
 @Composable
 private fun ContainerMenu(
     path: List<String>,
     onPath: (List<String>) -> Unit,
     working: ContainerStyle?,
-    onWorking: (ContainerStyle?) -> Unit,
-    onChanged: (String) -> Unit
+    onWorking: (ContainerStyle?) -> Unit
 ) {
     val w = working ?: ContainerStyle().also { onWorking(it) }
+
     when (path.getOrNull(1)) {
         null -> {
-            ToolbarIconButton(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, , contentDescription = null, tint = Color.White) }
-            ToolbarIconButton(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, , contentDescription = null, tint = Color.White) }
-            ToolbarIconButton(onClick = { onPath(path + "Scroll") }) { Icon(Icons.Filled.SwapVert, , contentDescription = null, tint = Color.White) }
-            ToolbarIconButton(onClick = { onPath(path + "Forma") }) { Icon(Icons.Filled.CropSquare, , contentDescription = null, tint = Color.White) }
-            ToolbarIconButton(onClick = { onPath(path + "Stile") }) { Icon(Icons.Filled.FlashOn, , contentDescription = null, tint = Color.White) }
-            ToolbarIconButton(onClick = { onPath(path + "Bordi") }) { Icon(Icons.Filled.BorderStyle, , contentDescription = null, tint = Color.White) }
-            ToolbarIconButton(onClick = { onPath(path + "Comportamento") }) { Icon(Icons.Filled.ViewCarousel, , contentDescription = null, tint = Color.White) }
+            FilterChip(false, { onPath(path + "Colore") }, { Text("Colore") },
+                leadingIcon = { Icon(Icons.Filled.ColorLens, contentDescription = null) })
+            FilterChip(false, { onPath(path + "Immagini") }, { Text("Immagini") },
+                leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) })
+            FilterChip(false, { onPath(path + "Scroll") }, { Text("Scrollabilità") })
+            FilterChip(false, { onPath(path + "Forma") }, { Text("Forma/Angoli") })
+            FilterChip(false, { onPath(path + "Stile") }, { Text("Stile") })
+            FilterChip(false, { onPath(path + "Bordi") }, { Text("Bordi/Ombra") })
+            FilterChip(false, { onPath(path + "Comportamento") }, { Text("Tipo") })
+            FilterChip(false, { onPath(path + "Azioni") }, { Text("Azioni (stub)") })
         }
 
         "Colore" -> {
-            ToggleIcon(w.bgMode == BgMode.Color, {
-                onWorking(w.copy(bgMode = BgMode.Color)); onChanged("Contenitore → Colore: singolo")
-            }, Icons.Filled.Lens)
-            ToggleIcon(w.bgMode == BgMode.Gradient, {
-                onWorking(w.copy(bgMode = BgMode.Gradient)); onChanged("Contenitore → Colore: gradiente")
-            }, Icons.Filled.LinearScale)
-
+            FilterChip(w.bgMode == BgMode.Color, { onWorking(w.copy(bgMode = BgMode.Color)) }, { Text("Colore") })
+            FilterChip(w.bgMode == BgMode.Gradient, { onWorking(w.copy(bgMode = BgMode.Gradient)) }, { Text("Gradiente") })
             listOf(Color(0xFFFFFFFF), Color(0xFFF3F4F6), Color(0xFF111827), Color(0xFF0EA5E9)).forEach {
-                ColorDot(it) { c -> onWorking(w.copy(color1 = c)); onChanged("Contenitore → Colore1") }
+                ColorDot(it) { c -> onWorking(w.copy(color1 = c)) }
             }
         }
 
         "Immagini" -> {
             val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-                if (uri != null) { onWorking(w.copy(bgMode = BgMode.Image, image = uri)); onChanged("Contenitore → Immagine") }
+                if (uri != null) onWorking(w.copy(bgMode = BgMode.Image, image = uri))
             }
             val pickAlbum = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-                if (uris.isNotEmpty()) { onWorking(w.copy(bgMode = BgMode.Album, album = uris)); onChanged("Contenitore → Album: ${uris.size} foto") }
+                if (uris.isNotEmpty()) onWorking(w.copy(bgMode = BgMode.Album, album = uris))
             }
-            OutlinedButton(onClick = { pickImage.launch("image/*") }) { Icon(Icons.Filled.Crop, , contentDescription = null,); Spacer(Modifier.width(6.dp)); Text("Foto") }
-            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) { Icon(Icons.Filled.Collections, , contentDescription = null,); Spacer(Modifier.width(6.dp)); Text("Album") }
+            OutlinedButton(onClick = { pickImage.launch("image/*") }) {
+                Icon(Icons.Filled.Crop, contentDescription = null)
+                Spacer(Modifier.width(6.dp)); Text("Seleziona immagine (crop in step 2)")
+            }
+            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) {
+                Icon(Icons.Filled.Collections, contentDescription = null)
+                Spacer(Modifier.width(6.dp)); Text("Album (multi‑selezione)")
+            }
         }
 
         "Scroll" -> {
-            ToggleIcon(w.scroll == ScrollMode.None, { onWorking(w.copy(scroll = ScrollMode.None)); onChanged("Contenitore → Scroll: nessuno") }, Icons.Filled.Block)
-            ToggleIcon(w.scroll == ScrollMode.Vertical, { onWorking(w.copy(scroll = ScrollMode.Vertical)); onChanged("Contenitore → Scroll: verticale") }, Icons.Filled.SwapVert)
-            ToggleIcon(w.scroll == ScrollMode.Horizontal, { onWorking(w.copy(scroll = ScrollMode.Horizontal)); onChanged("Contenitore → Scroll: orizzontale") }, Icons.Filled.SwapHoriz)
+            FilterChip(w.scroll == ScrollMode.None, { onWorking(w.copy(scroll = ScrollMode.None)) }, { Text("Nessuna") })
+            FilterChip(w.scroll == ScrollMode.Vertical, { onWorking(w.copy(scroll = ScrollMode.Vertical)) }, { Text("Verticale") })
+            FilterChip(w.scroll == ScrollMode.Horizontal, { onWorking(w.copy(scroll = ScrollMode.Horizontal)) }, { Text("Orizzontale") })
         }
 
         "Forma" -> {
-            ToggleIcon(w.shape == ShapeKind.Rect, { onWorking(w.copy(shape = ShapeKind.Rect)); onChanged("Contenitore → Forma: rettangolo") }, Icons.Filled.CropSquare)
-            ToggleIcon(w.shape == ShapeKind.RoundedRect, { onWorking(w.copy(shape = ShapeKind.RoundedRect)); onChanged("Contenitore → Forma: arrotondato") }, Icons.Filled.RoundedCorner)
-            ToggleIcon(w.shape == ShapeKind.Circle, { onWorking(w.copy(shape = ShapeKind.Circle)); onChanged("Contenitore → Forma: cerchio") }, Icons.Filled.Radiology)
+            FilterChip(w.shape == ShapeKind.Rect, { onWorking(w.copy(shape = ShapeKind.Rect)) }, { Text("Rettangolo") })
+            FilterChip(w.shape == ShapeKind.RoundedRect, { onWorking(w.copy(shape = ShapeKind.RoundedRect)) }, { Text("Arrotondato") })
+            FilterChip(w.shape == ShapeKind.Circle, { onWorking(w.copy(shape = ShapeKind.Circle)) }, { Text("Cerchio") })
+            if (w.shape != ShapeKind.Circle) {
+                Spacer(Modifier.width(8.dp))
+                listOf(0.dp, 8.dp, 12.dp, 16.dp, 24.dp).forEach { v ->
+                    OutlinedButton(onClick = {
+                        onWorking(w.copy(corners = w.corners.copy(
+                            topStart = v, topEnd = v, bottomStart = v, bottomEnd = v
+                        )))
+                    }) { Text("${v.value.toInt()}dp") }
+                }
+            }
         }
 
         "Stile" -> {
-            ToggleIcon(w.variant == Variant.Full, { onWorking(w.copy(variant = Variant.Full)); onChanged("Contenitore → Stile: full") }, Icons.Filled.InvertColors)
-            ToggleIcon(w.variant == Variant.Outlined, { onWorking(w.copy(variant = Variant.Outlined)); onChanged("Contenitore → Stile: outlined") }, Icons.Filled.CropDin)
-            ToggleIcon(w.variant == Variant.Text, { onWorking(w.copy(variant = Variant.Text)); onChanged("Contenitore → Stile: text") }, Icons.Filled.TextFields)
-            ToggleIcon(w.variant == Variant.TopBottom, { onWorking(w.copy(variant = Variant.TopBottom)); onChanged("Contenitore → Stile: topbottom") }, Icons.Filled.ViewDay)
+            FilterChip(w.variant == Variant.Full, { onWorking(w.copy(variant = Variant.Full)) }, { Text("Full") })
+            FilterChip(w.variant == Variant.Outlined, { onWorking(w.copy(variant = Variant.Outlined)) }, { Text("Outlined") })
+            FilterChip(w.variant == Variant.Text, { onWorking(w.copy(variant = Variant.Text)) }, { Text("Text") })
+            FilterChip(w.variant == Variant.TopBottom, { onWorking(w.copy(variant = Variant.TopBottom)) }, { Text("TopBottom") })
         }
 
         "Bordi" -> {
-            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color.Transparent, width = 0.dp, shadow = 0.dp))); onChanged("Contenitore → Bordi: nessuno") }) { Text("Nessuno") }
-            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color(0x22000000), width = 1.dp))); onChanged("Contenitore → Bordi: leggero") }) { Text("Leggero") }
-            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color(0x55000000), width = 2.dp, shadow = 8.dp))); onChanged("Contenitore → Bordi: evidente") }) { Text("Evidente") }
+            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color.Transparent, width = 0.dp, shadow = 0.dp))) }) { Text("Nessuno") }
+            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color(0x22000000), width = 1.dp))) }) { Text("Leggero") }
+            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color(0x55000000), width = 2.dp, shadow = 8.dp))) }) { Text("Evidente") }
         }
 
         "Comportamento" -> {
-            ToggleIcon(w.behavior == Behavior.Normal, { onWorking(w.copy(behavior = Behavior.Normal)); onChanged("Contenitore → Tipo: normale") }, Icons.Filled.SmartButton)
-            ToggleIcon(w.behavior == Behavior.Paged, { onWorking(w.copy(behavior = Behavior.Paged, pages = max(2, w.pages))); onChanged("Contenitore → Tipo: sfogliabile") }, Icons.Filled.ViewCarousel)
-            ToggleIcon(w.behavior == Behavior.Tabs, { onWorking(w.copy(behavior = Behavior.Tabs, tabsCount = max(2, w.tabsCount))); onChanged("Contenitore → Tipo: tabs") }, Icons.Filled.Tab)
+            FilterChip(w.behavior == Behavior.Normal, { onWorking(w.copy(behavior = Behavior.Normal)) }, { Text("Normale") })
+            FilterChip(w.behavior == Behavior.Paged, { onWorking(w.copy(behavior = Behavior.Paged, pages = max(2, w.pages))) }, { Text("Sfogliabile") })
+            FilterChip(w.behavior == Behavior.Tabs, { onWorking(w.copy(behavior = Behavior.Tabs, tabsCount = max(2, w.tabsCount))) }, { Text("Tabs") })
+        }
+
+        "Azioni" -> {
+            Text("Azioni al tap (placeholder): apri pagina, menù, HTTP, evidenzia, input testo…")
         }
     }
 }
 
+/* -------------------------
+ *  TESTO MENU (placeholder)
+ * ------------------------- */
 @Composable
-private fun TextMenu(
-    path: List<String>,
-    onPath: (List<String>) -> Unit,
-    onChanged: (String) -> Unit
-) {
-    var underline by remember { mutableStateOf(false) }
-    var italic by remember { mutableStateOf(false) }
-
-    ToggleIcon(underline, {
-        underline = !underline; onChanged("Testo → Sottolinea: ${if (underline) "on" else "off"}")
-    }, Icons.Filled.FormatUnderlined)
-
-    ToggleIcon(italic, {
-        italic = !italic; onChanged("Testo → Corsivo: ${if (italic) "on" else "off"}")
-    }, Icons.Filled.FormatItalic)
-
-    // font/weight/size come placeholder (menu a tendina in step successivo)
-    ToolbarIconButton(onClick = { onChanged("Testo → Font…") }) { Icon(Icons.Filled.FontDownload, contentDescription = null, tint = Color.White) }
-    ToolbarIconButton(onClick = { onChanged("Testo → Weight…") }) { Icon(Icons.Filled.FormatBold, contentDescription = null, tint = Color.White) }
-    ToolbarIconButton(onClick = { onChanged("Testo → Size…") }) { Icon(Icons.Filled.FormatSize, contentDescription = null, tint = Color.White) }
+private fun TextMenu(path: List<String>, onPath: (List<String>) -> Unit) {
+    FilterChip(false, {}, { Text("Sottolinea") })
+    FilterChip(false, {}, { Text("Evidenzia") })
+    FilterChip(false, {}, { Text("Font") })
+    FilterChip(false, {}, { Text("Weight") })
+    FilterChip(false, {}, { Text("Size") })
+    FilterChip(false, {}, { Text("Corsivo") })
+    FilterChip(false, {}, { Text("Importa font (.ttf)") })
 }
 
+/* -------------------------
+ *  IMMAGINE MENU (placeholder)
+ * ------------------------- */
 @Composable
-private fun ImageMenu(
-    path: List<String>,
-    onPath: (List<String>) -> Unit,
-    onChanged: (String) -> Unit
-) {
-    ToolbarIconButton(onClick = { onChanged("Immagine → Crop") }) { Icon(Icons.Filled.Crop, contentDescription = null, tint = Color.White) }
-    ToolbarIconButton(onClick = { onChanged("Immagine → Cornice") }) { Icon(Icons.Filled.CropPortrait, contentDescription = null, tint = Color.White) }
-    ToolbarIconButton(onClick = { onChanged("Immagine → Album") }) { Icon(Icons.Filled.Collections, contentDescription = null, tint = Color.White) }
-    ToolbarIconButton(onClick = { onChanged("Immagine → Adattamento") }) { Icon(Icons.Filled.FitScreen, contentDescription = null, tint = Color.White) }
+private fun ImageMenu(path: List<String>, onPath: (List<String>) -> Unit) {
+    FilterChip(false, {}, { Text("Crop (prossimo step)") }, leadingIcon = { Icon(Icons.Filled.Crop, contentDescription = null) })
+    FilterChip(false, {}, { Text("Cornice") })
+    FilterChip(false, {}, { Text("Album") }, leadingIcon = { Icon(Icons.Filled.Collections, contentDescription = null) })
+    FilterChip(false, {}, { Text("Adattamento") })
 }
 
+/* -------------------------
+ *  INSERISCI (creazione via griglia)
+ * ------------------------- */
 @Composable
-private fun InsertMenu() {
-    Text("Suggerimento: tocca due celle della griglia per creare un Contenitore.", color = Color.White)
+private fun InsertMenu(onPath: (List<String>) -> Unit) {
+    Text("Suggerimento: tocca due celle della griglia per creare un Contenitore.")
 }
 
-/* ===========================
- *  UTILS
- * =========================== */
-
-@Composable
-private fun ToggleIcon(selected: Boolean, onClick: () -> Unit, icon: ImageVector) {
-    val bw = if (selected) 2.dp else 1.dp
-    Box(
-        Modifier
-            .size(40.dp)
-            .border(bw, Color.White, CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, contentDescription = null, tint = Color.White)
-    }
-}
+/* ==========================================================
+ *  UTILITY
+ * ========================================================== */
 
 @Composable
 private fun ColorDot(color: Color, onPick: (Color) -> Unit) {
@@ -1010,7 +857,8 @@ private fun ColorDot(color: Color, onPick: (Color) -> Unit) {
             .size(28.dp)
             .background(color, CircleShape)
             .border(1.dp, Color(0x33000000), CircleShape)
-            .clickable { onPick(color) }
+            .padding(2.dp)
+            .pointerInput(Unit) { detectTapGestures { onPick(color) } }
     )
     Spacer(Modifier.width(4.dp))
 }
