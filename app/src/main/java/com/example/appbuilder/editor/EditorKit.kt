@@ -793,7 +793,7 @@ private fun AddLevel(
     if (path.getOrNull(1) == null) {
         ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
         ToolbarIconButton(Icons.Filled.ToggleOn, "Toggle") { onEnter("Toggle") }
-        ToolbarIconButton(Icons.Filled.Sliders, "Slider") { onEnter("Slider") }
+        ToolbarIconButton(Icons.Filled.sliders, "Slider") { onEnter("Slider") }
     } else {
         // placeholder: solo navigazione visiva
         ElevatedCard(
