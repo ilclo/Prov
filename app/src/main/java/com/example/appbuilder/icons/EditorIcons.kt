@@ -1,35 +1,42 @@
-package com.example.appbuilder.icons
+package com.example.appbuilder.editor.icons
 
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
- * Pacchetto icone centralizzato per l'editor.
- * Mappa nomi semantici → Material Icons, così in futuro puoi cambiare stile una volta sola.
+ * Pacchetto icone per l’editor.
+ * Mappate su Material Icons per evitare dipendenze extra.
  */
 object EditorIcons {
+    // Macro categorie
+    val Page: ImageVector = Icons.Filled.Article          // Layout
+    val Text: ImageVector = Icons.Filled.TextFields       // Testo
+    val Container: ImageVector = Icons.Filled.Widgets     // Contenitore (quadrato + cerchio, concetto)
+    val Image: ImageVector = Icons.Filled.Image           // Immagine
+    val Add: ImageVector = Icons.Filled.Add               // Inserisci
 
-    /* — Azioni generali / global — */
-    val Undo: ImageVector       = Icons.Filled.Undo
-    val Redo: ImageVector       = Icons.Filled.Redo
-    val Save: ImageVector       = Icons.Filled.Save
-    val Delete: ImageVector     = Icons.Filled.Delete
-    val Duplicate: ImageVector  = Icons.Filled.ContentCopy
-    val Settings: ImageVector   = Icons.Filled.Settings
-    val Ok: ImageVector         = Icons.Filled.Check
-    val Cancel: ImageVector     = Icons.Filled.Close
-    val Back: ImageVector       = Icons.Filled.ArrowBack
+    // Testo
+    val Underline: ImageVector = Icons.Filled.FormatUnderlined   // "T" sottolineata
+    val Italic: ImageVector = Icons.Filled.FormatItalic          // "T" corsivo
+    val Highlight: ImageVector = Icons.Filled.BorderColor        // tratto evidenziatore
+    val Font: ImageVector = Icons.Filled.FontDownload            // "F" font
+    val Weight: ImageVector = Icons.Filled.FormatBold            // grassetto (G spessa)
+    val Size: ImageVector = Icons.Filled.FormatSize              // T piccola + T grande
+    val TextColor: ImageVector = Icons.Filled.Brush              // pennello
 
-    /* — Categorie di menù (barra superiore) — */
-    val Layout: ImageVector     = Icons.Filled.Tune
-    val Container: ImageVector  = Icons.Filled.Widgets    // sostituisce BorderColor
-    val Text: ImageVector       = Icons.Filled.TextFields
-    val Image: ImageVector      = Icons.Filled.Image
-    val Insert: ImageVector     = Icons.Filled.Add
+    // Layout
+    val Gradient: ImageVector = Icons.Filled.SwapVert            // freccia su/giù
+    val FX: ImageVector = Icons.Filled.AutoAwesome               // "FX" concettuale
 
-    /* — Opzioni layout/immagini — */
-    val Color: ImageVector      = Icons.Filled.ColorLens
-    val Crop: ImageVector       = Icons.Filled.Crop
-    val Album: ImageVector      = Icons.Filled.Collections
+    // Contenitore (per futuri sottomenu)
+    val Palette1: ImageVector = Icons.Filled.Palette             // Colore 1
+    val Palette2: ImageVector = Icons.Filled.Palette             // Colore 2
+    val ShapeSquare: ImageVector = Icons.Filled.CropSquare       // Shape quadrato vuoto
+    val ThickBorder: ImageVector = Icons.Filled.CropDin          // bordo spesso
+    val Variant: ImageVector = Icons.Filled.Style                // variante (S stilizzata) – fallback generico
+
+    // Inserisci
+    val Toggle: ImageVector = Icons.Filled.ToggleOn
+    val Slider: ImageVector = Icons.Filled.LinearScale
 }
