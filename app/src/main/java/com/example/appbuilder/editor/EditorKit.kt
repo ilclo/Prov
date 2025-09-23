@@ -1,510 +1,587 @@
 package com.example.appbuilder.editor
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedFilterChip
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.max
-import kotlin.math.min
-import java.util.UUID
-import androidx.compose.foundation.layout.imePadding
 
-/* ==========================================================
- *  MODEL — document / nodes / styles (minimal v0)
- * ========================================================== */
-
-enum class BgMode { Color, Gradient, Image, Album }
-enum class Variant { Full, Outlined, Text, TopBottom }
-enum class ShapeKind { Rect, RoundedRect, Circle }
-enum class ScrollMode { None, Vertical, Horizontal }
-enum class Behavior { Normal, Paged, Tabs }
-
-data class PageStyle(
-    val mode: BgMode = BgMode.Color,
-    val color1: Color = Color.White,
-    val color2: Color = Color(0xFFF5F5F5),
-    val gradientAngleDeg: Float = 0f,
-    val image: Uri? = null,
-    val album: List<Uri> = emptyList(),
-    val pageFlipAnim: String = "none",
-    val pageFlipSpeed: Float = 1.0f
-)
-
-data class BorderStyle(
-    val color: Color = Color(0x33000000),
-    val width: Dp = 1.dp,
-    val shadow: Dp = 4.dp
-)
-
-data class CornerStyle(
-    val topStart: Dp = 12.dp,
-    val topEnd: Dp = 12.dp,
-    val bottomStart: Dp = 12.dp,
-    val bottomEnd: Dp = 12.dp
-)
-
-data class ContainerStyle(
-    val name: String = "contenitore ${UUID.randomUUID().toString().take(4)}",
-    val isDefault: Boolean = false,
-    val variant: Variant = Variant.Full,
-    val shape: ShapeKind = ShapeKind.RoundedRect,
-    val corners: CornerStyle = CornerStyle(),
-    val border: BorderStyle = BorderStyle(),
-    val bgMode: BgMode = BgMode.Color,
-    val color1: Color = Color(0xFF1F2937),
-    val color2: Color = Color(0xFF111827),
-    val gradientAngleDeg: Float = 90f,
-    val image: Uri? = null,
-    val album: List<Uri> = emptyList(),
-    val pageFlipAnim: String = "none",
-    val pageFlipSpeed: Float = 1.0f,
-    val scroll: ScrollMode = ScrollMode.None,
-    val behavior: Behavior = Behavior.Normal,
-    val pages: Int = 1,
-    val tabsCount: Int = 0,
-    val tabsShape: String = "underline",
-)
-
-data class GridRect(
-    val c0: Int, val r0: Int,
-    val c1: Int, val r1: Int
-) {
-    val left get() = min(c0, c1)
-    val right get() = max(c0, c1)
-    val top get() = min(r0, r1)
-    val bottom get() = max(r0, r1)
-}
-
-sealed interface Node {
-    val id: String
-    val frame: GridRect
-}
-
-data class ContainerNode(
-    override val id: String = "cont_" + UUID.randomUUID().toString().take(8),
-    override val frame: GridRect,
-    val style: ContainerStyle = ContainerStyle(),
-    val children: List<Node> = emptyList()
-) : Node
-
-data class TextNode(
-    override val id: String = "text_" + UUID.randomUUID().toString().take(8),
-    override val frame: GridRect,
-    val text: String = "Testo",
-    val fontFamily: String? = null,
-    val weight: FontWeight = FontWeight.Medium,
-    val sizeSp: Float = 16f,
-    val underline: Boolean = false,
-    val highlight: Boolean = false,
-    val highlightColor: Color = Color.Yellow.copy(alpha = 0.3f),
-    val italic: Boolean = false,
-    val color: Color = Color.Unspecified
-) : Node
-
-data class IconNode(
-    override val id: String = "icon_" + UUID.randomUUID().toString().take(8),
-    override val frame: GridRect,
-    val color: Color = Color.Unspecified,
-    val shadow: Dp = 0.dp,
-    val border: BorderStyle = BorderStyle(color = Color.Transparent, width = 0.dp, shadow = 0.dp)
-) : Node
-
-data class ImageNode(
-    override val id: String = "img_" + UUID.randomUUID().toString().take(8),
-    override val frame: GridRect,
-    val uri: Uri? = null,
-    val fit: String = "cover", // contain / cover / fill / fitWidth / fitHeight
-    val crop: String? = null   // in futuro passeremo un rect di crop
-) : Node
-
-/* Documento pagina (per ora una sola pagina) */
-data class PageDocument(
-    val gridCols: Int = 12,
-    val gridRows: Int = 24,
-    val style: PageStyle = PageStyle(),
-    val nodes: List<Node> = emptyList()
-)
-
-data class EditorState(
-    val doc: PageDocument = PageDocument(),
-    val selection: String? = null,
-    val isEditor: Boolean = true
-)
-
-/* ==========================================================
- *  ENTRY DEMO — schermata di prova
- * ========================================================== */
+/* ============================================================================
+ *  MENUS-ONLY: niente canvas/oggetti. Solo estetica e navigazione dei menù.
+ *  - Due barre scure sempre visibili (icone bianche) quando NON sei in un sotto-menù
+ *  - Se entri in Layout/Contenitore/Testo/Aggiungi: le barre spariscono,
+ *    compaiono pannellini di opzioni + breadcrumb in basso;
+ *    se hai toccato qualche opzione → “uscendo” vedi la barra Annulla/OK/Salva.
+ * ============================================================================ */
 
 @Composable
-fun EditorDemoScreen() {
-    // Per questa fase mostriamo solo i menù; lo sfondo non è interattivo.
-    var state by remember {
-        mutableStateOf(
-            EditorState(doc = PageDocument(style = PageStyle()))
-        )
-    }
-    EditorRoot(state = state, onStateChange = { state = it })
+fun EditorScreen() {
+    MenusOnlyEditor()
 }
 
-/* ==========================================================
- *  ROOT — canvas neutro + menù
- * ========================================================== */
+private enum class TopMenu { Layout, Contenitore, Testo, Aggiungi }
+
+/** Stato locale “solo menù” */
+private data class MenusState(
+    val activeTop: TopMenu? = null,            // quale menù principale è aperto
+    val path: List<String> = emptyList(),      // es. ["Contenitore", "Bordi", "Spessore"]
+    val lastEdited: String? = null,            // stringa sintetica dell’ultima opzione toccata
+    val dirty: Boolean = false,                // true se ci sono modifiche non confermate
+    val showExitConfirm: Boolean = false,      // mostra la barra (o dialog) di conferma uscita
+    // esempi di valori selezionati (solo per UI) — niente azioni
+    val pageColor1: String = "Indigo",
+    val pageColor2: String = "Gray",
+    val pageGradient: String = "Orizzontale",
+    val textUnderline: Boolean = false,
+    val textItalic: Boolean = false,
+    val textFont: String = "Default",
+    val textWeight: String = "Medium",
+    val textSize: String = "16sp"
+)
+
+/** Colori delle barre scure tipo GitHub */
+private val BarBg = Color(0xFF0D1117)
+private val BarBorder = Color(0x1FFFFFFF)
+private val IconTint = Color.White
 
 @Composable
-fun EditorRoot(
-    state: EditorState,
-    onStateChange: (EditorState) -> Unit
-) {
-    // Path del menù corrente (es. ["Layout","Immagini"])
-    var menuPath by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    // Stili “di lavoro” (si confermano con OK)
-    var workingPageStyle by remember { mutableStateOf(state.doc.style) }
-    var workingContainerStyle by remember { mutableStateOf<ContainerStyle?>(null) }
-
-    // Solo estetica: sfondo bianco, non interattivo
-    Box(Modifier.fillMaxSize().background(Color.White)) {
-
-        // === BOTTOM AREA (due barre) ===
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding()                  // si appoggia alla tastiera
-                .padding(bottom = 56.dp),      // “spazio bottombar”
-            verticalArrangement = Arrangement.Bottom
-        ) {
-            // Barra MENÙ corrente (scrollabile)
-            MenuBar(
-                menuPath = menuPath,
-                onMenuPath = { menuPath = it },
-                workingPageStyle = workingPageStyle,
-                onWorkingPageStyle = { workingPageStyle = it },
-                workingContainerStyle = workingContainerStyle,
-                onWorkingContainerStyle = { workingContainerStyle = it },
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            // Barra COMANDI (icone bianche, solo estetica)
-            CommandBar(
-                onUndo = { /* no-op */ },
-                onRedo = { /* no-op */ },
-                onSavePage = { /* no-op */ },
-                onDelete = { /* no-op */ },
-                onDuplicate = { /* no-op */ },
-                onProps = { /* no-op */ },
-                onPage = { menuPath = listOf("Layout") },
-                onCreate = { /* apri menù a tendina in futuro */ },
-                onList = { /* no-op */ },
-                onOk = {
-                    // Applica eventuali modifiche allo stile pagina
-                    if (menuPath.firstOrNull() == "Layout") {
-                        onStateChange(state.copy(doc = state.doc.copy(style = workingPageStyle)))
-                    }
-                    menuPath = emptyList()
-                },
-                onSaveProject = { /* no-op */ },
-                onFolder = { /* no-op */ },
-                onNewProject = { /* no-op */ }
-            )
+private fun MenusOnlyEditor() {
+    var s by remember { mutableStateOf(MenusState()) }
+    val onBack: () -> Unit = {
+        // se sei dentro a un sotto-menù e ci sono modifiche non confermate
+        if (s.activeTop != null && s.dirty && !s.showExitConfirm) {
+            s = s.copy(showExitConfirm = true)
+        } else if (s.activeTop != null) {
+            // esci dal menù
+            s = s.copy(activeTop = null, path = emptyList(), lastEdited = null, dirty = false, showExitConfirm = false)
         }
     }
-}
+    BackHandler(enabled = s.activeTop != null) { onBack() }
 
-/* ==========================================================
- *  BARRA MENÙ (superiore fra le due)
- * ========================================================== */
+    Box(Modifier.fillMaxSize().background(Color.White)) {
+        // Se non sei in un sotto-menù → mostra le due barre in basso
+        if (s.activeTop == null) {
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Barra superiore (categorie: Layout/Contenitore/Testo/Aggiungi)
+                TopCategoryBar(
+                    onLayout = { s = s.copy(activeTop = TopMenu.Layout, path = listOf("Layout")) },
+                    onContainer = { s = s.copy(activeTop = TopMenu.Contenitore, path = listOf("Contenitore")) },
+                    onText = { s = s.copy(activeTop = TopMenu.Testo, path = listOf("Testo")) },
+                    onAdd = { s = s.copy(activeTop = TopMenu.Aggiungi, path = listOf("Aggiungi")) }
+                )
+                // Barra inferiore (comandi generali – icone bianche, scrollabile)
+                BottomActionBar()
+            }
+        } else {
+            // Sei dentro un menù: pannello opzioni + path bar + eventuale conferma uscita
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Pannellino opzioni (orizzontale, chips/dropdown/icons)
+                Surface(
+                    color = BarBg, tonalElevation = 8.dp, shadowElevation = 8.dp,
+                    shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(Modifier.padding(10.dp)) {
+                        when (s.activeTop) {
+                            TopMenu.Layout -> LayoutPanel(s) { s = it }
+                            TopMenu.Contenitore -> ContainerPanel(s) { s = it }
+                            TopMenu.Testo -> TextPanel(s) { s = it }
+                            TopMenu.Aggiungi -> AddPanel(s) { s = it }
+                            null -> {}
+                        }
+                    }
+                }
 
-@Composable
-private fun MenuBar(
-    menuPath: List<String>,
-    onMenuPath: (List<String>) -> Unit,
-    workingPageStyle: PageStyle,
-    onWorkingPageStyle: (PageStyle) -> Unit,
-    workingContainerStyle: ContainerStyle?,
-    onWorkingContainerStyle: (ContainerStyle?) -> Unit,
-) {
-    Surface(
-        tonalElevation = 6.dp,
-        shadowElevation = 6.dp,
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-    ) {
-        val scroll = rememberScrollState()
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(scroll)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (menuPath.isEmpty()) {
-                // Solo icone (layout / contenitore / testo / immagine / aggiungi)
-                IconButton(onClick = { onMenuPath(listOf("Layout")) }) { Icon(Icons.Filled.Description, null, tint = Color.White) }
-                IconButton(onClick = { onMenuPath(listOf("Contenitore")) }) { Icon(Icons.Filled.BorderColor, null, tint = Color.White) }
-                IconButton(onClick = { onMenuPath(listOf("Testo")) }) { Icon(Icons.Filled.TextFields, null, tint = Color.White) }
-                IconButton(onClick = { onMenuPath(listOf("Immagine")) }) { Icon(Icons.Filled.Image, null, tint = Color.White) }
-                IconButton(onClick = { onMenuPath(listOf("Inserisci")) }) { Icon(Icons.Filled.Add, null, tint = Color.White) }
-            } else {
-                when (menuPath.first()) {
-                    "Layout" -> LayoutMenu(menuPath, onMenuPath, workingPageStyle, onWorkingPageStyle)
-                    "Contenitore" -> ContainerMenu(menuPath, onMenuPath, workingContainerStyle, onWorkingContainerStyle)
-                    "Testo" -> TextMenu(menuPath, onMenuPath)   // placeholder estetico
-                    "Immagine" -> ImageMenu(menuPath, onMenuPath) // placeholder estetico
-                    "Inserisci" -> InsertMenu(onMenuPath)       // placeholder
+                // Breadcrumb/path + ultima opzione toccata
+                PathBar(
+                    path = s.path,
+                    last = s.lastEdited,
+                    onBack = {
+                        // se ho modifiche, prima la conferma
+                        if (s.dirty) s = s.copy(showExitConfirm = true)
+                        else s = s.copy(activeTop = null, path = emptyList(), lastEdited = null)
+                    }
+                )
+
+                // Barra conferma uscita (se modifiche fatte)
+                if (s.showExitConfirm) {
+                    ConfirmBar(
+                        onCancel = { // scarta modifiche e chiudi
+                            s = s.copy(activeTop = null, path = emptyList(), lastEdited = null, dirty = false, showExitConfirm = false)
+                        },
+                        onOk = { // tieni modifiche e chiudi
+                            s = s.copy(activeTop = null, path = emptyList(), showExitConfirm = false)
+                        },
+                        onSaveStyle = { // finta “salva come stile”
+                            s = s.copy(showExitConfirm = false)
+                            // Dialog “salva stile con nome”
+                            StyleSaveDialog(
+                                onDismiss = { s = s.copy(showExitConfirm = false) },
+                                onSave = { _ -> s = s.copy(activeTop = null, path = emptyList(), showExitConfirm = false) }
+                            )
+                        }
+                    )
                 }
             }
         }
     }
 }
 
-/* ==========================================================
- *  BARRA COMANDI (inferiore)
- * ========================================================== */
+/* ----------------------------------------------------------
+ *   BARRE INFERIORI (icone bianche, stile scuro GitHub-like)
+ * ---------------------------------------------------------- */
 
 @Composable
-private fun CommandBar(
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onSavePage: () -> Unit,
-    onDelete: () -> Unit,
-    onDuplicate: () -> Unit,
-    onProps: () -> Unit,
-    onPage: () -> Unit,
-    onCreate: () -> Unit,
-    onList: () -> Unit,
-    onOk: () -> Unit,
-    onSaveProject: () -> Unit,
-    onFolder: () -> Unit,
-    onNewProject: () -> Unit,
+private fun TopCategoryBar(
+    onLayout: () -> Unit,
+    onContainer: () -> Unit,
+    onText: () -> Unit,
+    onAdd: () -> Unit
 ) {
     Surface(
-        tonalElevation = 8.dp,
-        shadowElevation = 8.dp,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        modifier = Modifier
+        color = BarBg, tonalElevation = 8.dp, shadowElevation = 8.dp,
+        shape = RoundedCornerShape(16.dp), modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
     ) {
+        val scroll = rememberScrollState()
         Row(
             Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
+                .horizontalScroll(scroll)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                IconButton(onClick = onUndo) { Icon(Icons.Filled.Undo, null, tint = Color.White) }
-                IconButton(onClick = onRedo) { Icon(Icons.Filled.Redo, null, tint = Color.White) }
-                IconButton(onClick = onSavePage) { Icon(Icons.Filled.Save, null, tint = Color.White) }
-                IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, null, tint = Color.White) }
-                IconButton(onClick = onDuplicate) { Icon(Icons.Filled.ContentCopy, null, tint = Color.White) }
-                IconButton(onClick = onProps) { Icon(Icons.Filled.Settings, null, tint = Color.White) }
-                IconButton(onClick = onPage) { Icon(Icons.Filled.Description, null, tint = Color.White) }
-                IconButton(onClick = onCreate) { Icon(Icons.Filled.CreateNewFolder, null, tint = Color.White) }
-                IconButton(onClick = onList) { Icon(Icons.Filled.List, null, tint = Color.White) }
+            ActionIcon(Icons.Filled.Tune, "Layout", onClick = onLayout)
+            ActionIcon(Icons.Filled.Settings, "Contenitore", onClick = onContainer)
+            ActionIcon(Icons.Filled.TextFields, "Testo", onClick = onText)
+            ActionIcon(Icons.Filled.Add, "Aggiungi", onClick = onAdd)
+        }
+    }
+}
+
+@Composable
+private fun BottomActionBar() {
+    Surface(
+        color = BarBg, tonalElevation = 8.dp, shadowElevation = 8.dp,
+        shape = RoundedCornerShape(16.dp), modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+    ) {
+        val scroll = rememberScrollState()
+        var showCreate by remember { mutableStateOf(false) }
+        var showList by remember { mutableStateOf(false) }
+
+        Row(
+            Modifier
+                .horizontalScroll(scroll)
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .heightIn(min = 56.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                ActionIcon(Icons.Filled.ArrowBack, "Indietro") { }
+                ActionIcon(Icons.Filled.ArrowForward, "Avanti") { }
+                ActionIcon(Icons.Filled.Save, "Salva pagina") { }
+                ActionIcon(Icons.Filled.Delete, "Elimina") { }
+                ActionIcon(Icons.Filled.ContentCopy, "Duplica") { }
+                ActionIcon(Icons.Filled.Settings, "Proprietà") { }
+                ActionIcon(Icons.Filled.Tune, "Layout pagina") { }
+                Box {
+                    ActionIcon(Icons.Filled.Add, "Crea") { showCreate = !showCreate }
+                    DropdownMenu(expanded = showCreate, onDismissRequest = { showCreate = false }) {
+                        DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { showCreate = false })
+                        DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { showCreate = false })
+                        DropdownMenuItem(text = { Text("Nuovo menù laterale") }, onClick = { showCreate = false })
+                        DropdownMenuItem(text = { Text("Nuovo menù centrale") }, onClick = { showCreate = false })
+                    }
+                }
+                Box {
+                    ActionIcon(Icons.Filled.List, "Elenco") { showList = !showList }
+                    DropdownMenu(expanded = showList, onDismissRequest = { showList = false }) {
+                        DropdownMenuItem(text = { Text("Pagine create") }, onClick = { showList = false })
+                        DropdownMenuItem(text = { Text("Avvisi creati") }, onClick = { showList = false })
+                        DropdownMenuItem(text = { Text("Menù creati") }, onClick = { showList = false })
+                    }
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                // Ok conferma (per ora solo estetica; in EditorRoot applichiamo lo stile Layout)
-                FilledIconButton(onClick = onOk) { Icon(Icons.Filled.Check, null, tint = Color.White) }
-                IconButton(onClick = onSaveProject) { Icon(Icons.Filled.SaveAs, null, tint = Color.White) }
-                IconButton(onClick = onFolder) { Icon(Icons.Filled.FolderOpen, null, tint = Color.White) }
-                IconButton(onClick = onNewProject) { Icon(Icons.Filled.NoteAdd, null, tint = Color.White) }
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                ActionIcon(Icons.Filled.Check, "OK") { /* conferma proprietà correnti (futuro) */ }
+                ActionIcon(Icons.Filled.Cloud, "Salva progetto") { }
+                ActionIcon(Icons.Filled.FolderOpen, "Apri/Importa") { }
+                ActionIcon(Icons.Filled.CreateNewFolder, "Nuovo progetto") { }
             }
         }
     }
 }
 
-/* ==========================================================
- *  MENU: LAYOUT (pagina)
- * ========================================================== */
+@Composable
+private fun ActionIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+        Icon(icon, contentDescription = desc, tint = IconTint)
+    }
+}
+
+/* ---------------------------
+ *  PATH + CONFERMA USCITA
+ * --------------------------- */
 
 @Composable
-private fun LayoutMenu(
-    path: List<String>,
-    onPath: (List<String>) -> Unit,
-    working: PageStyle,
-    onWorking: (PageStyle) -> Unit
+private fun PathBar(path: List<String>, last: String?, onBack: () -> Unit) {
+    Surface(
+        color = BarBg, tonalElevation = 8.dp, shadowElevation = 8.dp,
+        shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ActionIcon(Icons.Filled.ArrowBack, "Indietro", onClick)
+            val text = buildString {
+                append(path.joinToString("  →  "))
+                if (!last.isNullOrBlank()) { append("  —  "); append(last) }
+            }
+            Text(text, color = Color.White, modifier = Modifier.padding(start = 6.dp))
+        }
+    }
+}
+
+@Composable
+private fun ConfirmBar(
+    onCancel: () -> Unit,
+    onOk: () -> Unit,
+    onSaveStyle: () -> Unit
 ) {
-    when (path.getOrNull(1)) {
-        null -> {
-            IconButton(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, null, tint = Color.White) }
-        }
-
-        "Colore" -> {
-            SuggestChip(selected = working.mode == BgMode.Color, onClick = { onWorking(working.copy(mode = BgMode.Color)) }, label = { Text("Colore") })
-            SuggestChip(selected = working.mode == BgMode.Gradient, onClick = { onWorking(working.copy(mode = BgMode.Gradient)) }, label = { Text("Gradiente") })
-            Spacer(Modifier.width(8.dp))
-            listOf(Color(0xFF0EA5E9), Color(0xFF9333EA), Color(0xFFEF4444), Color(0xFF10B981)).forEach {
-                ColorDot(it) { c -> onWorking(working.copy(color1 = c)) }
-            }
-        }
-
-        "Immagini" -> {
-            val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-                if (uri != null) onWorking(working.copy(mode = BgMode.Image, image = uri))
-            }
-            val pickAlbum = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-                if (uris.isNotEmpty()) onWorking(working.copy(mode = BgMode.Album, album = uris))
-            }
-            OutlinedButton(onClick = { pickImage.launch("image/*") }) { Icon(Icons.Filled.Crop, null); Spacer(Modifier.width(6.dp)); Text("Immagine (crop a parte)") }
-            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) { Icon(Icons.Filled.Collections, null); Spacer(Modifier.width(6.dp)); Text("Album (multi)") }
+    Surface(
+        color = BarBg, tonalElevation = 10.dp, shadowElevation = 10.dp,
+        shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextButton(onClick = onCancel) { Text("Annulla", color = Color.White) }
+            Spacer(Modifier.weight(1f))
+            OutlinedButton(onClick = onSaveStyle) { Text("Salva impostazioni") }
+            androidx.compose.material3.Button(onClick = onOk) { Text("OK") }
         }
     }
 }
 
-/* ==========================================================
- *  MENU: CONTENITORE (placeholder estetico)
- * ========================================================== */
-
 @Composable
-private fun ContainerMenu(
-    path: List<String>,
-    onPath: (List<String>) -> Unit,
-    working: ContainerStyle?,
-    onWorking: (ContainerStyle?) -> Unit
-) {
-    val w = working ?: ContainerStyle().also { onWorking(it) }
-
-    when (path.getOrNull(1)) {
-        null -> {
-            IconButton(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, null, tint = Color.White) }
-            SuggestChip(false, { onPath(path + "Scroll") }, { Text("Scroll") })
-            SuggestChip(false, { onPath(path + "Forma") }, { Text("Forma") })
-            SuggestChip(false, { onPath(path + "Stile") }, { Text("Stile") })
-            SuggestChip(false, { onPath(path + "Bordi") }, { Text("Bordi") })
-            SuggestChip(false, { onPath(path + "Comportamento") }, { Text("Tipo") })
+private fun StyleSaveDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf("Stile 1") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = { onSave(name) }) { Text("Salva") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        title = { Text("Salva come stile") },
+        text = {
+            androidx.compose.material3.OutlinedTextField(
+                value = name, onValueChange = { name = it },
+                singleLine = true, label = { Text("Nome") }
+            )
         }
-
-        "Colore" -> {
-            SuggestChip(w.bgMode == BgMode.Color, { onWorking(w.copy(bgMode = BgMode.Color)) }, { Text("Colore") })
-            SuggestChip(w.bgMode == BgMode.Gradient, { onWorking(w.copy(bgMode = BgMode.Gradient)) }, { Text("Gradiente") })
-            Spacer(Modifier.width(8.dp))
-            listOf(Color(0xFFFFFFFF), Color(0xFFF3F4F6), Color(0xFF111827), Color(0xFF0EA5E9)).forEach {
-                ColorDot(it) { c -> onWorking(w.copy(color1 = c)) }
-            }
-        }
-
-        "Immagini" -> {
-            val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-                if (uri != null) onWorking(w.copy(bgMode = BgMode.Image, image = uri))
-            }
-            val pickAlbum = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-                if (uris.isNotEmpty()) onWorking(w.copy(bgMode = BgMode.Album, album = uris))
-            }
-            OutlinedButton(onClick = { pickImage.launch("image/*") }) { Icon(Icons.Filled.Crop, null); Spacer(Modifier.width(6.dp)); Text("Immagine (crop a parte)") }
-            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) { Icon(Icons.Filled.Collections, null); Spacer(Modifier.width(6.dp)); Text("Album (multi)") }
-        }
-
-        "Scroll" -> {
-            SuggestChip(w.scroll == ScrollMode.None, { onWorking(w.copy(scroll = ScrollMode.None)) }, { Text("Nessuna") })
-            SuggestChip(w.scroll == ScrollMode.Vertical, { onWorking(w.copy(scroll = ScrollMode.Vertical)) }, { Text("Verticale") })
-            SuggestChip(w.scroll == ScrollMode.Horizontal, { onWorking(w.copy(scroll = ScrollMode.Horizontal)) }, { Text("Orizzontale") })
-        }
-
-        "Forma" -> {
-            SuggestChip(w.shape == ShapeKind.Rect, { onWorking(w.copy(shape = ShapeKind.Rect)) }, { Text("Rettangolo") })
-            SuggestChip(w.shape == ShapeKind.RoundedRect, { onWorking(w.copy(shape = ShapeKind.RoundedRect)) }, { Text("Arrotondato") })
-            SuggestChip(w.shape == ShapeKind.Circle, { onWorking(w.copy(shape = ShapeKind.Circle)) }, { Text("Cerchio") })
-        }
-
-        "Stile" -> {
-            SuggestChip(w.variant == Variant.Full, { onWorking(w.copy(variant = Variant.Full)) }, { Text("Full") })
-            SuggestChip(w.variant == Variant.Outlined, { onWorking(w.copy(variant = Variant.Outlined)) }, { Text("Outlined") })
-            SuggestChip(w.variant == Variant.Text, { onWorking(w.copy(variant = Variant.Text)) }, { Text("Text") })
-            SuggestChip(w.variant == Variant.TopBottom, { onWorking(w.copy(variant = Variant.TopBottom)) }, { Text("TopBottom") })
-        }
-
-        "Bordi" -> {
-            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color.Transparent, width = 0.dp, shadow = 0.dp))) }) { Text("Nessuno") }
-            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color(0x22000000), width = 1.dp))) }) { Text("Leggero") }
-            OutlinedButton(onClick = { onWorking(w.copy(border = w.border.copy(color = Color(0x55000000), width = 2.dp, shadow = 8.dp))) }) { Text("Evidente") }
-        }
-
-        "Comportamento" -> {
-            SuggestChip(w.behavior == Behavior.Normal, { onWorking(w.copy(behavior = Behavior.Normal)) }, { Text("Normale") })
-            SuggestChip(w.behavior == Behavior.Paged, { onWorking(w.copy(behavior = Behavior.Paged, pages = max(2, w.pages))) }, { Text("Sfogliabile") })
-            SuggestChip(w.behavior == Behavior.Tabs, { onWorking(w.copy(behavior = Behavior.Tabs, tabsCount = max(2, w.tabsCount))) }, { Text("Tabs") })
-        }
-    }
-}
-
-/* ==========================================================
- *  MENU: TESTO / IMMAGINE / INSERISCI (placeholder, estetica)
- * ========================================================== */
-
-@Composable
-private fun TextMenu(path: List<String>, onPath: (List<String>) -> Unit) {
-    AssistChip(onClick = {}, label = { Text("Sottolinea") }, leadingIcon = { Icon(Icons.Filled.FormatUnderlined, null) })
-    AssistChip(onClick = {}, label = { Text("Corsivo") }, leadingIcon = { Icon(Icons.Filled.FormatItalic, null) })
-    AssistChip(onClick = {}, label = { Text("Evidenzia") }, leadingIcon = { Icon(Icons.Filled.FormatColorFill, null) })
-    AssistChip(onClick = {}, label = { Text("Font") }, leadingIcon = { Icon(Icons.Filled.FontDownload, null) })
-    AssistChip(onClick = {}, label = { Text("Size") }, leadingIcon = { Icon(Icons.Filled.FormatSize, null) })
-    AssistChip(onClick = {}, label = { Text("Importa .ttf") }, leadingIcon = { Icon(Icons.Filled.UploadFile, null) })
-}
-
-@Composable
-private fun ImageMenu(path: List<String>, onPath: (List<String>) -> Unit) {
-    AssistChip(onClick = {}, label = { Text("Crop") }, leadingIcon = { Icon(Icons.Filled.Crop, null) })
-    AssistChip(onClick = {}, label = { Text("Cornice") }, leadingIcon = { Icon(Icons.Filled.CropSquare, null) })
-    AssistChip(onClick = {}, label = { Text("Album") }, leadingIcon = { Icon(Icons.Filled.Collections, null) })
-    AssistChip(onClick = {}, label = { Text("Adattamento") }, leadingIcon = { Icon(Icons.Filled.AspectRatio, null) })
-}
-
-@Composable
-private fun InsertMenu(onPath: (List<String>) -> Unit) {
-    Text("Placeholder: qui andranno le azioni per aggiungere contenuti.")
-}
-
-/* ==========================================================
- *  UTILITY
- * ========================================================== */
-
-@Composable
-private fun ColorDot(color: Color, onPick: (Color) -> Unit) {
-    Box(
-        Modifier
-            .size(28.dp)
-            .background(color, CircleShape)
-            .border(1.dp, Color(0x33000000), CircleShape)
-            .padding(2.dp)
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { onPick(color) })
-            }
     )
+}
+
+/* ----------------------------------------------------------
+ *  PANNELLI OPZIONI (UI-only, nessuna azione collegata)
+ * ---------------------------------------------------------- */
+
+@Composable
+private fun LayoutPanel(s: MenusState, set: (MenusState) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // 1) Colore
+        SectionTitle("Colore")
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Colore 1
+            DropdownSelector(
+                icon = Icons.Filled.ColorLens,
+                selected = s.pageColor1,
+                items = listOf("Indigo", "Teal", "Purple", "Red", "Emerald"),
+                onSelected = {
+                    set(s.copy(pageColor1 = it, dirty = true, lastEdited = "Colore 1: $it"))
+                }
+            )
+            // Colore 2
+            DropdownSelector(
+                icon = Icons.Filled.ColorLens,
+                selected = s.pageColor2,
+                items = listOf("Gray", "Slate", "Stone", "Zinc", "Black"),
+                onSelected = {
+                    set(s.copy(pageColor2 = it, dirty = true, lastEdited = "Colore 2: $it"))
+                }
+            )
+            // Gradiente
+            DropdownSelector(
+                icon = Icons.Filled.Tune,
+                selected = s.pageGradient,
+                items = listOf("Orizzontale", "Verticale"),
+                onSelected = {
+                    set(s.copy(pageGradient = it, dirty = true, lastEdited = "Gradiente: $it"))
+                }
+            )
+            // Effetti combinazione 2 colori (toggle)
+            ChipToggle(label = "Strisce", selected = false) {
+                set(s.copy(dirty = true, lastEdited = "Effetto: Strisce"))
+            }
+            ChipToggle(label = "Noise", selected = false) {
+                set(s.copy(dirty = true, lastEdited = "Effetto: Noise"))
+            }
+        }
+
+        // 2) Immagini (UI placeholder)
+        SectionTitle("Immagini")
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ElevatedFilterChip(selected = false, onClick = { set(s.copy(dirty = true, lastEdited = "Aggiungi foto")) }, label = { Text("Aggiungi foto", color = Color.White) }, leadingIcon = { Icon(Icons.Filled.Image, null, tint = IconTint) })
+            ElevatedFilterChip(selected = false, onClick = { set(s.copy(dirty = true, lastEdited = "Aggiungi album")) }, label = { Text("Aggiungi album", color = Color.White) }, leadingIcon = { Icon(Icons.Filled.Collections, null, tint = IconTint) })
+            DropdownSelector(icon = Icons.Filled.Tune, selected = "Adatta alla pagina", items = listOf("Adatta alla pagina","Riempi","Contieni","Centra")) {
+                set(s.copy(dirty = true, lastEdited = "Adattamento: $it"))
+            }
+            DropdownSelector(icon = Icons.Filled.Tune, selected = "Filtro: nessuno", items = listOf("Filtro: nessuno","BN","Seppia","Vivido")) {
+                set(s.copy(dirty = true, lastEdited = it))
+            }
+        }
+
+        // 3) Scegli default
+        SectionTitle("Scegli default")
+        DropdownSelector(icon = Icons.Filled.Tune, selected = "Default Light", items = listOf("Default Light", "Default Dark", "Indigo", "Emerald")) {
+            set(s.copy(dirty = true, lastEdited = "Default: $it"))
+        }
+    }
+}
+
+@Composable
+private fun ContainerPanel(s: MenusState, set: (MenusState) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("Colore contenitore")
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DropdownSelector(Icons.Filled.ColorLens, "Bianco", listOf("Bianco","Nero","Indigo","Teal")) {
+                set(s.copy(dirty = true, lastEdited = "Contenitore: Colore $it"))
+            }
+            DropdownSelector(Icons.Filled.Tune, "Gradiente: Orizzontale", listOf("Gradiente: Orizzontale","Gradiente: Verticale")) {
+                set(s.copy(dirty = true, lastEdited = it))
+            }
+            ChipToggle("Strisce", false) { set(s.copy(dirty = true, lastEdited = "Effetto: Strisce")) }
+            ChipToggle("Noise", false) { set(s.copy(dirty = true, lastEdited = "Effetto: Noise")) }
+        }
+
+        SectionTitle("Immagini contenitore")
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ElevatedFilterChip(false, { set(s.copy(dirty = true, lastEdited = "Aggiungi foto")) }, { Text("Aggiungi foto", color = Color.White) }, leadingIcon = { Icon(Icons.Filled.Image, null, tint = IconTint) })
+            ElevatedFilterChip(false, { set(s.copy(dirty = true, lastEdited = "Aggiungi album")) }, { Text("Aggiungi album", color = Color.White) }, leadingIcon = { Icon(Icons.Filled.Collections, null, tint = IconTint) })
+            DropdownSelector(Icons.Filled.Tune, "Adatta al contenitore", listOf("Adatta al contenitore","Riempi","Contieni","Centra")) {
+                set(s.copy(dirty = true, lastEdited = "Adattamento: $it"))
+            }
+        }
+
+        SectionTitle("Scrollabilità / Forma / Stile / Bordi / Tipo / Azione")
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DropdownSelector(Icons.Filled.Tune, "Scroll: assente", listOf("Scroll: assente","Scroll: verticale","Scroll: orizzontale")) { set(s.copy(dirty = true, lastEdited = it)) }
+            DropdownSelector(Icons.Filled.Tune, "Forma: rettangolo", listOf("Forma: cerchio","Forma: quadrato","Forma: rettangolo","Forma: altra")) { set(s.copy(dirty = true, lastEdited = it)) }
+            DropdownSelector(Icons.Filled.Tune, "Angoli: 8dp", listOf("Angoli: 0dp","Angoli: 8dp","Angoli: 16dp","Angoli: 24dp")) { set(s.copy(dirty = true, lastEdited = it)) }
+            DropdownSelector(Icons.Filled.Tune, "Stile: full", listOf("Stile: text","Stile: outlined","Stile: full","Stile: topbottom")) { set(s.copy(dirty = true, lastEdited = it)) }
+            DropdownSelector(Icons.Filled.Tune, "Bordo: leggero", listOf("Bordo: nessuno","Bordo: leggero","Bordo: spesso + ombra")) { set(s.copy(dirty = true, lastEdited = it)) }
+            DropdownSelector(Icons.Filled.Tune, "Tipo: normale", listOf("Tipo: normale","Tipo: sfogliabile","Tipo: tabs")) { set(s.copy(dirty = true, lastEdited = it)) }
+            DropdownSelector(Icons.Filled.Tune, "Tap: evidenzia", listOf("Tap: evidenzia","Tap: apri pagina","Tap: apri menù","Tap: tendina","Tap: HTTP+mostra","Tap: input testo")) { set(s.copy(dirty = true, lastEdited = it)) }
+            DropdownSelector(Icons.Filled.Tune, "Default: nessuno", listOf("Default: nessuno","Default: Stile A","Default: Stile B")) { set(s.copy(dirty = true, lastEdited = it)) }
+        }
+    }
+}
+
+@Composable
+private fun TextPanel(s: MenusState, set: (MenusState) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("Formattazione")
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Toggle con bordo più spesso se selezionati
+            ChipToggle("Sottolinea", s.textUnderline) {
+                set(s.copy(textUnderline = !s.textUnderline, dirty = true, lastEdited = if (!s.textUnderline) "Sottolinea: on" else "Sottolinea: off"))
+            }
+            ChipToggle("Corsivo", s.textItalic) {
+                set(s.copy(textItalic = !s.textItalic, dirty = true, lastEdited = if (!s.textItalic) "Corsivo: on" else "Corsivo: off"))
+            }
+            DropdownSelector(Icons.Filled.TextFields, s.textFont, listOf("Default","Roboto","Inter","Lato","Merriweather")) {
+                set(s.copy(textFont = it, dirty = true, lastEdited = "Font: $it"))
+            }
+            DropdownSelector(Icons.Filled.TextFields, s.textWeight, listOf("Light","Regular","Medium","Bold","Black")) {
+                set(s.copy(textWeight = it, dirty = true, lastEdited = "Weight: $it"))
+            }
+            DropdownSelector(Icons.Filled.TextFields, s.textSize, listOf("12sp","14sp","16sp","18sp","20sp","24sp")) {
+                set(s.copy(textSize = it, dirty = true, lastEdited = "Size: $it"))
+            }
+            ElevatedFilterChip(false, { set(s.copy(dirty = true, lastEdited = "Importa font (.ttf)")) }, { Text("Importa .ttf", color = Color.White) })
+            DropdownSelector(Icons.Filled.Tune, "Evidenzia: nessuna", listOf("Evidenzia: nessuna","Marker giallo","Obliqua","Sporca")) {
+                set(s.copy(dirty = true, lastEdited = it))
+            }
+        }
+
+        SectionTitle("Scegli default")
+        DropdownSelector(Icons.Filled.Tune, "Testo default: Nessuno", listOf("Testo default: Nessuno","Titolo A","Paragrafo B","Callout C")) {
+            set(s.copy(dirty = true, lastEdited = it))
+        }
+    }
+}
+
+@Composable
+private fun AddPanel(s: MenusState, set: (MenusState) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("Aggiungi elementi")
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ElevatedFilterChip(false, { set(s.copy(dirty = true, lastEdited = "Aggiungi icona")) }, { Text("Icona", color = Color.White) }, leadingIcon = { Icon(Icons.Filled.Image, null, tint = IconTint) })
+            ElevatedFilterChip(false, { set(s.copy(dirty = true, lastEdited = "Aggiungi toggle")) }, { Text("Toggle", color = Color.White) })
+            ElevatedFilterChip(false, { set(s.copy(dirty = true, lastEdited = "Aggiungi slider")) }, { Text("Slider", color = Color.White) })
+        }
+    }
+}
+
+/* ----------------------------------------------------------
+ *  WIDGETS RIUTILIZZABILI
+ * ---------------------------------------------------------- */
+
+@Composable
+private fun SectionTitle(t: String) {
+    Text(t, color = Color.White, fontSize = 13.sp, modifier = Modifier
+        .fillMaxWidth()
+        .padding(top = 2.dp, bottom = 2.dp))
+}
+
+@Composable
+private fun ChipToggle(label: String, selected: Boolean, onToggle: () -> Unit) {
+    val border = if (selected) 2.dp else 1.dp
+    Surface(
+        color = Color.Transparent, shape = RoundedCornerShape(999.dp),
+        modifier = Modifier
+            .height(36.dp)
+            .border(border, Color.White.copy(alpha = 0.9f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 12.dp),
+    ) {
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .padding(horizontal = 2.dp)
+                .wrapContentWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(label, color = Color.White)
+        }
+    }
     Spacer(Modifier.width(4.dp))
+    // Tap “fake”: usiamo un piccolo IconButton trasparente sovrapposto
+    IconButton(onClick = onToggle, modifier = Modifier.size(0.dp)) { }
+}
+
+@Composable
+private fun DropdownSelector(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: String,
+    items: List<String>,
+    onSelected: (String) -> Unit
+) {
+    var expand by remember { mutableStateOf(false) }
+    Surface(
+        color = Color.Transparent,
+        modifier = Modifier
+            .heightIn(min = 36.dp)
+            .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(999.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = IconTint, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(selected, color = Color.White)
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { expand = true }, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = IconTint)
+            }
+            DropdownMenu(expanded = expand, onDismissRequest = { expand = false }) {
+                items.forEach { v ->
+                    DropdownMenuItem(
+                        text = { Text(v) },
+                        onClick = { expand = false; onSelected(v) }
+                    )
+                }
+            }
+        }
+    }
 }

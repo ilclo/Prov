@@ -5,18 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
-import com.example.appbuilder.editor.EditorDemoScreen
+import androidx.compose.ui.graphics.Color
+import com.example.appbuilder.editor.EditorScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface {
-                    // Entry point dell’editor (nessun EditorScreen: così sparisce l’errore)
-                    EditorDemoScreen()
-                }
+            // Tema base: lasciamo il default Material3
+            Surface(color = Color.White) {
+                EditorScreen()   // schermo menù-only
             }
         }
     }
