@@ -162,22 +162,29 @@ fun ToolbarIconButton(
     contentDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    selected: Boolean = false,
+    selected: Boolean = false,          // se vuoi evidenziare uno stato ON/OFF
     onClick: () -> Unit
 ) {
-    val colors = IconButtonDefaults.filledIconButtonColors(
-        containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = Color.White,
-        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        disabledContentColor = Color.White.copy(alpha = 0.5f)
-    )
+    val container = when {
+        selected -> MaterialTheme.colorScheme.primary
+        else    -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val content   = Color.White
+    val containerDisabled = container.copy(alpha = 0.5f)
+    val contentDisabled   = content.copy(alpha = 0.5f)
+
     FilledIconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.size(44.dp),
-        colors = colors
+        modifier = modifier.size(44.dp), // pulsante più “importante” di una icon button base
+        colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = container,
+            contentColor = content,
+            disabledContainerColor = containerDisabled,
+            disabledContentColor = contentDisabled
+        )
     ) {
-        Icon(icon, contentDescription)
+        Icon(imageVector = icon, contentDescription = contentDescription)
     }
 }
 
