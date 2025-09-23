@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.LinearScale
+import androidx.compose.material.icons.filled.ToggleOn
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Redo
@@ -383,7 +384,7 @@ private fun BoxScope.MainMenuBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
-            ToolbarIconButton(Icons.Filled.Widgets, "Contenitore", onClick = onContainer)
+            ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer)
             ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
             ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
         }
@@ -508,7 +509,7 @@ private fun LayoutLevel(
             ToggleIcon(
                 selected = (get("mode") ?: "colore") == "gradiente",
                 onClick = { onPick("mode", "gradiente") },
-                icon = Icons.Filled.LinearScale
+                icon = EditorIcons.Gradient
             )
 
             // Colore 1 / Colore 2 / Gradiente / Effetti
@@ -522,12 +523,12 @@ private fun LayoutLevel(
                 options = listOf("Grigio", "Nero", "Ciano", "Arancio"),
                 onSelected = { onPick("col2", it) }
             )
-            IconDropdown(Icons.Filled.LinearScale, "Gradiente",
+            IconDropdown(EditorIcons.Gradient, "Gradiente",
                 current = get("grad") ?: "Orizzontale",
                 options = listOf("Orizzontale", "Verticale"),
                 onSelected = { onPick("grad", it) }
             )
-            IconDropdown(EditorIcons.Layout, "Effetti",
+            IconDropdown(EditorIcons.FX, "FX",
                 current = get("fx") ?: "Vignettatura",
                 options = listOf("Vignettatura", "Grana", "Strisce"),
                 onSelected = { onPick("fx", it) }
@@ -615,22 +616,22 @@ private fun ContainerLevel(
                 options = listOf("Assente", "Verticale", "Orizzontale"),
                 onSelected = { onPick("scroll", it) }
             )
-            IconDropdown(EditorIcons.Layout, "Forma",
+            IconDropdown(EditorIcons.Shape, "Shape",
                 current = get("shape") ?: "Rettangolo",
                 options = listOf("Rettangolo", "Quadrato", "Cerchio", "Altre"),
                 onSelected = { onPick("shape", it) }
             )
-            IconDropdown(EditorIcons.Layout, "Stile",
+            IconDropdown(EditorIcons.Variant, "Variant",
                 current = get("variant") ?: "Full",
                 options = listOf("Full", "Outlined", "Text", "TopBottom"),
                 onSelected = { onPick("variant", it) }
             )
-            IconDropdown(EditorIcons.Layout, "Bordi",
+            IconDropdown(EditorIcons.Shape, "b_tick",
                 current = get("b_thick") ?: "1dp",
                 options = listOf("0dp", "1dp", "2dp", "3dp"),
                 onSelected = { onPick("b_thick", it) }
             )
-            IconDropdown(EditorIcons.Layout, "Tipo",
+            IconDropdown(EditorIcons.Type, "Tipo",
                 current = get("tipo") ?: "Normale",
                 options = listOf("Normale", "Sfogliabile", "Tab"),
                 onSelected = { onPick("tipo", it) }
@@ -654,12 +655,12 @@ private fun ContainerLevel(
                 options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
                 onSelected = { onPick("col2", it) }
             )
-            IconDropdown(Icons.Filled.LinearScale, "Gradiente",
+            IconDropdown(EditorIcons.Gradient, "Gradiente",
                 current = get("grad") ?: "Orizzontale",
                 options = listOf("Orizzontale", "Verticale"),
                 onSelected = { onPick("grad", it) }
             )
-            IconDropdown(EditorIcons.Layout, "Effetti",
+            IconDropdown(EditorIcons.FX, "FX",
                 current = get("fx") ?: "Vignettatura",
                 options = listOf("Vignettatura", "Noise", "Strisce"),
                 onSelected = { onPick("fx", it) }
@@ -740,32 +741,37 @@ private fun TextLevel(
     val iKey = key(path, "italic")
     ToggleIcon(selected = (selections[uKey] as? Boolean) == true, onClick = {
         onToggle("Sottolinea", !((selections[uKey] as? Boolean) == true))
-    }, icon = EditorIcons.Text) // riuso icona testo; in futuro icone specifiche
+    }, icon = EditorIcons.TextUnderline)
 
     ToggleIcon(selected = (selections[iKey] as? Boolean) == true, onClick = {
         onToggle("Corsivo", !((selections[iKey] as? Boolean) == true))
-    }, icon = EditorIcons.Layout) // icona generica per stato
+    }, icon = EditorIcons.TextItalic)
 
     // dropdown (font / weight / size / evidenzia)
-    IconDropdown(EditorIcons.Layout, "Evidenzia",
+    IconDropdown(EditorIcons.HighlightStroke, "Evidenzia",
         current = (selections[key(path, "highlight")] as? String) ?: "Nessuna",
         options = listOf("Nessuna", "Marker", "Oblique", "Scribble"),
         onSelected = { onPick("Evidenzia", it) }
     )
-    IconDropdown(EditorIcons.Layout, "Font",
+    IconDropdown(EditorIcons.Font, "Font",
         current = (selections[key(path, "font")] as? String) ?: "System",
         options = listOf("System", "Inter", "Roboto", "SF Pro"),
         onSelected = { onPick("Font", it) }
     )
-    IconDropdown(EditorIcons.Layout, "Peso",
+    IconDropdown(EditorIcons.Weight, "Peso",
         current = (selections[key(path, "weight")] as? String) ?: "Regular",
         options = listOf("Light", "Regular", "Medium", "Bold"),
         onSelected = { onPick("Weight", it) }
     )
-    IconDropdown(EditorIcons.Layout, "Size",
+    IconDropdown(EditorIcons.Size, "Size",
         current = (selections[key(path, "size")] as? String) ?: "16sp",
         options = listOf("12sp", "14sp", "16sp", "18sp", "22sp"),
         onSelected = { onPick("Size", it) }
+    )
+    IconDropdown(EditorIcons.TextColor, "Colore",
+        current = (selections[key(path, "tcolor")] as? String) ?: "Nero",
+        options = listOf("Nero", "Bianco", "Blu", "Verde", "Rosso"),
+        onSelected = { onPick("Colore", it) }
     )
 
     // default
@@ -786,9 +792,9 @@ private fun AddLevel(
     onEnter: (String) -> Unit
 ) {
     if (path.getOrNull(1) == null) {
-        ToolbarIconButton(Icons.Filled.Widgets, "Icona") { onEnter("Icona") }
-        ToolbarIconButton(EditorIcons.Layout, "Toggle") { onEnter("Toggle") }
-        ToolbarIconButton(EditorIcons.Layout, "Slider") { onEnter("Slider") }
+        ToolbarIconButton(EditorIcons.IconMenu, "Icona") { onEnter("Icona") }
+        ToolbarIconButton(Icons.Filled.ToggleOn, "Toggle") { onEnter("Toggle") }
+        ToolbarIconButton(Icons.Filled.LinearScale, "Slider") { onEnter("Slider") }
     } else {
         // placeholder: solo navigazione visiva
         ElevatedCard(
@@ -881,6 +887,28 @@ private fun IconDropdown(
     var expanded by remember { mutableStateOf(false) }
     Box {
         ToolbarIconButton(icon, contentDescription, onClick = { expanded = true })
+        // badge numerico angolare per "Colore 1"/"Colore 2"
+        val cornerBadge = when (contentDescription) {
+            "Colore 1" -> "1"
+            "Colore 2" -> "2"
+            else -> null
+        }
+        if (cornerBadge != null) {
+            Surface(
+                color = Color(0xFF1B2334),
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset { IntOffset(6, -6) }
+            ) {
+                Text(
+                    text = cornerBadge,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                    fontSize = 10.sp
+                )
+            }
+        }
         // badge valore corrente
         if (!current.isNullOrBlank()) {
             Surface(
