@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Collections
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
