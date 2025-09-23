@@ -1,5 +1,6 @@
 package com.example.appbuilder.editor
 
+import com.example.appbuilder.icons.EditorIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -19,27 +20,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LinearScale
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
@@ -75,8 +68,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.Collections
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
@@ -316,20 +307,20 @@ private fun BoxScope.MainBottomBar(
 
                 dividerDot()
 
-                ToolbarIconButton(Icons.Filled.Save, "Salva pagina", onClick = onSaveFile)
-                ToolbarIconButton(Icons.Filled.Delete, "Cestino", onClick = onDelete)
-                ToolbarIconButton(Icons.Filled.ContentCopy, "Duplica", onClick = onDuplicate)
+                ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile)
+                ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete)
+                ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate)
 
                 dividerDot()
 
-                ToolbarIconButton(Icons.Filled.Settings, "Proprietà", onClick = onProperties)
-                ToolbarIconButton(Icons.Filled.Tune, "Layout pagina", onClick = onLayout)
+                ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties)
+                ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout)
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 // Crea
                 Box {
-                    ToolbarIconButton(Icons.Filled.Add, "Crea", onClick = { showCreateMenu = true })
+                    ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
                     DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
                         DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { showCreateMenu = false })
                         DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { showCreateMenu = false })
@@ -391,10 +382,10 @@ private fun BoxScope.MainMenuBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ToolbarIconButton(Icons.Filled.TextFields, "Testo", onClick = onText)
+            ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
             ToolbarIconButton(Icons.Filled.Widgets, "Contenitore", onClick = onContainer)
-            ToolbarIconButton(Icons.Filled.Tune, "Layout", onClick = onLayout)
-            ToolbarIconButton(Icons.Filled.Add, "Aggiungi", onClick = onAdd)
+            ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
+            ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
         }
     }
 }
@@ -497,8 +488,8 @@ private fun LayoutLevel(
 
     when (path.getOrNull(1)) {
         null -> {
-            ToolbarIconButton(Icons.Filled.ColorLens, "Colore") { onEnter("Colore") }
-            ToolbarIconButton(Icons.Filled.Image, "Immagini") { onEnter("Immagini") }
+            ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
+            ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
             IconDropdown(
                 icon = Icons.Filled.BookmarkAdd,
                 contentDescription = "Scegli default",
@@ -512,7 +503,7 @@ private fun LayoutLevel(
             ToggleIcon(
                 selected = (get("mode") ?: "colore") == "colore",
                 onClick = { onPick("mode", "colore") },
-                icon = Icons.Filled.ColorLens
+                icon = EditorIcons.Color
             )
             ToggleIcon(
                 selected = (get("mode") ?: "colore") == "gradiente",
@@ -521,12 +512,12 @@ private fun LayoutLevel(
             )
 
             // Colore 1 / Colore 2 / Gradiente / Effetti
-            IconDropdown(Icons.Filled.ColorLens, "Colore 1",
+            IconDropdown(EditorIcons.Color, "Colore 1",
                 current = get("col1") ?: "Blu",
                 options = listOf("Blu", "Viola", "Rosso", "Verde"),
                 onSelected = { onPick("col1", it) }
             )
-            IconDropdown(Icons.Filled.ColorLens, "Colore 2",
+            IconDropdown(EditorIcons.Color, "Colore 2",
                 current = get("col2") ?: "Grigio",
                 options = listOf("Grigio", "Nero", "Ciano", "Arancio"),
                 onSelected = { onPick("col2", it) }
@@ -536,65 +527,65 @@ private fun LayoutLevel(
                 options = listOf("Orizzontale", "Verticale"),
                 onSelected = { onPick("grad", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Effetti",
+            IconDropdown(EditorIcons.Layout, "Effetti",
                 current = get("fx") ?: "Vignettatura",
                 options = listOf("Vignettatura", "Grana", "Strisce"),
                 onSelected = { onPick("fx", it) }
             )
         }
         "Immagini" -> {
-            ToolbarIconButton(Icons.Filled.Image, "Aggiungi foto") { onEnter("Aggiungi foto") }
-            ToolbarIconButton(Icons.Filled.Collections, "Aggiungi album") { onEnter("Aggiungi album") }
+            ToolbarIconButton(EditorIcons.Image, "Aggiungi foto") { onEnter("Aggiungi foto") }
+            ToolbarIconButton(EditorIcons.Album, "Aggiungi album") { onEnter("Aggiungi album") }
         }
         "Aggiungi foto" -> {
-            IconDropdown(Icons.Filled.Crop, "Crop",
+            IconDropdown(EditorIcons.Crop, "Crop",
                 current = get("crop") ?: "Nessuno",
                 options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
                 onSelected = { onPick("crop", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Cornice",
+            IconDropdown(EditorIcons.Layout, "Cornice",
                 current = get("frame") ?: "Sottile",
                 options = listOf("Nessuna", "Sottile", "Marcata"),
                 onSelected = { onPick("frame", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Filtri",
+            IconDropdown(EditorIcons.Layout, "Filtri",
                 current = get("filtro") ?: "Nessuno",
                 options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
                 onSelected = { onPick("filtro", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Adattamento",
+            IconDropdown(EditorIcons.Layout, "Adattamento",
                 current = get("fit") ?: "Cover",
                 options = listOf("Cover", "Contain", "Fill"),
                 onSelected = { onPick("fit", it) }
             )
         }
         "Aggiungi album" -> {
-            IconDropdown(Icons.Filled.Crop, "Crop",
+            IconDropdown(EditorIcons.Crop, "Crop",
                 current = get("cropAlbum") ?: "Nessuno",
                 options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
                 onSelected = { onPick("cropAlbum", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Cornice",
+            IconDropdown(EditorIcons.Layout, "Cornice",
                 current = get("frameAlbum") ?: "Sottile",
                 options = listOf("Nessuna", "Sottile", "Marcata"),
                 onSelected = { onPick("frameAlbum", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Filtri album",
+            IconDropdown(EditorIcons.Layout, "Filtri album",
                 current = get("filtroAlbum") ?: "Nessuno",
                 options = listOf("Nessuno", "Tutte foto stesso filtro"),
                 onSelected = { onPick("filtroAlbum", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Adattamento",
+            IconDropdown(EditorIcons.Layout, "Adattamento",
                 current = get("fitAlbum") ?: "Cover",
                 options = listOf("Cover", "Contain", "Fill"),
                 onSelected = { onPick("fitAlbum", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Animazione",
+            IconDropdown(EditorIcons.Layout, "Animazione",
                 current = get("anim") ?: "Slide",
                 options = listOf("Slide", "Fade", "Page flip"),
                 onSelected = { onPick("anim", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Velocità",
+            IconDropdown(EditorIcons.Layout, "Velocità",
                 current = get("speed") ?: "Media",
                 options = listOf("Lenta", "Media", "Veloce"),
                 onSelected = { onPick("speed", it) }
@@ -617,29 +608,29 @@ private fun ContainerLevel(
 
     when (path.getOrNull(1)) {
         null -> {
-            ToolbarIconButton(Icons.Filled.ColorLens, "Colore") { onEnter("Colore") }
-            ToolbarIconButton(Icons.Filled.Image, "Immagini") { onEnter("Immagini") }
+            ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
+            ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
             IconDropdown(Icons.Filled.SwapVert, "Scrollabilità",
                 current = get("scroll") ?: "Assente",
                 options = listOf("Assente", "Verticale", "Orizzontale"),
                 onSelected = { onPick("scroll", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Forma",
+            IconDropdown(EditorIcons.Layout, "Forma",
                 current = get("shape") ?: "Rettangolo",
                 options = listOf("Rettangolo", "Quadrato", "Cerchio", "Altre"),
                 onSelected = { onPick("shape", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Stile",
+            IconDropdown(EditorIcons.Layout, "Stile",
                 current = get("variant") ?: "Full",
                 options = listOf("Full", "Outlined", "Text", "TopBottom"),
                 onSelected = { onPick("variant", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Bordi",
+            IconDropdown(EditorIcons.Layout, "Bordi",
                 current = get("b_thick") ?: "1dp",
                 options = listOf("0dp", "1dp", "2dp", "3dp"),
                 onSelected = { onPick("b_thick", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Tipo",
+            IconDropdown(EditorIcons.Layout, "Tipo",
                 current = get("tipo") ?: "Normale",
                 options = listOf("Normale", "Sfogliabile", "Tab"),
                 onSelected = { onPick("tipo", it) }
@@ -653,12 +644,12 @@ private fun ContainerLevel(
             )
         }
         "Colore" -> {
-            IconDropdown(Icons.Filled.ColorLens, "Colore 1",
+            IconDropdown(EditorIcons.Color, "Colore 1",
                 current = get("col1") ?: "Bianco",
                 options = listOf("Bianco", "Grigio", "Nero", "Ciano"),
                 onSelected = { onPick("col1", it) }
             )
-            IconDropdown(Icons.Filled.ColorLens, "Colore 2",
+            IconDropdown(EditorIcons.Color, "Colore 2",
                 current = get("col2") ?: "Grigio chiaro",
                 options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
                 onSelected = { onPick("col2", it) }
@@ -668,65 +659,65 @@ private fun ContainerLevel(
                 options = listOf("Orizzontale", "Verticale"),
                 onSelected = { onPick("grad", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Effetti",
+            IconDropdown(EditorIcons.Layout, "Effetti",
                 current = get("fx") ?: "Vignettatura",
                 options = listOf("Vignettatura", "Noise", "Strisce"),
                 onSelected = { onPick("fx", it) }
             )
         }
         "Immagini" -> {
-            ToolbarIconButton(Icons.Filled.Image, "Aggiungi foto") { onEnter("Aggiungi foto") }
-            ToolbarIconButton(Icons.Filled.Image, "Aggiungi album") { onEnter("Aggiungi album") }
+            ToolbarIconButton(EditorIcons.Image, "Aggiungi foto") { onEnter("Aggiungi foto") }
+            ToolbarIconButton(EditorIcons.Image, "Aggiungi album") { onEnter("Aggiungi album") }
         }
         "Aggiungi foto" -> {
-            IconDropdown(Icons.Filled.Crop, "Crop",
+            IconDropdown(EditorIcons.Crop, "Crop",
                 current = get("crop") ?: "Nessuno",
                 options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
                 onSelected = { onPick("crop", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Cornice",
+            IconDropdown(EditorIcons.Layout, "Cornice",
                 current = get("frame") ?: "Sottile",
                 options = listOf("Nessuna", "Sottile", "Marcata"),
                 onSelected = { onPick("frame", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Filtri",
+            IconDropdown(EditorIcons.Layout, "Filtri",
                 current = get("filtro") ?: "Nessuno",
                 options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
                 onSelected = { onPick("filtro", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Adatta",
+            IconDropdown(EditorIcons.Layout, "Adatta",
                 current = get("fitCont") ?: "Cover",
                 options = listOf("Cover", "Contain", "Fill", "FitWidth", "FitHeight"),
                 onSelected = { onPick("fitCont", it) }
             )
         }
         "Aggiungi album" -> {
-            IconDropdown(Icons.Filled.Crop, "Crop",
+            IconDropdown(EditorIcons.Crop, "Crop",
                 current = get("cropAlbum") ?: "Nessuno",
                 options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
                 onSelected = { onPick("cropAlbum", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Cornice",
+            IconDropdown(EditorIcons.Layout, "Cornice",
                 current = get("frameAlbum") ?: "Sottile",
                 options = listOf("Nessuna", "Sottile", "Marcata"),
                 onSelected = { onPick("frameAlbum", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Filtri album",
+            IconDropdown(EditorIcons.Layout, "Filtri album",
                 current = get("filtroAlbum") ?: "Nessuno",
                 options = listOf("Nessuno", "Tutte foto stesso filtro"),
                 onSelected = { onPick("filtroAlbum", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Adattamento",
+            IconDropdown(EditorIcons.Layout, "Adattamento",
                 current = get("fit") ?: "Cover",
                 options = listOf("Cover", "Contain", "Fill"),
                 onSelected = { onPick("fit", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Animazione",
+            IconDropdown(EditorIcons.Layout, "Animazione",
                 current = get("anim") ?: "Slide",
                 options = listOf("Slide", "Fade", "Page flip"),
                 onSelected = { onPick("anim", it) }
             )
-            IconDropdown(Icons.Filled.Tune, "Velocità",
+            IconDropdown(EditorIcons.Layout, "Velocità",
                 current = get("speed") ?: "Media",
                 options = listOf("Lenta", "Media", "Veloce"),
                 onSelected = { onPick("speed", it) }
@@ -749,29 +740,29 @@ private fun TextLevel(
     val iKey = key(path, "italic")
     ToggleIcon(selected = (selections[uKey] as? Boolean) == true, onClick = {
         onToggle("Sottolinea", !((selections[uKey] as? Boolean) == true))
-    }, icon = Icons.Filled.TextFields) // riuso icona testo; in futuro icone specifiche
+    }, icon = EditorIcons.Text) // riuso icona testo; in futuro icone specifiche
 
     ToggleIcon(selected = (selections[iKey] as? Boolean) == true, onClick = {
         onToggle("Corsivo", !((selections[iKey] as? Boolean) == true))
-    }, icon = Icons.Filled.Tune) // icona generica per stato
+    }, icon = EditorIcons.Layout) // icona generica per stato
 
     // dropdown (font / weight / size / evidenzia)
-    IconDropdown(Icons.Filled.Tune, "Evidenzia",
+    IconDropdown(EditorIcons.Layout, "Evidenzia",
         current = (selections[key(path, "highlight")] as? String) ?: "Nessuna",
         options = listOf("Nessuna", "Marker", "Oblique", "Scribble"),
         onSelected = { onPick("Evidenzia", it) }
     )
-    IconDropdown(Icons.Filled.Tune, "Font",
+    IconDropdown(EditorIcons.Layout, "Font",
         current = (selections[key(path, "font")] as? String) ?: "System",
         options = listOf("System", "Inter", "Roboto", "SF Pro"),
         onSelected = { onPick("Font", it) }
     )
-    IconDropdown(Icons.Filled.Tune, "Peso",
+    IconDropdown(EditorIcons.Layout, "Peso",
         current = (selections[key(path, "weight")] as? String) ?: "Regular",
         options = listOf("Light", "Regular", "Medium", "Bold"),
         onSelected = { onPick("Weight", it) }
     )
-    IconDropdown(Icons.Filled.Tune, "Size",
+    IconDropdown(EditorIcons.Layout, "Size",
         current = (selections[key(path, "size")] as? String) ?: "16sp",
         options = listOf("12sp", "14sp", "16sp", "18sp", "22sp"),
         onSelected = { onPick("Size", it) }
@@ -796,8 +787,8 @@ private fun AddLevel(
 ) {
     if (path.getOrNull(1) == null) {
         ToolbarIconButton(Icons.Filled.Widgets, "Icona") { onEnter("Icona") }
-        ToolbarIconButton(Icons.Filled.Tune, "Toggle") { onEnter("Toggle") }
-        ToolbarIconButton(Icons.Filled.Tune, "Slider") { onEnter("Slider") }
+        ToolbarIconButton(EditorIcons.Layout, "Toggle") { onEnter("Toggle") }
+        ToolbarIconButton(EditorIcons.Layout, "Slider") { onEnter("Slider") }
     } else {
         // placeholder: solo navigazione visiva
         ElevatedCard(
@@ -955,9 +946,9 @@ private fun BoxScope.ConfirmBar(
                 fontWeight = FontWeight.Medium
             )
             // icone-only
-            ToolbarIconButton(Icons.Filled.Close, "Annulla", onClick = onCancel)
+            ToolbarIconButton(EditorIcons.Cancel, "Annulla", onClick = onCancel)
             ToolbarIconButton(Icons.Filled.BookmarkAdd, "Salva impostazioni", onClick = onSavePreset)
-            ToolbarIconButton(Icons.Filled.Check, "OK", onClick = onOk, selected = true)
+            ToolbarIconButton(EditorIcons.Ok, "OK", onClick = onOk, selected = true)
         }
     }
 }
