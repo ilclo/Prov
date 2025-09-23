@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -36,20 +35,6 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.Widgets
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.Brush
-import androidx.compose.material.icons.filled.CropSquare
-import androidx.compose.material.icons.filled.FormatBold
-import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.FormatUnderlined
-import androidx.compose.material.icons.filled.FontDownload
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.ToggleOn
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -83,35 +68,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-
-/* =========================================================================================
- *  CUSTOM ICONS (semplici) — Contenitore (quadrato + cerchio)
- * ========================================================================================= */
-private val IconContainer by lazy {
-    androidx.compose.ui.graphics.vector.ImageVector.Builder(
-        name = "IconContainer",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f
-    ).apply {
-        // Quadrato a sinistra
-        addPath(
-            pathData = androidx.compose.ui.graphics.vector.PathBuilder().apply {
-                moveTo(3f, 7f); lineTo(11f, 7f); lineTo(11f, 15f); lineTo(3f, 15f); close()
-            }.getNodes(),
-            fill = androidx.compose.ui.graphics.SolidColor(Color.White)
-        )
-        // Cerchio a destra
-        addPath(
-            pathData = androidx.compose.ui.graphics.vector.PathBuilder().apply {
-                addOval(androidx.compose.ui.geometry.Rect(13f, 7f, 21f, 15f))
-            }.getNodes(),
-            fill = androidx.compose.ui.graphics.SolidColor(Color.White)
-        )
-    }.build()
-}
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
@@ -196,7 +152,7 @@ fun EditorMenusOnly(
                 onDelete = { /* stub */ },
                 onDuplicate = { /* stub */ },
                 onProperties = { /* stub */ },
-                onLayout = { lastChanged = null; menuPath = listOf("Layout") },
+                onLayout = { menuPath = listOf("Layout") },
                 onCreate = { /* dropdown nella bar stessa */ },
                 onOpenList = { /* stub */ },
                 onSaveProject = { /* stub */ },
@@ -205,10 +161,10 @@ fun EditorMenusOnly(
                 onMeasured = { actionsBarHeightPx = it }
             )
             MainMenuBar(
-                onLayout = { lastChanged = null; menuPath = listOf("Layout") },
-                onContainer = { lastChanged = null; menuPath = listOf("Contenitore") },
-                onText = { lastChanged = null; menuPath = listOf("Testo") },
-                onAdd = { lastChanged = null; menuPath = listOf("Aggiungi") },
+                onLayout = { menuPath = listOf("Layout") },
+                onContainer = { menuPath = listOf("Contenitore") },
+                onText = { menuPath = listOf("Testo") },
+                onAdd = { menuPath = listOf("Aggiungi") },
                 bottomBarHeightPx = actionsBarHeightPx
             )
         } else {
@@ -227,7 +183,7 @@ fun EditorMenusOnly(
                 },
                 onToggle = { label, value ->
                     menuSelections[key(menuPath, label)] = value
-                    lastChanged = "$label: " + if (value) "ON" else "OFF"
+                    lastChanged = "$label: ${if (value) "ON" else "OFF"}"
                     dirty = true
                 },
                 onPick = { label, value ->
@@ -235,13 +191,9 @@ fun EditorMenusOnly(
                     lastChanged = "$label: $value"
                     dirty = true
                 },
-                savedPresets = savedPresets,
-                bottomBarHeightPx = actionsBarHeightPx,
-                onPeek = { label, current ->
-                    lastChanged = if (current.isNullOrBlank()) label else "$label: $current"
-                }
+                savedPresets = savedPresets
             )
-            BreadcrumbBar(path = menuPath, lastChanged = lastChanged, bottomBarHeightPx = actionsBarHeightPx)
+            BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
         }
 
         // Barra di conferma quando risalgo con modifiche
@@ -362,7 +314,7 @@ private fun BoxScope.MainBottomBar(
                 dividerDot()
 
                 ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties)
-                ToolbarIconButton(Icons.Filled.Article, "Layout pagina", onClick = onLayout)
+                ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout)
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -431,8 +383,8 @@ private fun BoxScope.MainMenuBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
-            ToolbarIconButton(IconContainer, "Contenitore", onClick = onContainer)
-            ToolbarIconButton(Icons.Filled.Article, "Layout", onClick = onLayout)
+            ToolbarIconButton(Icons.Filled.Widgets, "Contenitore", onClick = onContainer)
+            ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
             ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
         }
     }
@@ -451,9 +403,7 @@ private fun BoxScope.SubMenuBar(
     onEnter: (String) -> Unit,
     onToggle: (label: String, value: Boolean) -> Unit,
     onPick: (label: String, value: String) -> Unit,
-    savedPresets: Map<String, MutableList<String>>,
-    bottomBarHeightPx: Int,
-    onPeek: (label: String, current: String?) -> Unit
+    savedPresets: Map<String, MutableList<String>>
 ) {
     Surface(
         color = Color(0xFF0F141E),
@@ -465,11 +415,7 @@ private fun BoxScope.SubMenuBar(
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .let { mod ->
-            val gap = 8.dp
-            val dy = with(LocalDensity.current) { bottomBarHeightPx.toDp() + gap }
-            mod.offset { IntOffset(0, -dy.roundToPx()) }
-        }
+            .offset { IntOffset(0, -64) }
     ) {
         val scroll = rememberScrollState()
         Row(
@@ -484,9 +430,9 @@ private fun BoxScope.SubMenuBar(
             ToolbarIconButton(Icons.Filled.ArrowBack, "Indietro", onClick = onBack)
 
             when (path.firstOrNull()) {
-                "Layout" -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets, onPeek)
-                "Contenitore" -> ContainerLevel(path, selections, onEnter, onToggle, onPick, savedPresets, onPeek)
-                "Testo" -> TextLevel(path, selections, onToggle, onPick, savedPresets, onPeek)
+                "Layout" -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
+                "Contenitore" -> ContainerLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
+                "Testo" -> TextLevel(path, selections, onToggle, onPick, savedPresets)
                 "Aggiungi" -> AddLevel(path, selections, onEnter)
             }
         }
@@ -497,7 +443,7 @@ private fun BoxScope.SubMenuBar(
  *  BREADCRUMB — path corrente + ultima opzione
  * ========================================================================================= */
 @Composable
-private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?, bottomBarHeightPx: Int) {
+private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
     Surface(
         color = Color(0xFF0B0F16),
         contentColor = Color(0xFF9BA3AF),
@@ -507,13 +453,8 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?, bot
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 10.dp)
             .imePadding()
-            .let { mod ->
-                val barH = with(LocalDensity.current) { bottomBarHeightPx.toDp() }
-                mod.heightIn(min = barH)
-            }
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
@@ -541,8 +482,7 @@ private fun LayoutLevel(
     onEnter: (String) -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onPick: (String, String) -> Unit,
-    saved: Map<String, MutableList<String>>,
-    onPeek: (String, String?) -> Unit
+    saved: Map<String, MutableList<String>>
 ) {
     fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
 
@@ -568,35 +508,29 @@ private fun LayoutLevel(
             ToggleIcon(
                 selected = (get("mode") ?: "colore") == "gradiente",
                 onClick = { onPick("mode", "gradiente") },
-                icon = Icons.Filled.SwapVert
+                icon = Icons.Filled.LinearScale
             )
 
             // Colore 1 / Colore 2 / Gradiente / Effetti
-            IconDropdown(Icons.Filled.Palette, "Colore 1",
+            IconDropdown(EditorIcons.Color, "Colore 1",
                 current = get("col1") ?: "Blu",
                 options = listOf("Blu", "Viola", "Rosso", "Verde"),
-                onSelected = { onPick("col1", it) },
-                badgeCorner = "1",
-                onOpen = { label, cur -> onPeek(label, cur) }
+                onSelected = { onPick("col1", it) }
             )
-            IconDropdown(Icons.Filled.Palette, "Colore 2",
+            IconDropdown(EditorIcons.Color, "Colore 2",
                 current = get("col2") ?: "Grigio",
                 options = listOf("Grigio", "Nero", "Ciano", "Arancio"),
-                onSelected = { onPick("col2", it) },
-                badgeCorner = "2",
-                onOpen = { label, cur -> onPeek(label, cur) }
+                onSelected = { onPick("col2", it) }
             )
-            IconDropdown(Icons.Filled.SwapVert, "Gradiente",
+            IconDropdown(Icons.Filled.LinearScale, "Gradiente",
                 current = get("grad") ?: "Orizzontale",
                 options = listOf("Orizzontale", "Verticale"),
-                onSelected = { onPick("grad", it) },
-                onOpen = { label, cur -> onPeek(label, cur) }
+                onSelected = { onPick("grad", it) }
             )
-            IconDropdown(Icons.Filled.AutoFixHigh, "FX",
+            IconDropdown(EditorIcons.Layout, "Effetti",
                 current = get("fx") ?: "Vignettatura",
                 options = listOf("Vignettatura", "Grana", "Strisce"),
-                onSelected = { onPick("fx", it) },
-                onOpen = { label, cur -> onPeek(label, cur) }
+                onSelected = { onPick("fx", it) }
             )
         }
         "Immagini" -> {
@@ -668,8 +602,7 @@ private fun ContainerLevel(
     onEnter: (String) -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onPick: (String, String) -> Unit,
-    saved: Map<String, MutableList<String>>,
-    onPeek: (String, String?) -> Unit
+    saved: Map<String, MutableList<String>>
 ) {
     fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
 
@@ -682,22 +615,22 @@ private fun ContainerLevel(
                 options = listOf("Assente", "Verticale", "Orizzontale"),
                 onSelected = { onPick("scroll", it) }
             )
-            IconDropdown(Icons.Filled.CropSquare, "Forma", onOpen = { label, cur -> onPeek(label, cur) },
+            IconDropdown(EditorIcons.Layout, "Forma",
                 current = get("shape") ?: "Rettangolo",
                 options = listOf("Rettangolo", "Quadrato", "Cerchio", "Altre"),
                 onSelected = { onPick("shape", it) }
             )
-            IconDropdown(Icons.Filled.FormatItalic, "Variant", onOpen = { label, cur -> onPeek(label, cur) },
+            IconDropdown(EditorIcons.Layout, "Stile",
                 current = get("variant") ?: "Full",
                 options = listOf("Full", "Outlined", "Text", "TopBottom"),
                 onSelected = { onPick("variant", it) }
             )
-            IconDropdown(Icons.Filled.CropSquare, "Bordi", onOpen = { label, cur -> onPeek(label, cur) },
+            IconDropdown(EditorIcons.Layout, "Bordi",
                 current = get("b_thick") ?: "1dp",
                 options = listOf("0dp", "1dp", "2dp", "3dp"),
                 onSelected = { onPick("b_thick", it) }
             )
-            IconDropdown(Icons.Filled.TextFields, "Tipo", onOpen = { label, cur -> onPeek(label, cur) },
+            IconDropdown(EditorIcons.Layout, "Tipo",
                 current = get("tipo") ?: "Normale",
                 options = listOf("Normale", "Sfogliabile", "Tab"),
                 onSelected = { onPick("tipo", it) }
@@ -711,31 +644,25 @@ private fun ContainerLevel(
             )
         }
         "Colore" -> {
-            IconDropdown(Icons.Filled.Palette, "Colore 1",
+            IconDropdown(EditorIcons.Color, "Colore 1",
                 current = get("col1") ?: "Bianco",
                 options = listOf("Bianco", "Grigio", "Nero", "Ciano"),
-                onSelected = { onPick("col1", it) },
-                badgeCorner = "1",
-                onOpen = { label, cur -> onPeek(label, cur) }
+                onSelected = { onPick("col1", it) }
             )
-            IconDropdown(Icons.Filled.Palette, "Colore 2",
+            IconDropdown(EditorIcons.Color, "Colore 2",
                 current = get("col2") ?: "Grigio chiaro",
                 options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
-                onSelected = { onPick("col2", it) },
-                badgeCorner = "2",
-                onOpen = { label, cur -> onPeek(label, cur) }
+                onSelected = { onPick("col2", it) }
             )
-            IconDropdown(Icons.Filled.SwapVert, "Gradiente",
+            IconDropdown(Icons.Filled.LinearScale, "Gradiente",
                 current = get("grad") ?: "Orizzontale",
                 options = listOf("Orizzontale", "Verticale"),
-                onSelected = { onPick("grad", it) },
-                onOpen = { label, cur -> onPeek(label, cur) }
+                onSelected = { onPick("grad", it) }
             )
-            IconDropdown(Icons.Filled.AutoFixHigh, "FX",
+            IconDropdown(EditorIcons.Layout, "Effetti",
                 current = get("fx") ?: "Vignettatura",
                 options = listOf("Vignettatura", "Noise", "Strisce"),
-                onSelected = { onPick("fx", it) },
-                onOpen = { label, cur -> onPeek(label, cur) }
+                onSelected = { onPick("fx", it) }
             )
         }
         "Immagini" -> {
@@ -806,37 +733,36 @@ private fun TextLevel(
     selections: MutableMap<String, Any?>,
     onToggle: (String, Boolean) -> Unit,
     onPick: (String, String) -> Unit,
-    saved: Map<String, MutableList<String>>,
-    onPeek: (String, String?) -> Unit
+    saved: Map<String, MutableList<String>>
 ) {
     // toggles (bordo più spesso se selezionati)
     val uKey = key(path, "underline")
     val iKey = key(path, "italic")
     ToggleIcon(selected = (selections[uKey] as? Boolean) == true, onClick = {
         onToggle("Sottolinea", !((selections[uKey] as? Boolean) == true))
-    }, icon = Icons.Filled.FormatUnderlined)
+    }, icon = EditorIcons.Text) // riuso icona testo; in futuro icone specifiche
 
     ToggleIcon(selected = (selections[iKey] as? Boolean) == true, onClick = {
         onToggle("Corsivo", !((selections[iKey] as? Boolean) == true))
-    }, icon = Icons.Filled.FormatItalic)
+    }, icon = EditorIcons.Layout) // icona generica per stato
 
     // dropdown (font / weight / size / evidenzia)
-    IconDropdown(Icons.Filled.Remove, "Evidenzia", onOpen = { label, cur -> onPeek(label, cur) },
+    IconDropdown(EditorIcons.Layout, "Evidenzia",
         current = (selections[key(path, "highlight")] as? String) ?: "Nessuna",
         options = listOf("Nessuna", "Marker", "Oblique", "Scribble"),
         onSelected = { onPick("Evidenzia", it) }
     )
-    IconDropdown(Icons.Filled.FontDownload, "Font", onOpen = { label, cur -> onPeek(label, cur) },
+    IconDropdown(EditorIcons.Layout, "Font",
         current = (selections[key(path, "font")] as? String) ?: "System",
         options = listOf("System", "Inter", "Roboto", "SF Pro"),
         onSelected = { onPick("Font", it) }
     )
-    IconDropdown(Icons.Filled.FormatBold, "Peso", onOpen = { label, cur -> onPeek(label, cur) },
+    IconDropdown(EditorIcons.Layout, "Peso",
         current = (selections[key(path, "weight")] as? String) ?: "Regular",
         options = listOf("Light", "Regular", "Medium", "Bold"),
         onSelected = { onPick("Weight", it) }
     )
-    IconDropdown(Icons.Filled.FormatSize, "Size", onOpen = { label, cur -> onPeek(label, cur) },
+    IconDropdown(EditorIcons.Layout, "Size",
         current = (selections[key(path, "size")] as? String) ?: "16sp",
         options = listOf("12sp", "14sp", "16sp", "18sp", "22sp"),
         onSelected = { onPick("Size", it) }
@@ -860,9 +786,9 @@ private fun AddLevel(
     onEnter: (String) -> Unit
 ) {
     if (path.getOrNull(1) == null) {
-        ToolbarIconButton(Icons.Filled.SwapVert, "Icona") { onEnter("Icona") }
-        ToolbarIconButton(Icons.Filled.ToggleOn, "Toggle") { onEnter("Toggle") }
-        ToolbarIconButton(Icons.Filled.LinearScale, "Slider") { onEnter("Slider") }
+        ToolbarIconButton(Icons.Filled.Widgets, "Icona") { onEnter("Icona") }
+        ToolbarIconButton(EditorIcons.Layout, "Toggle") { onEnter("Toggle") }
+        ToolbarIconButton(EditorIcons.Layout, "Slider") { onEnter("Slider") }
     } else {
         // placeholder: solo navigazione visiva
         ElevatedCard(
@@ -950,30 +876,11 @@ private fun IconDropdown(
     contentDescription: String,
     current: String?,
     options: List<String>,
-    onSelected: (String) -> Unit,
-    badgeCorner: String? = null,
-    onOpen: ((String, String?) -> Unit)? = null
+    onSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        ToolbarIconButton(icon, contentDescription, onClick = { onOpen?.invoke(contentDescription, current); expanded = true })
-        // badge angolare (es. "1"/"2")
-        if (!badgeCorner.isNullOrBlank()) {
-            Surface(
-                color = Color(0xFF1B2334),
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset { IntOffset(6, -6) }
-            ) {
-                Text(
-                    text = badgeCorner,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                    fontSize = 10.sp
-                )
-            }
-        }
+        ToolbarIconButton(icon, contentDescription, onClick = { expanded = true })
         // badge valore corrente
         if (!current.isNullOrBlank()) {
             Surface(
