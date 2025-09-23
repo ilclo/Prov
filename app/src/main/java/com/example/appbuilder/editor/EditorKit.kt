@@ -760,7 +760,7 @@ private fun TextLevel(
         options = listOf("12sp", "14sp", "16sp", "18sp", "22sp"),
         onSelected = { onPick("Size", it) }
     )
-    IconDropdown(EditorIcons.TextColor, "Colore",
+    IconDropdown(EditorIcons.Brush, "Colore",
         current = (selections[key(path, "tcolor")] as? String) ?: "Nero",
         options = listOf("Nero", "Bianco", "Blu", "Verde", "Rosso"),
         onSelected = { onPick("Colore", it) }
@@ -792,8 +792,8 @@ private fun AddLevel(
 ) {
     if (path.getOrNull(1) == null) {
         ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
-        ToolbarIconButton(Icons.Filled.Toggle, "Toggle") { onEnter("Toggle") }
-        ToolbarIconButton(Icons.Filled.Slider, "Slider") { onEnter("Slider") }
+        ToolbarIconButton(Icons.Filled.ToggleOn, "Toggle") { onEnter("Toggle") }
+        ToolbarIconButton(Icons.Filled.Tune, "Slider") { onEnter("Slider") }
     } else {
         // placeholder: solo navigazione visiva
         ElevatedCard(
