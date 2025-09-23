@@ -1,5 +1,7 @@
 package com.example.appbuilder.editor
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.AutoAwesome // sostituisce Radiology
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +33,11 @@ import androidx.compose.ui.unit.*
 import kotlin.math.max
 import kotlin.math.min
 import java.util.UUID
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 
 /* ===========================
  *  MODEL (minimo editor)
@@ -148,6 +155,39 @@ data class EditorState(
 /* ===========================
  *  DEMO ENTRY
  * =========================== */
+
+@Composable
+fun ToolbarIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    selected: Boolean = false,          // se vuoi evidenziare uno stato ON/OFF
+    onClick: () -> Unit
+) {
+    val container = when {
+        selected -> MaterialTheme.colorScheme.primary
+        else    -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val content   = Color.White
+    val containerDisabled = container.copy(alpha = 0.5f)
+    val contentDisabled   = content.copy(alpha = 0.5f)
+
+    FilledIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(44.dp), // pulsante più “importante” di una icon button base
+        colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = container,
+            contentColor = content,
+            disabledContainerColor = containerDisabled,
+            disabledContentColor = contentDisabled
+        )
+    ) {
+        Icon(imageVector = icon, contentDescription = contentDescription)
+    }
+}
+
 
 @Composable
 fun EditorDemoScreen() {
@@ -532,13 +572,13 @@ private fun BoxScope.NodeView(node: Node, rect: android.graphics.Rect, selected:
                         .border(1.dp, Color(0x33000000), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Image, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Icon(Icons.Filled.Image, , contentDescription = null,, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
             }
 
             is IconNode -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Settings, null, tint = if (node.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else node.color)
+                    Icon(Icons.Filled.Settings, , contentDescription = null,, tint = if (node.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else node.color)
                 }
             }
         }
@@ -607,19 +647,19 @@ private fun BoxScope.EditorBottomArea(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    IconButton(onClick = onUndo) { Icon(Icons.Filled.Undo, null, tint = iconTint) }
-                    IconButton(onClick = onRedo) { Icon(Icons.Filled.Redo, null, tint = iconTint) }
-                    IconButton(onClick = onSavePage) { Icon(Icons.Filled.Save, null, tint = iconTint) }
-                    IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, null, tint = iconTint) }
-                    IconButton(onClick = onDuplicate) { Icon(Icons.Filled.ContentCopy, null, tint = iconTint) }
-                    IconButton(onClick = onProps) { Icon(Icons.Filled.Settings, null, tint = iconTint) }
-                    IconButton(onClick = onPageLayout) { Icon(Icons.Filled.Tune, null, tint = iconTint) }
+                    ToolbarIconButton(onClick = onUndo) { Icon(Icons.Filled.Undo, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onRedo) { Icon(Icons.Filled.Redo, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onSavePage) { Icon(Icons.Filled.Save, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onDuplicate) { Icon(Icons.Filled.ContentCopy, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onProps) { Icon(Icons.Filled.Settings, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onPageLayout) { Icon(Icons.Filled.Tune, , contentDescription = null,, tint = iconTint) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     // “Crea” con dropdown stub
                     var openCreate by remember { mutableStateOf(false) }
                     Box {
-                        IconButton(onClick = { openCreate = true }) { Icon(Icons.Filled.Add, null, tint = iconTint) }
+                        ToolbarIconButton(onClick = { openCreate = true }) { Icon(Icons.Filled.Add, , contentDescription = null,, tint = iconTint) }
                         DropdownMenu(expanded = openCreate, onDismissRequest = { openCreate = false }) {
                             DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { openCreate = false })
                             DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { openCreate = false })
@@ -627,10 +667,10 @@ private fun BoxScope.EditorBottomArea(
                             DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { openCreate = false })
                         }
                     }
-                    IconButton(onClick = onList) { Icon(Icons.Filled.List, null, tint = iconTint) }
-                    IconButton(onClick = onSaveProject) { Icon(Icons.Filled.SaveAs, null, tint = iconTint) }
-                    IconButton(onClick = onOpen) { Icon(Icons.Filled.FolderOpen, null, tint = iconTint) }
-                    IconButton(onClick = onNew) { Icon(Icons.Filled.CreateNewFolder, null, tint = iconTint) }
+                    ToolbarIconButton(onClick = onList) { Icon(Icons.Filled.List, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onSaveProject) { Icon(Icons.Filled.SaveAs, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onOpen) { Icon(Icons.Filled.FolderOpen, , contentDescription = null,, tint = iconTint) }
+                    ToolbarIconButton(onClick = onNew) { Icon(Icons.Filled.CreateNewFolder, , contentDescription = null,, tint = iconTint) }
                 }
             }
         }
@@ -659,11 +699,11 @@ private fun BoxScope.EditorBottomArea(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onOpenLayout) { Icon(Icons.Filled.Tune, null, tint = iconTint) }
-                IconButton(onClick = onOpenContainer) { Icon(Icons.Filled.Widgets, null, tint = iconTint) }
-                IconButton(onClick = onOpenText) { Icon(Icons.Filled.TextFields, null, tint = iconTint) }
-                IconButton(onClick = onOpenImage) { Icon(Icons.Filled.Image, null, tint = iconTint) }
-                IconButton(onClick = onOpenInsert) { Icon(Icons.Filled.Add, null, tint = iconTint) }
+                ToolbarIconButton(onClick = onOpenLayout) { Icon(Icons.Filled.Tune, , contentDescription = null,, tint = iconTint) }
+                ToolbarIconButton(onClick = onOpenContainer) { Icon(Icons.Filled.Widgets, , contentDescription = null,, tint = iconTint) }
+                ToolbarIconButton(onClick = onOpenText) { Icon(Icons.Filled.TextFields, , contentDescription = null,, tint = iconTint) }
+                ToolbarIconButton(onClick = onOpenImage) { Icon(Icons.Filled.Image, , contentDescription = null,, tint = iconTint) }
+                ToolbarIconButton(onClick = onOpenInsert) { Icon(Icons.Filled.Add, , contentDescription = null,, tint = iconTint) }
             }
         }
     } else {
@@ -690,7 +730,7 @@ private fun BoxScope.EditorBottomArea(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                IconButton(onClick = onExitMenu) { Icon(Icons.Filled.ArrowBack, null, tint = Color.White) }
+                ToolbarIconButton(onClick = onExitMenu) { Icon(Icons.Filled.ArrowBack, , contentDescription = null,, tint = Color.White) }
                 Text(bread, color = Color.White, style = MaterialTheme.typography.labelLarge)
             }
         }
@@ -748,9 +788,9 @@ private fun BoxScope.ConfirmBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("Salvare le modifiche?", color = Color.White, modifier = Modifier.weight(1f))
-            TextButton(onClick = onCancel) { Icon(Icons.Filled.Close, null, tint = Color.White) }
-            TextButton(onClick = onSavePreset) { Icon(Icons.Filled.BookmarkAdd, null, tint = Color.White) }
-            Button(onClick = onOk) { Icon(Icons.Filled.Check, null) }
+            TextButton(onClick = onCancel) { Icon(Icons.Filled.Close, , contentDescription = null,, tint = Color.White) }
+            TextButton(onClick = onSavePreset) { Icon(Icons.Filled.BookmarkAdd, , contentDescription = null,, tint = Color.White) }
+            Button(onClick = onOk) { Icon(Icons.Filled.Check, , contentDescription = null,) }
         }
     }
 }
@@ -769,8 +809,8 @@ private fun LayoutMenu(
 ) {
     when (path.getOrNull(1)) {
         null -> {
-            IconButton(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, null, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, , contentDescription = null,, tint = Color.White) }
         }
 
         "Colore" -> {
@@ -821,8 +861,8 @@ private fun LayoutMenu(
                     onChanged("Layout → Album: ${uris.size} foto")
                 }
             }
-            OutlinedButton(onClick = { pickImage.launch("image/*") }) { Icon(Icons.Filled.Crop, null); Spacer(Modifier.width(6.dp)); Text("Foto") }
-            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) { Icon(Icons.Filled.Collections, null); Spacer(Modifier.width(6.dp)); Text("Album") }
+            OutlinedButton(onClick = { pickImage.launch("image/*") }) { Icon(Icons.Filled.Crop, , contentDescription = null,); Spacer(Modifier.width(6.dp)); Text("Foto") }
+            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) { Icon(Icons.Filled.Collections, , contentDescription = null,); Spacer(Modifier.width(6.dp)); Text("Album") }
         }
     }
 }
@@ -838,13 +878,13 @@ private fun ContainerMenu(
     val w = working ?: ContainerStyle().also { onWorking(it) }
     when (path.getOrNull(1)) {
         null -> {
-            IconButton(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Scroll") }) { Icon(Icons.Filled.SwapVert, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Forma") }) { Icon(Icons.Filled.CropSquare, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Stile") }) { Icon(Icons.Filled.FlashOn, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Bordi") }) { Icon(Icons.Filled.BorderStyle, null, tint = Color.White) }
-            IconButton(onClick = { onPath(path + "Comportamento") }) { Icon(Icons.Filled.ViewCarousel, null, tint = Color.White) }
+            ToolbarIconButto(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButto(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButto(onClick = { onPath(path + "Scroll") }) { Icon(Icons.Filled.SwapVert, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButto(onClick = { onPath(path + "Forma") }) { Icon(Icons.Filled.CropSquare, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButto(onClick = { onPath(path + "Stile") }) { Icon(Icons.Filled.FlashOn, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButto(onClick = { onPath(path + "Bordi") }) { Icon(Icons.Filled.BorderStyle, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButto(onClick = { onPath(path + "Comportamento") }) { Icon(Icons.Filled.ViewCarousel, , contentDescription = null,, tint = Color.White) }
         }
 
         "Colore" -> {
@@ -867,8 +907,8 @@ private fun ContainerMenu(
             val pickAlbum = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
                 if (uris.isNotEmpty()) { onWorking(w.copy(bgMode = BgMode.Album, album = uris)); onChanged("Contenitore → Album: ${uris.size} foto") }
             }
-            OutlinedButton(onClick = { pickImage.launch("image/*") }) { Icon(Icons.Filled.Crop, null); Spacer(Modifier.width(6.dp)); Text("Foto") }
-            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) { Icon(Icons.Filled.Collections, null); Spacer(Modifier.width(6.dp)); Text("Album") }
+            OutlinedButton(onClick = { pickImage.launch("image/*") }) { Icon(Icons.Filled.Crop, , contentDescription = null,); Spacer(Modifier.width(6.dp)); Text("Foto") }
+            OutlinedButton(onClick = { pickAlbum.launch("image/*") }) { Icon(Icons.Filled.Collections, , contentDescription = null,); Spacer(Modifier.width(6.dp)); Text("Album") }
         }
 
         "Scroll" -> {
@@ -922,9 +962,9 @@ private fun TextMenu(
     }, Icons.Filled.FormatItalic)
 
     // font/weight/size come placeholder (menu a tendina in step successivo)
-    IconButton(onClick = { onChanged("Testo → Font…") }) { Icon(Icons.Filled.FontDownload, null, tint = Color.White) }
-    IconButton(onClick = { onChanged("Testo → Weight…") }) { Icon(Icons.Filled.FormatBold, null, tint = Color.White) }
-    IconButton(onClick = { onChanged("Testo → Size…") }) { Icon(Icons.Filled.FormatSize, null, tint = Color.White) }
+    ToolbarIconButto(onClick = { onChanged("Testo → Font…") }) { Icon(Icons.Filled.FontDownload, contentDescription = null, tint = Color.White) }
+    ToolbarIconButto(onClick = { onChanged("Testo → Weight…") }) { Icon(Icons.Filled.FormatBold, contentDescription = null, tint = Color.White) }
+    ToolbarIconButto(onClick = { onChanged("Testo → Size…") }) { Icon(Icons.Filled.FormatSize, contentDescription = null, tint = Color.White) }
 }
 
 @Composable
@@ -933,10 +973,10 @@ private fun ImageMenu(
     onPath: (List<String>) -> Unit,
     onChanged: (String) -> Unit
 ) {
-    IconButton(onClick = { onChanged("Immagine → Crop") }) { Icon(Icons.Filled.Crop, null, tint = Color.White) }
-    IconButton(onClick = { onChanged("Immagine → Cornice") }) { Icon(Icons.Filled.CropPortrait, null, tint = Color.White) }
-    IconButton(onClick = { onChanged("Immagine → Album") }) { Icon(Icons.Filled.Collections, null, tint = Color.White) }
-    IconButton(onClick = { onChanged("Immagine → Adattamento") }) { Icon(Icons.Filled.FitScreen, null, tint = Color.White) }
+    ToolbarIconButto(onClick = { onChanged("Immagine → Crop") }) { Icon(Icons.Filled.Crop, contentDescription = null, tint = Color.White) }
+    ToolbarIconButto(onClick = { onChanged("Immagine → Cornice") }) { Icon(Icons.Filled.CropPortrait, contentDescription = null, tint = Color.White) }
+    ToolbarIconButto(onClick = { onChanged("Immagine → Album") }) { Icon(Icons.Filled.Collections, contentDescription = null, tint = Color.White) }
+    ToolbarIconButto(onClick = { onChanged("Immagine → Adattamento") }) { Icon(Icons.Filled.FitScreen, contentDescription = null, tint = Color.White) }
 }
 
 @Composable
@@ -958,7 +998,7 @@ private fun ToggleIcon(selected: Boolean, onClick: () -> Unit, icon: ImageVector
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, null, tint = Color.White)
+        Icon(icon, contentDescription = null, tint = Color.White)
     }
 }
 
