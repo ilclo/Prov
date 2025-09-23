@@ -878,13 +878,13 @@ private fun ContainerMenu(
     val w = working ?: ContainerStyle().also { onWorking(it) }
     when (path.getOrNull(1)) {
         null -> {
-            ToolbarIconButto(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, , contentDescription = null,, tint = Color.White) }
-            ToolbarIconButto(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, , contentDescription = null,, tint = Color.White) }
-            ToolbarIconButto(onClick = { onPath(path + "Scroll") }) { Icon(Icons.Filled.SwapVert, , contentDescription = null,, tint = Color.White) }
-            ToolbarIconButto(onClick = { onPath(path + "Forma") }) { Icon(Icons.Filled.CropSquare, , contentDescription = null,, tint = Color.White) }
-            ToolbarIconButto(onClick = { onPath(path + "Stile") }) { Icon(Icons.Filled.FlashOn, , contentDescription = null,, tint = Color.White) }
-            ToolbarIconButto(onClick = { onPath(path + "Bordi") }) { Icon(Icons.Filled.BorderStyle, , contentDescription = null,, tint = Color.White) }
-            ToolbarIconButto(onClick = { onPath(path + "Comportamento") }) { Icon(Icons.Filled.ViewCarousel, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Colore") }) { Icon(Icons.Filled.ColorLens, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Immagini") }) { Icon(Icons.Filled.Image, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Scroll") }) { Icon(Icons.Filled.SwapVert, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Forma") }) { Icon(Icons.Filled.CropSquare, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Stile") }) { Icon(Icons.Filled.FlashOn, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Bordi") }) { Icon(Icons.Filled.BorderStyle, , contentDescription = null,, tint = Color.White) }
+            ToolbarIconButton(onClick = { onPath(path + "Comportamento") }) { Icon(Icons.Filled.ViewCarousel, , contentDescription = null,, tint = Color.White) }
         }
 
         "Colore" -> {
@@ -962,9 +962,9 @@ private fun TextMenu(
     }, Icons.Filled.FormatItalic)
 
     // font/weight/size come placeholder (menu a tendina in step successivo)
-    ToolbarIconButto(onClick = { onChanged("Testo → Font…") }) { Icon(Icons.Filled.FontDownload, contentDescription = null, tint = Color.White) }
-    ToolbarIconButto(onClick = { onChanged("Testo → Weight…") }) { Icon(Icons.Filled.FormatBold, contentDescription = null, tint = Color.White) }
-    ToolbarIconButto(onClick = { onChanged("Testo → Size…") }) { Icon(Icons.Filled.FormatSize, contentDescription = null, tint = Color.White) }
+    ToolbarIconButton(onClick = { onChanged("Testo → Font…") }) { Icon(Icons.Filled.FontDownload, contentDescription = null, tint = Color.White) }
+    ToolbarIconButton(onClick = { onChanged("Testo → Weight…") }) { Icon(Icons.Filled.FormatBold, contentDescription = null, tint = Color.White) }
+    ToolbarIconButton(onClick = { onChanged("Testo → Size…") }) { Icon(Icons.Filled.FormatSize, contentDescription = null, tint = Color.White) }
 }
 
 @Composable
@@ -973,10 +973,10 @@ private fun ImageMenu(
     onPath: (List<String>) -> Unit,
     onChanged: (String) -> Unit
 ) {
-    ToolbarIconButto(onClick = { onChanged("Immagine → Crop") }) { Icon(Icons.Filled.Crop, contentDescription = null, tint = Color.White) }
-    ToolbarIconButto(onClick = { onChanged("Immagine → Cornice") }) { Icon(Icons.Filled.CropPortrait, contentDescription = null, tint = Color.White) }
-    ToolbarIconButto(onClick = { onChanged("Immagine → Album") }) { Icon(Icons.Filled.Collections, contentDescription = null, tint = Color.White) }
-    ToolbarIconButto(onClick = { onChanged("Immagine → Adattamento") }) { Icon(Icons.Filled.FitScreen, contentDescription = null, tint = Color.White) }
+    ToolbarIconButton(onClick = { onChanged("Immagine → Crop") }) { Icon(Icons.Filled.Crop, contentDescription = null, tint = Color.White) }
+    ToolbarIconButton(onClick = { onChanged("Immagine → Cornice") }) { Icon(Icons.Filled.CropPortrait, contentDescription = null, tint = Color.White) }
+    ToolbarIconButton(onClick = { onChanged("Immagine → Album") }) { Icon(Icons.Filled.Collections, contentDescription = null, tint = Color.White) }
+    ToolbarIconButton(onClick = { onChanged("Immagine → Adattamento") }) { Icon(Icons.Filled.FitScreen, contentDescription = null, tint = Color.White) }
 }
 
 @Composable
