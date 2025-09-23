@@ -83,5 +83,5 @@ object EditorIcons {
     // toggle: toggle_on
     val Toggle: ImageVector            = Icons.Filled.ToggleOn
     // slider: switches → fallback "Tune"
-    val Slider: ImageVector            = Icons.Filled.sliders
+    val Slider: ImageVector            = Icons.Filled.LinearScale
 }
