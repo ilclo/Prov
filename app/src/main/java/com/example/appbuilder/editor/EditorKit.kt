@@ -5,8 +5,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,6 +71,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+/* ---- BARS: altezze fisse + gap ---- */
+private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (uguale in Home e Submenu)
+private val TOP_BAR_HEIGHT = 44.dp           // barra superiore (categorie / submenu)
+private val BARS_GAP = 8.dp                  // distacco tra le due barre
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
@@ -291,13 +298,15 @@ private fun BoxScope.MainBottomBar(
             .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
             .navigationBarsPadding()
             .imePadding()
+            .height(BOTTOM_BAR_HEIGHT)
             .onGloballyPositioned { onMeasured(it.size.height) }
     ) {
         val scroll = rememberScrollState()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .fillMaxHeight()
+                .padding(horizontal = 8.dp)
                 .horizontalScroll(scroll),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -359,8 +368,9 @@ private fun BoxScope.MainMenuBar(
     onAdd: () -> Unit,
     bottomBarHeightPx: Int
 ) {
-    val gap = 8.dp
-    val dy = with(LocalDensity.current) { bottomBarHeightPx.toDp() + gap }
+    val dy = with(LocalDensity.current) {
+        (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) + BARS_GAP
+    }
 
     Surface(
         color = Color(0xFF111621),
@@ -373,12 +383,14 @@ private fun BoxScope.MainMenuBar(
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .offset { IntOffset(0, -dy.roundToPx()) }
+            .height(TOP_BAR_HEIGHT)
     ) {
         val scroll = rememberScrollState()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .fillMaxHeight()
+                .padding(horizontal = 10.dp)
                 .horizontalScroll(scroll),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -406,6 +418,7 @@ private fun BoxScope.SubMenuBar(
     onPick: (label: String, value: String) -> Unit,
     savedPresets: Map<String, MutableList<String>>
 ) {
+    val offsetY = with(LocalDensity.current) { (BOTTOM_BAR_HEIGHT + BARS_GAP).roundToPx() }
     Surface(
         color = Color(0xFF0F141E),
         contentColor = Color.White,
@@ -416,14 +429,16 @@ private fun BoxScope.SubMenuBar(
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .offset { IntOffset(0, -64) }
+            .offset { IntOffset(0, -offsetY) }
+            .height(TOP_BAR_HEIGHT)
     ) {
         val scroll = rememberScrollState()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .fillMaxHeight()
                 .horizontalScroll(scroll)
-                .padding(horizontal = 10.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -455,14 +470,19 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 10.dp)
+            .navigationBarsPadding()
             .imePadding()
+            .height(BOTTOM_BAR_HEIGHT)
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
             lastChanged?.let { append("   •   "); append(it) }
         }
         Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(pretty, style = MaterialTheme.typography.labelLarge)
