@@ -481,7 +481,6 @@ private fun BoxScope.MainBottomBar(
                 fontWeight = FontWeight.Medium,
                 color = Color.White
             )
-            val labelBg = Color(0xFF0D1117)
 
             // "elementi" – centrata sotto le 4 icone
             if (firstBlockCenter != null) {
@@ -496,7 +495,6 @@ private fun BoxScope.MainBottomBar(
                             val x = ((firstBlockCenter ?: 0f) - wElementi / 2f).toInt()
                             IntOffset(x, 0)
                         }
-                        .background(labelBg)
                         .padding(horizontal = 4.dp)
                 )
             }
@@ -514,7 +512,6 @@ private fun BoxScope.MainBottomBar(
                             val x = (cx - wPagine / 2f).toInt()
                             IntOffset(x, 0)
                         }
-                        .background(labelBg)
                         .padding(horizontal = 4.dp)
                 )
             }
@@ -531,7 +528,6 @@ private fun BoxScope.MainBottomBar(
                             val x = ((lastBlockCenter ?: 0f) - wProgetti / 2f).toInt()
                             IntOffset(x, 0)
                         }
-                        .background(labelBg)
                         .padding(horizontal = 4.dp)
                 )
             }
