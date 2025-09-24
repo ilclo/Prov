@@ -75,7 +75,7 @@ import androidx.compose.ui.unit.sp
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (uguale in Home e Submenu)
 private val TOP_BAR_HEIGHT = 44.dp           // barra superiore (categorie / submenu)
-private val BARS_GAP = 8.dp                  // distacco tra le due barre
+private val BARS_GAP = 10.dp                 // distacco tra le due barre (+2dp di “aria”)
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
@@ -469,7 +469,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp) // rimosso padding verticale esterno: prima alzava la barra e causava sovrapposizione
             .navigationBarsPadding()
             .imePadding()
             .height(BOTTOM_BAR_HEIGHT)
