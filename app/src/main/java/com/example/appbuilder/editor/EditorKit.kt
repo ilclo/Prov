@@ -422,7 +422,7 @@ private fun BoxScope.MainBottomBar(
             }
 
             // --- Bordo inferiore bianco con "gap" sotto le etichette ---
-            val underlineInsetY = 6.dp   // distanza dal fondo
+            val underlineInsetY = 0.dp   // distanza dal fondo
             val underlineStroke = 1.dp   // spessore linea
 
             androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
