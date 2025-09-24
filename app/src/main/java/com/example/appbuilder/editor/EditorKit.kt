@@ -22,22 +22,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.BookmarkAdd
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.LinearScale
-import androidx.compose.material.icons.filled.ToggleOn
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Redo
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.Undo
-import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.LinearScale
+import androidx.compose.material.icons.outlined.ToggleOn
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Redo
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.Undo
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -321,8 +321,8 @@ private fun BoxScope.MainBottomBar(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ToolbarIconButton(Icons.Filled.Undo, "Undo", onClick = onUndo)
-                ToolbarIconButton(Icons.Filled.Redo, "Redo", onClick = onRedo)
+                ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo)
+                ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo)
 
                 dividerDot()
 
@@ -349,7 +349,7 @@ private fun BoxScope.MainBottomBar(
                 }
                 // Lista
                 Box {
-                    ToolbarIconButton(Icons.Filled.List, "Lista", onClick = { showListMenu = true })
+                    ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true })
                     DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
                         DropdownMenuItem(text = { Text("Pagine…") }, onClick = { showListMenu = false })
                         DropdownMenuItem(text = { Text("Avvisi…") }, onClick = { showListMenu = false })
@@ -360,9 +360,9 @@ private fun BoxScope.MainBottomBar(
 
                 dividerDot()
 
-                ToolbarIconButton(Icons.Filled.Save, "Salva progetto", onClick = onSaveProject)
-                ToolbarIconButton(Icons.Filled.FolderOpen, "Apri", onClick = onOpenProject)
-                ToolbarIconButton(Icons.Filled.CreateNewFolder, "Nuovo progetto", onClick = onNewProject)
+                ToolbarIconButton(Icons.Outlined.Save, "Salva progetto", onClick = onSaveProject)
+                ToolbarIconButton(Icons.Outlined.FolderOpen, "Apri", onClick = onOpenProject)
+                ToolbarIconButton(Icons.Outlined.CreateNewFolder, "Nuovo progetto", onClick = onNewProject)
             }
         }
     }
@@ -452,7 +452,7 @@ private fun BoxScope.SubMenuBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // back icon
-            ToolbarIconButton(Icons.Filled.ArrowBack, "Indietro", onClick = onBack)
+            ToolbarIconButton(Icons.Outlined.ArrowBack, "Indietro", onClick = onBack)
 
             when (path.firstOrNull()) {
                 "Layout" -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
@@ -521,7 +521,7 @@ private fun LayoutLevel(
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
             IconDropdown(
-                icon = Icons.Filled.BookmarkAdd,
+                icon = Icons.Outlined.BookmarkAdd,
                 contentDescription = "Scegli default",
                 current = get("default") ?: saved["Layout"]?.firstOrNull(),
                 options = saved["Layout"].orEmpty(),
@@ -653,7 +653,7 @@ private fun ContainerLevel(
                 onSelected = { onPick("tipo", it) }
             )
             IconDropdown(
-                icon = Icons.Filled.BookmarkAdd,
+                icon = Icons.Outlined.BookmarkAdd,
                 contentDescription = "Scegli default",
                 current = get("default") ?: saved["Contenitore"]?.firstOrNull(),
                 options = saved["Contenitore"].orEmpty(),
@@ -804,7 +804,7 @@ private fun TextLevel(
 
     // default
     IconDropdown(
-        icon = Icons.Filled.BookmarkAdd,
+        icon = Icons.Outlined.BookmarkAdd,
         contentDescription = "Scegli default",
         current = (selections[key(path, "default")] as? String) ?: saved["Testo"]?.firstOrNull(),
         options = saved["Testo"].orEmpty(),
@@ -821,8 +821,8 @@ private fun AddLevel(
 ) {
     if (path.getOrNull(1) == null) {
         ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
-        ToolbarIconButton(Icons.Filled.ToggleOn, "Toggle") { onEnter("Toggle") }
-        ToolbarIconButton(Icons.Filled.LinearScale, "Slider") { onEnter("Slider") }
+        ToolbarIconButton(Icons.Outlined.ToggleOn, "Toggle") { onEnter("Toggle") }
+        ToolbarIconButton(Icons.Outlined.LinearScale, "Slider") { onEnter("Slider") }
     } else {
         // placeholder: solo navigazione visiva
         ElevatedCard(
@@ -960,7 +960,7 @@ private fun BoxScope.ConfirmBar(
             )
             // icone-only
             ToolbarIconButton(EditorIcons.Cancel, "Annulla", onClick = onCancel)
-            ToolbarIconButton(Icons.Filled.BookmarkAdd, "Salva impostazioni", onClick = onSavePreset)
+            ToolbarIconButton(Icons.Outlined.BookmarkAdd, "Salva impostazioni", onClick = onSavePreset)
             ToolbarIconButton(EditorIcons.Ok, "OK", onClick = onOk, selected = true)
         }
     }
