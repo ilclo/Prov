@@ -138,7 +138,7 @@ fun EditorMenusOnly(
                 if (menuPath.size == 1 && dirty) showConfirm = true
                 else {
                     menuPath = menuPath.dropLast(1)
-                    if (menuPath.size <= 1) lastChanged = null  // ← pulisci info extra
+                    lastChanged = null  // ← azzera info extra su navigazione
                 }
             }
         }
@@ -187,18 +187,22 @@ fun EditorMenusOnly(
                 selections = menuSelections,
                 onBack = {
                     if (menuPath.size == 1 && dirty) showConfirm = true
-                    else menuPath = menuPath.dropLast(1)
+                    else {
+                        menuPath = menuPath.dropLast(1)
+                        lastChanged = null   // ← niente “scia” nel breadcrumb
+                    }
                 },
                 onEnter = { label ->
-                val leafToggles = setOf("Aggiungi foto", "Aggiungi album")
-                val newPath = when {
-                    menuPath.lastOrNull() == label -> menuPath                      // no-op su identico
-                    menuPath.lastOrNull() in leafToggles && label in leafToggles -> // switch tra sibling
-                    menuPath.dropLast(1) + label
-                    else -> menuPath + label
-                }
-                menuPath = newPath
-                lastChanged = if (newPath.size >= 2) label else null
+                    // Sibling foglia nello stesso ramo (immagini)
+                    val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
+                    menuPath = when {
+                        menuPath.lastOrNull() == label -> menuPath
+                        menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
+                            menuPath.dropLast(1) + label   // ← sostituisci, non accumulare
+                        else -> menuPath + label
+                    }
+                    // Navigazione ≠ scelta: non mostrare nel breadcrumb
+                    lastChanged = null
                 },
                 onToggle = { label, value ->
                     menuSelections[key(menuPath, label)] = value
@@ -480,9 +484,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
-            if (path.size >= 2) {                      // ← mostra extra solo in sotto-menù
-                lastChanged?.let { append("   •   "); append(it) }
-            }
+            lastChanged?.let { append("   •   "); append(it) } // ← mostra sempre scelte utente
         }
         Row(
             Modifier
