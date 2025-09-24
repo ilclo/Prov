@@ -469,7 +469,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, bottom = SAFE_BOTTOM_MARGIN) // ← fisso
+            .padding(start = 12.dp, top = 0.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
             .height(BOTTOM_BAR_HEIGHT)
     ) {
         val pretty = buildString {
