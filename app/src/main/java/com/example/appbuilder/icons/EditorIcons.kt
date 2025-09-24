@@ -1,90 +1,66 @@
 package com.example.appbuilder.icons
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import com.example.appbuilder.R
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.* // per CrueltyFree
+import androidx.compose.material.icons.outlined.*
 
 /**
- * Pacchetto icone centralizzato per l'editor.
- * Mappa nomi semantici → Material Icons (Compose, Android).
- * Dove il nome richiesto non esiste in Android, usiamo un fallback vicino (commentato).
+ * Pacchetto icone centralizzato per l'editor (Vector Asset + fallback Icons.*).
+ * Tutte le icone "nuove" (Material Symbols) arrivano da res/drawable via vectorResource.
+ * In questo modo EditorKit continua a ricevere ImageVector e non va toccato.
  */
 object EditorIcons {
 
-    /* — Azioni generali — */
-    val Undo: ImageVector       = Icons.Filled.Undo
-    val Redo: ImageVector       = Icons.Filled.Redo
-    val Save: ImageVector       = Icons.Filled.Save
-    val Delete: ImageVector     = Icons.Filled.Delete
-    val Duplicate: ImageVector  = Icons.Filled.ContentCopy
-    val Settings: ImageVector   = Icons.Filled.Settings
-    val Ok: ImageVector         = Icons.Filled.Check
-    val Cancel: ImageVector     = Icons.Filled.Close
-    val Back: ImageVector       = Icons.Filled.ArrowBack
+    /* — Azioni generali (restano da Icons.*) — */
+    val Undo: ImageVector       = Icons.Outlined.Undo
+    val Redo: ImageVector       = Icons.Outlined.Redo
+    val Save: ImageVector       = Icons.Outlined.Save
+    val Delete: ImageVector     = Icons.Outlined.Delete
+    val Duplicate: ImageVector  = Icons.Outlined.ContentCopy
+    val Settings: ImageVector   = Icons.Outlined.Settings
+    val Ok: ImageVector         = Icons.Outlined.Check
+    val Cancel: ImageVector     = Icons.Outlined.Close
+    val Back: ImageVector       = Icons.Outlined.ArrowBack
+    val Image: ImageVector      = Icons.Outlined.Image
+    val Insert: ImageVector     = Icons.Outlined.Add
+    val Crop: ImageVector       = Icons.Outlined.Crop
 
     /* — Categorie di menù (barra superiore) — */
-    // testo: title
-    val Text: ImageVector       = Icons.Filled.Title
-    // contenitore: add_box
-    val Container: ImageVector  = Icons.Filled.AddBox
-    // layout: news → fallback: Article
-    val Layout: ImageVector     = Icons.Filled.Article
-
-    // generici
-    val Image: ImageVector      = Icons.Filled.Image
-    val Insert: ImageVector     = Icons.Filled.Add
+    val Text: ImageVector       @Composable get() = ImageVector.vectorResource(R.drawable.ic_title)       // title
+    val Container: ImageVector  @Composable get() = ImageVector.vectorResource(R.drawable.ic_add_box)     // add_box
+    val Layout: ImageVector     @Composable get() = ImageVector.vectorResource(R.drawable.ic_news)        // news
 
     /* — Testo (menù) — */
-    // Sottolinea: format_color_text
-    val Underline: ImageVector         = Icons.Filled.FormatColorText
-    // Corsivo: format_italic
-    val Italic: ImageVector            = Icons.Filled.FormatItalic
-    // Evidenzia: format_ink_highlighter → fallback: Highlight
-    val Highlight: ImageVector         = Icons.Filled.Highlight
-    // Font: custom_typography → fallback: FontDownload
-    val CustomTypography: ImageVector  = Icons.Filled.FontDownload
-    // Weight: format_bold
-    val Bold: ImageVector              = Icons.Filled.FormatBold
-    // Size: format_size
-    val Size: ImageVector              = Icons.Filled.FormatSize
-    // Colore (menù testo): brush
-    val Brush: ImageVector             = Icons.Filled.Brush
+    val Underline: ImageVector         @Composable get() = ImageVector.vectorResource(R.drawable.ic_format_color_text)
+    val Italic: ImageVector            @Composable get() = ImageVector.vectorResource(R.drawable.ic_format_italic)
+    val Highlight: ImageVector         @Composable get() = ImageVector.vectorResource(R.drawable.ic_format_ink_highlighter)
+    val CustomTypography: ImageVector  @Composable get() = ImageVector.vectorResource(R.drawable.ic_custom_typography)
+    val Bold: ImageVector              @Composable get() = ImageVector.vectorResource(R.drawable.ic_format_bold)
+    val Size: ImageVector              @Composable get() = ImageVector.vectorResource(R.drawable.ic_format_size)
+    val Brush: ImageVector             @Composable get() = ImageVector.vectorResource(R.drawable.ic_brush) // Colore testo
 
     /* — Colore (contenitore & layout) — */
-    // voce "Colore": format_paint
-    val Color: ImageVector             = Icons.Filled.FormatPaint
-    // "Colore 1/2": colors → fallback: Palette
-    val Colors: ImageVector            = Icons.Filled.Palette
-    // Gradiente: transition_fade → fallback: LinearScale
-    val Gradient: ImageVector          = Icons.Filled.LinearScale
-    // fx: function
-    val Functions: ImageVector         = Icons.Filled.Functions
+    val Color: ImageVector             @Composable get() = ImageVector.vectorResource(R.drawable.ic_format_paint)
+    val Colors: ImageVector            @Composable get() = ImageVector.vectorResource(R.drawable.ic_colors) // 1 & 2
+    val Gradient: ImageVector          @Composable get() = ImageVector.vectorResource(R.drawable.ic_transition_fade)
+    val Functions: ImageVector         @Composable get() = ImageVector.vectorResource(R.drawable.ic_function)
 
     /* — Contenitore (altre opzioni) — */
-    // scroll: swipe_vertical → fallback: SwapVert
-    val SwipeVertical: ImageVector     = Icons.Filled.SwapVert
-    // Shape: square → fallback: CropSquare
-    val Square: ImageVector            = Icons.Filled.CropSquare
-    // Variant: variables → fallback: ViewModule
-    val Variant: ImageVector           = Icons.Filled.ViewModule
-    // b_tick: line_weight
-    val LineWeight: ImageVector        = Icons.Filled.LineWeight
-    // Tipo: swipe_right → fallback: SwapHoriz
-    val SwipeRight: ImageVector        = Icons.Filled.SwapHoriz
+    val SwipeVertical: ImageVector     @Composable get() = ImageVector.vectorResource(R.drawable.ic_swipe_vertical)
+    val Square: ImageVector            @Composable get() = ImageVector.vectorResource(R.drawable.ic_square)
+    val Variant: ImageVector           @Composable get() = ImageVector.vectorResource(R.drawable.ic_variables)
+    val LineWeight: ImageVector        @Composable get() = ImageVector.vectorResource(R.drawable.ic_line_weight)
+    val SwipeRight: ImageVector        @Composable get() = ImageVector.vectorResource(R.drawable.ic_swipe_right)
 
     /* — Immagini — */
-    // aggiungi immagine: add_photo_alternate
-    val AddPhotoAlternate: ImageVector = Icons.Filled.AddPhotoAlternate
-    // aggiungi album: perm_media
-    val PermMedia: ImageVector         = Icons.Filled.PermMedia
-    val Crop: ImageVector              = Icons.Filled.Crop
+    val AddPhotoAlternate: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.ic_add_photo_alternate)
+    val PermMedia: ImageVector         @Composable get() = ImageVector.vectorResource(R.drawable.ic_perm_media)
 
     /* — Menù "Aggiungi" — */
-    // icona: cruelty_free (Outlined); alternativa fallback: Pets
-    val Icon: ImageVector              = Icons.Outlined.CrueltyFree
-    // toggle: toggle_on
-    val Toggle: ImageVector            = Icons.Filled.ToggleOn
-    // slider: switches → fallback: Tune (sliders)
-    val Slider: ImageVector            = Icons.Filled.Commit
+    val Icon: ImageVector              @Composable get() = ImageVector.vectorResource(R.drawable.ic_cruelty_free) // cruelty_free
+    val Toggle: ImageVector            @Composable get() = ImageVector.vectorResource(R.drawable.ic_toggle_on)    // toggle_on
+    val Slider: ImageVector            @Composable get() = ImageVector.vectorResource(R.drawable.ic_switches)     // switches
 }
