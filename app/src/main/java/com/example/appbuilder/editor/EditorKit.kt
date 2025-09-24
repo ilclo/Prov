@@ -136,7 +136,10 @@ fun EditorMenusOnly(
             menuPath.isNotEmpty() -> {
                 // se sto tornando alla home e ho modifiche → conferma
                 if (menuPath.size == 1 && dirty) showConfirm = true
-                else menuPath = menuPath.dropLast(1)
+                else {
+                    menuPath = menuPath.dropLast(1)
+                    if (menuPath.size <= 1) lastChanged = null  // ← pulisci info extra
+                }
             }
         }
     }
@@ -187,9 +190,15 @@ fun EditorMenusOnly(
                     else menuPath = menuPath.dropLast(1)
                 },
                 onEnter = { label ->
-                    // entro in un sotto ramo
-                    menuPath = menuPath + label
-                    lastChanged = label // evidenzio nel path cosa sto aprendo
+                val leafToggles = setOf("Aggiungi foto", "Aggiungi album")
+                val newPath = when {
+                    menuPath.lastOrNull() == label -> menuPath                      // no-op su identico
+                    menuPath.lastOrNull() in leafToggles && label in leafToggles -> // switch tra sibling
+                    menuPath.dropLast(1) + label
+                    else -> menuPath + label
+                }
+                menuPath = newPath
+                lastChanged = if (newPath.size >= 2) label else null
                 },
                 onToggle = { label, value ->
                     menuSelections[key(menuPath, label)] = value
@@ -474,7 +483,9 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
-            lastChanged?.let { append("   •   "); append(it) }
+            if (path.size >= 2) {                      // ← mostra extra solo in sotto-menù
+                lastChanged?.let { append("   •   "); append(it) }
+            }
         }
         Row(
             Modifier
@@ -742,8 +753,8 @@ private fun TextLevel(
     saved: Map<String, MutableList<String>>
 ) {
     // toggles (bordo più spesso se selezionati)
-    val uKey = key(path, "underline")
-    val iKey = key(path, "italic")
+    val uKey = key(path, "Sottolinea")
+    val iKey = key(path, "Corsivo")
     // Sottolinea
     ToggleIcon(
         selected = (selections[uKey] as? Boolean) == true,
@@ -857,40 +868,19 @@ private fun ToggleIcon(
     onClick: () -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
-    val borderWidth = if (selected) 2.dp else 1.dp
     Surface(
         shape = CircleShape,
         color = Color(0xFF1B2334),
         contentColor = Color.White,
         tonalElevation = if (selected) 6.dp else 0.dp,
         shadowElevation = if (selected) 6.dp else 0.dp,
-        modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
+        border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null,
+        modifier = Modifier.size(42.dp)
     ) {
-        Box(
-            Modifier
-                .background(Color.Transparent)
-        ) {
-            IconButton(onClick = onClick, modifier = Modifier.matchParentSize()) {
-                Icon(icon, contentDescription = null)
-            }
-            // bordo manuale
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .padding(1.dp)
-                    .clip(CircleShape)
-                    .background(Color.Transparent)
-            )
+        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
+            Icon(icon, contentDescription = null)
         }
     }
-    // disegno bordo esterno (usiamo ElevatedCard per un bordo pulito)
-    ElevatedCard(
-        modifier = Modifier
-            .offset { IntOffset(-42, -42) } // invisibile: hack rimosso, lasciamo così (no overlay)
-            .size(0.dp)
-    ) {}
 }
 
 @Composable
