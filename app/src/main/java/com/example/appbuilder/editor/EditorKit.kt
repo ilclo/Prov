@@ -2,6 +2,7 @@ package com.example.appbuilder.editor
 
 import com.example.appbuilder.icons.EditorIcons
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -310,64 +311,234 @@ private fun BoxScope.MainBottomBar(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN) // ← fisso
+            .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
             .height(BOTTOM_BAR_HEIGHT)
             .onGloballyPositioned { onMeasured(it.size.height) }
     ) {
         val scroll = rememberScrollState()
-        Row(
+
+        // --- misure per linea + etichette ---
+        var boxLeftRoot by remember { mutableStateOf(0f) }
+        var firstBlockCenter by remember { mutableStateOf<Float?>(null) } // 4 icone
+        var firstDotCenter by remember { mutableStateOf<Float?>(null) }   // puntino 1
+        var secondDotCenter by remember { mutableStateOf<Float?>(null) }  // puntino 2
+        var lastBlockCenter by remember { mutableStateOf<Float?>(null) }  // icone progetti
+        var wElementi by remember { mutableStateOf(0f) }
+        var wPagine by remember { mutableStateOf(0f) }
+        var wProgetti by remember { mutableStateOf(0f) }
+
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .padding(horizontal = 8.dp)
-                .horizontalScroll(scroll),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .fillMaxSize()
+                .onGloballyPositioned { boxLeftRoot = it.positionInRoot().x }
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo)
-                ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo)
-                ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete)
-                ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(horizontal = 10.dp)
+                    .horizontalScroll(scroll),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Gruppo sinistro
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Blocco 1: quattro icone (ELEMENTI)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.onGloballyPositioned {
+                            val pos = it.positionInRoot()
+                            firstBlockCenter = pos.x + it.size.width / 2f - boxLeftRoot
+                        }
+                    ) {
+                        ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo)
+                        ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo)
+                        ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete)
+                        ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate)
+                    }
 
-                dividerDot()
+                    // Puntino 1 (misurato)
+                    Box(
+                        modifier = Modifier.onGloballyPositioned {
+                            val pos = it.positionInRoot()
+                            firstDotCenter = pos.x + it.size.width / 2f - boxLeftRoot
+                        }
+                    ) { dividerDot() }
 
-                ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties)
-                ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout)
-                ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile)
+                    // Blocco intermedio (PAGINE E MENÙ)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties)
+                        ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout)
+                        ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile)
+                    }
+                }
+
+                // Gruppo destro
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Crea
+                    Box {
+                        ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
+                        DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
+                            DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { showCreateMenu = false })
+                            DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { showCreateMenu = false })
+                            DropdownMenuItem(text = { Text("Menù laterale") }, onClick = { showCreateMenu = false })
+                            DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { showCreateMenu = false })
+                        }
+                    }
+                    // Lista
+                    Box {
+                        ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true })
+                        DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
+                            DropdownMenuItem(text = { Text("Pagine…") }, onClick = { showListMenu = false })
+                            DropdownMenuItem(text = { Text("Avvisi…") }, onClick = { showListMenu = false })
+                            DropdownMenuItem(text = { Text("Menu laterali…") }, onClick = { showListMenu = false })
+                            DropdownMenuItem(text = { Text("Menu centrali…") }, onClick = { showListMenu = false })
+                        }
+                    }
+
+                    // Puntino 2 (misurato)
+                    Box(
+                        modifier = Modifier.onGloballyPositioned {
+                            val pos = it.positionInRoot()
+                            secondDotCenter = pos.x + it.size.width / 2f - boxLeftRoot
+                        }
+                    ) { dividerDot() }
+
+                    // Blocco finale: PROGETTI
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.onGloballyPositioned {
+                            val pos = it.positionInRoot()
+                            lastBlockCenter = pos.x + it.size.width / 2f - boxLeftRoot
+                        }
+                    ) {
+                        ToolbarIconButton(Icons.Outlined.Save, "Salva progetto", onClick = onSaveProject)
+                        ToolbarIconButton(Icons.Outlined.FolderOpen, "Apri", onClick = onOpenProject)
+                        ToolbarIconButton(Icons.Outlined.CreateNewFolder, "Nuovo progetto", onClick = onNewProject)
+                    }
+                }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                // Crea
-                Box {
-                    ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
-                    DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
-                        DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { showCreateMenu = false })
-                        DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { showCreateMenu = false })
-                        DropdownMenuItem(text = { Text("Menù laterale") }, onClick = { showCreateMenu = false })
-                        DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { showCreateMenu = false })
+            // --- Bordo inferiore bianco con "gap" sotto le etichette ---
+            val underlineInsetY = 6.dp   // distanza dal fondo
+            val underlineStroke = 1.dp   // spessore linea
+
+            androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                val y = size.height - with(this) { underlineInsetY.toPx() }
+                val stroke = with(this) { underlineStroke.toPx() }
+
+                val gaps = mutableListOf<Pair<Float, Float>>()
+
+                firstBlockCenter?.let { cx ->
+                    if (wElementi > 0f) {
+                        val pad = with(this) { 6.dp.toPx() }
+                        gaps += (cx - wElementi / 2f - pad) to (cx + wElementi / 2f + pad)
                     }
                 }
-                // Lista
-                Box {
-                    ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true })
-                    DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
-                        DropdownMenuItem(text = { Text("Pagine…") }, onClick = { showListMenu = false })
-                        DropdownMenuItem(text = { Text("Avvisi…") }, onClick = { showListMenu = false })
-                        DropdownMenuItem(text = { Text("Menu laterali…") }, onClick = { showListMenu = false })
-                        DropdownMenuItem(text = { Text("Menu centrali…") }, onClick = { showListMenu = false })
+                if (firstDotCenter != null && secondDotCenter != null && wPagine > 0f) {
+                    val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
+                    val pad = with(this) { 6.dp.toPx() }
+                    gaps += (cx - wPagine / 2f - pad) to (cx + wPagine / 2f + pad)
+                }
+                lastBlockCenter?.let { cx ->
+                    if (wProgetti > 0f) {
+                        val pad = with(this) { 6.dp.toPx() }
+                        gaps += (cx - wProgetti / 2f - pad) to (cx + wProgetti / 2f + pad)
                     }
                 }
 
-                dividerDot()
+                gaps.sortBy { it.first }
+                var x0 = 0f
+                for ((gs, ge) in gaps) {
+                    val startX = gs.coerceAtLeast(0f)
+                    if (startX > x0) {
+                        drawLine(
+                            color = Color.White,
+                            start = androidx.compose.ui.geometry.Offset(x0, y),
+                            end = androidx.compose.ui.geometry.Offset(startX, y),
+                            strokeWidth = stroke,
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        )
+                    }
+                    x0 = ge.coerceAtLeast(x0)
+                }
+                if (x0 < size.width) {
+                    drawLine(
+                        color = Color.White,
+                        start = androidx.compose.ui.geometry.Offset(x0, y),
+                        end = androidx.compose.ui.geometry.Offset(size.width, y),
+                        strokeWidth = stroke,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                }
+            }
 
-                ToolbarIconButton(Icons.Outlined.Save, "Salva progetto", onClick = onSaveProject)
-                ToolbarIconButton(Icons.Outlined.FolderOpen, "Apri", onClick = onOpenProject)
-                ToolbarIconButton(Icons.Outlined.CreateNewFolder, "Nuovo progetto", onClick = onNewProject)
+            // Etichette (background = colore barra per bucare la linea)
+            val labelStyle = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White
+            )
+            val labelBg = Color(0xFF0D1117)
+
+            // "elementi" – centrata sotto le 4 icone
+            if (firstBlockCenter != null) {
+                Text(
+                    "elementi",
+                    style = labelStyle,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = underlineInsetY + 2.dp)
+                        .onGloballyPositioned { wElementi = it.size.width.toFloat() }
+                        .offset {
+                            val x = ((firstBlockCenter ?: 0f) - wElementi / 2f).toInt()
+                            IntOffset(x, 0)
+                        }
+                        .background(labelBg)
+                        .padding(horizontal = 4.dp)
+                )
+            }
+            // "pagine e menù" – centrata tra puntino 1 e puntino 2
+            if (firstDotCenter != null && secondDotCenter != null) {
+                Text(
+                    "pagine e menù",
+                    style = labelStyle,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = underlineInsetY + 2.dp)
+                        .onGloballyPositioned { wPagine = it.size.width.toFloat() }
+                        .offset {
+                            val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
+                            val x = (cx - wPagine / 2f).toInt()
+                            IntOffset(x, 0)
+                        }
+                        .background(labelBg)
+                        .padding(horizontal = 4.dp)
+                )
+            }
+            // "progetti" – centrata sotto le ultime icone
+            if (lastBlockCenter != null) {
+                Text(
+                    "progetti",
+                    style = labelStyle,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = underlineInsetY + 2.dp)
+                        .onGloballyPositioned { wProgetti = it.size.width.toFloat() }
+                        .offset {
+                            val x = ((lastBlockCenter ?: 0f) - wProgetti / 2f).toInt()
+                            IntOffset(x, 0)
+                        }
+                        .background(labelBg)
+                        .padding(horizontal = 4.dp)
+                )
             }
         }
     }
 }
+
 
 /* Barretta categorie (sopra la barra principale), icone-only */
 @Composable
