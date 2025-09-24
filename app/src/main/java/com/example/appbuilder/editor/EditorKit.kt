@@ -74,7 +74,7 @@ import androidx.compose.ui.unit.sp
 
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (uguale in Home e Submenu)
-private val TOP_BAR_HEIGHT = 44.dp           // barra superiore (categorie / submenu)
+private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / submenu)
 private val BARS_GAP = 10.dp                 // distacco tra le due barre (+2dp di “aria”)
 
 /* =========================================================================================
