@@ -75,7 +75,9 @@ import androidx.compose.ui.unit.sp
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (uguale in Home e Submenu)
 private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / submenu)
-private val BARS_GAP = 10.dp                 // distacco tra le due barre (+2dp di “aria”)
+private val BARS_GAP = 14.dp                 // distacco tra le due barre (+2dp di “aria”)
+private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto al bordo schermo
+
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
@@ -147,7 +149,7 @@ fun EditorMenusOnly(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color(0xFF0F131A), Color(0xFF141922))
+                    listOf(Color(0xFF1A1A1A), Color(0xFF242424)) // grigi scuri
                 )
             )
     ) {
@@ -295,9 +297,7 @@ private fun BoxScope.MainBottomBar(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-            .navigationBarsPadding()
-            .imePadding()
+            .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN) // ← fisso
             .height(BOTTOM_BAR_HEIGHT)
             .onGloballyPositioned { onMeasured(it.size.height) }
     ) {
@@ -369,9 +369,9 @@ private fun BoxScope.MainMenuBar(
     bottomBarHeightPx: Int
 ) {
     val dy = with(LocalDensity.current) {
-        (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) + BARS_GAP
+        (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) +
+        BARS_GAP + SAFE_BOTTOM_MARGIN
     }
-
     Surface(
         color = Color(0xFF111621),
         contentColor = Color.White,
@@ -418,7 +418,7 @@ private fun BoxScope.SubMenuBar(
     onPick: (label: String, value: String) -> Unit,
     savedPresets: Map<String, MutableList<String>>
 ) {
-    val offsetY = with(LocalDensity.current) { (BOTTOM_BAR_HEIGHT + BARS_GAP).roundToPx() }
+    val offsetY = with(LocalDensity.current) { (BOTTOM_BAR_HEIGHT + BARS_GAP + SAFE_BOTTOM_MARGIN).roundToPx() }
     Surface(
         color = Color(0xFF0F141E),
         contentColor = Color.White,
@@ -469,9 +469,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(horizontal = 12.dp) // rimosso padding verticale esterno: prima alzava la barra e causava sovrapposizione
-            .navigationBarsPadding()
-            .imePadding()
+            .padding(horizontal = 12.dp, bottom = SAFE_BOTTOM_MARGIN) // ← fisso
             .height(BOTTOM_BAR_HEIGHT)
     ) {
         val pretty = buildString {
@@ -520,12 +518,12 @@ private fun LayoutLevel(
             )
         }
         "Colore" -> {
-            IconDropdown(EditorIcons.Colors, "Colore 1",
+            IconDropdown(EditorIcons.Colors1, "Colore 1",
                 current = get("col1") ?: "Bianco",
                 options = listOf("Bianco", "Grigio", "Nero", "Ciano"),
                 onSelected = { onPick("col1", it) }
             )
-            IconDropdown(EditorIcons.Colors, "Colore 2",
+            IconDropdown(EditorIcons.Colors2, "Colore 2",
                 current = get("col2") ?: "Grigio chiaro",
                 options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
                 onSelected = { onPick("col2", it) }
@@ -652,12 +650,12 @@ private fun ContainerLevel(
             )
         }
         "Colore" -> {
-            IconDropdown(EditorIcons.Colors, "Colore 1",
+            IconDropdown(EditorIcons.Colors1, "Colore 1",
                 current = get("col1") ?: "Bianco",
                 options = listOf("Bianco", "Grigio", "Nero", "Ciano"),
                 onSelected = { onPick("col1", it) }
             )
-            IconDropdown(EditorIcons.Colors, "Colore 2",
+            IconDropdown(EditorIcons.Colors2, "Colore 2",
                 current = get("col2") ?: "Grigio chiaro",
                 options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
                 onSelected = { onPick("col2", it) }
@@ -907,28 +905,6 @@ private fun IconDropdown(
     Box {
         ToolbarIconButton(icon, contentDescription, onClick = { expanded = true })
         // badge numerico angolare per "Colore 1"/"Colore 2"
-        val cornerBadge = when (contentDescription) {
-            "Colore 1" -> "1"
-            "Colore 2" -> "2"
-            else -> null
-        }
-        if (cornerBadge != null) {
-            Surface(
-                color = Color(0xFF1B2334),
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset { IntOffset(6, -6) }
-            ) {
-                Text(
-                    text = cornerBadge,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                    fontSize = 10.sp
-                )
-            }
-        }
-        // badge valore corrente
         if (!current.isNullOrBlank()) {
             Surface(
                 color = Color(0xFF22304B),

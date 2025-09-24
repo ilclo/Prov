@@ -7,6 +7,8 @@ import com.example.appbuilder.R
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 
+
+
 /**
  * Pacchetto icone centralizzato per l'editor (Vector Asset + fallback Icons.*).
  * Tutte le icone "nuove" (Material Symbols) arrivano da res/drawable via vectorResource.
@@ -44,7 +46,8 @@ object EditorIcons {
 
     /* — Colore (contenitore & layout) — */
     val Color: ImageVector             @Composable get() = ImageVector.vectorResource(R.drawable.ic_format_paint)
-    val Colors: ImageVector            @Composable get() = ImageVector.vectorResource(R.drawable.ic_colors) // 1 & 2
+    val Colors1: ImageVector           @Composable get() = ImageVector.vectorResource(R.drawable.ic_colors1) 
+    val Colors2: ImageVector           @Composable get() = ImageVector.vectorResource(R.drawable.ic_colors2)
     val Gradient: ImageVector          @Composable get() = ImageVector.vectorResource(R.drawable.ic_transition_fade)
     val Functions: ImageVector         @Composable get() = ImageVector.vectorResource(R.drawable.ic_function)
 
