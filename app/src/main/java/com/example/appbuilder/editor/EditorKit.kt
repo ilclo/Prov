@@ -323,10 +323,6 @@ private fun BoxScope.MainBottomBar(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo)
                 ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo)
-
-                dividerDot()
-
-                ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile)
                 ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete)
                 ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate)
 
@@ -334,6 +330,7 @@ private fun BoxScope.MainBottomBar(
 
                 ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties)
                 ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout)
+                ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile)
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
