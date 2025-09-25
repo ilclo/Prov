@@ -1,5 +1,6 @@
 package com.example.appbuilder.editor
 
+
 import com.example.appbuilder.icons.EditorIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.unit.IntOffset
@@ -296,6 +297,13 @@ fun EditorMenusOnly(
 
     // Misuro l’altezza della barra azioni per distanziare la barra categorie
     var actionsBarHeightPx by remember { mutableStateOf(0) }
+    // Dialog salvataggio stile
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var newPresetName by remember { mutableStateOf("") }
+
+    // Conferma all’uscita dai sottomenu verso la home
+    var showConfirm by remember { mutableStateOf(false) }
+   
 
     Box(
         Modifier
@@ -920,8 +928,12 @@ private fun LayoutLevel(
 
     when (path.getOrNull(1)) {
         null -> {
+            fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
+
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
+
+            // DEFAULT
             IconDropdown(
                 icon = Icons.Outlined.BookmarkAdd,
                 contentDescription = "Scegli default",
@@ -929,13 +941,25 @@ private fun LayoutLevel(
                 options = saved["Layout"].orEmpty(),
                 onSelected = { onPick("default", it) }
             )
+
+            // STILE (usa vettore custom)  — se NON hai ic_style.xml, vedi la variante sotto
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_style),
                 contentDescription = "Stile",
                 current = get("style") ?: "Nessuno",
                 options = saved["Layout"].orEmpty(),
                 onSelected = { onPick("style", it) }
-            )           
+            )
+
+            /* Variante senza risorsa:
+            IconDropdown(
+                icon = Icons.Outlined.Style,
+                contentDescription = "Stile",
+                current = get("style") ?: "Nessuno",
+                options = saved["Layout"].orEmpty(),
+                onSelected = { onPick("style", it) }
+            )
+            */
         }
         "Colore" -> {
             IconDropdown(EditorIcons.Colors1, "Colore 1",
@@ -1030,12 +1054,13 @@ private fun ContainerLevel(
     onPick: (String, String) -> Unit,
     saved: Map<String, MutableList<String>>
 ) {
-    fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
-
     when (path.getOrNull(1)) {
         null -> {
+            fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
+
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
+
             IconDropdown(EditorIcons.SwipeVertical, "Scrollabilità",
                 current = get("scroll") ?: "Assente",
                 options = listOf("Assente", "Verticale", "Orizzontale"),
@@ -1061,6 +1086,8 @@ private fun ContainerLevel(
                 options = listOf("Normale", "Sfogliabile", "Tab"),
                 onSelected = { onPick("tipo", it) }
             )
+
+            // DEFAULT
             IconDropdown(
                 icon = Icons.Outlined.BookmarkAdd,
                 contentDescription = "Scegli default",
@@ -1068,6 +1095,8 @@ private fun ContainerLevel(
                 options = saved["Contenitore"].orEmpty(),
                 onSelected = { onPick("default", it) }
             )
+
+            // STILE
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_style),
                 contentDescription = "Stile",
@@ -1218,13 +1247,24 @@ private fun TextLevel(
         current = (selections[key(path, "default")] as? String) ?: saved["Testo"]?.firstOrNull(),
         options = saved["Testo"].orEmpty(),
         onSelected = { onPick("default", it) }
+    // STILE (accanto al "Scegli default")
     IconDropdown(
         icon = ImageVector.vectorResource(id = R.drawable.ic_style),
         contentDescription = "Stile",
-        current = (selections[key(path, "style")] as? String) ?: saved["Testo"]?.firstOrNull(),
+        current = (selections[key(path, "style")] as? String) ?: "Nessuno",
         options = saved["Testo"].orEmpty(),
         onSelected = { onPick("style", it) }
     )
+
+    /* Variante senza risorsa:
+    IconDropdown(
+        icon = Icons.Outlined.Style,
+        contentDescription = "Stile",
+        current = (selections[key(path, "style")] as? String) ?: "Nessuno",
+        options = saved["Testo"].orEmpty(),
+        onSelected = { onPick("style", it) }
+    )
+    */
 }
 
 /* ---------- AGGIUNGI ---------- */
