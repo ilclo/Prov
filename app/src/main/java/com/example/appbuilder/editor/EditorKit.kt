@@ -307,7 +307,8 @@ private fun BoxScope.MainBottomBar(
     val localDensity = LocalDensity.current
     var containerHeightPx by remember { mutableStateOf(0f) }
     var containerLeftInRoot by remember { mutableStateOf(0f) }
-
+    var firstDotWidth by remember { mutableStateOf(0f) }
+    var secondDotWidth by remember { mutableStateOf(0f) }
     var firstBlockCenter by remember { mutableStateOf<Float?>(null) }  // 4 icone a sinistra
     var firstDotCenter by remember { mutableStateOf<Float?>(null) }    // puntino 1
     var secondDotCenter by remember { mutableStateOf<Float?>(null) }   // puntino 2
@@ -325,9 +326,9 @@ private fun BoxScope.MainBottomBar(
     )
 
     // parametri linea
-    val underlineInsetY = 0.dp     // distanza dal bordo inferiore
+    val underlineInsetY = 2.dp     // distanza dal bordo inferiore
     val underlineStroke = 1.dp     // spessore linea
-
+    val separatorPad = 6.dp // deve combaciare con lo spacedBy(...) tra i gruppi
     Surface(
         color = Color(0xFF0D1117),
         contentColor = Color.White,
@@ -369,6 +370,7 @@ private fun BoxScope.MainBottomBar(
                         modifier = Modifier.onGloballyPositioned { coords ->
                             val pos = coords.positionInRoot()
                             firstBlockCenter = pos.x + coords.size.width / 2f - containerLeftInRoot
+                     firstDotWidth = coords.size.width.toFloat()
                         }
                     ) {
                         ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo)
@@ -423,6 +425,7 @@ private fun BoxScope.MainBottomBar(
                         modifier = Modifier.onGloballyPositioned { coords ->
                             val pos = coords.positionInRoot()
                             secondDotCenter = pos.x + coords.size.width / 2f - containerLeftInRoot
+                    firstDotWidth = coords.size.width.toFloat()
                         }
                     ) { dividerDot() }
 
@@ -470,6 +473,22 @@ private fun BoxScope.MainBottomBar(
                     if (wProgressi > 0f) {
                         val pad = with(localDensity) { 6.dp.toPx() }
                         gaps += (cx - wProgressi / 2f - pad) to (cx + wProgressi / 2f + pad)
+                    }
+                }
+                // --- GAP NEGLI SPAZI DEI SEPARATORI (puntini) ---
+                val sepPadPx = with(localDensity) { separatorPad.toPx() }
+
+                firstDotCenter?.let { cx ->
+                    if (firstDotWidth > 0f) {
+                        val half = (firstDotWidth / 2f) + sepPadPx
+                        gaps += (cx - half) to (cx + half)
+                    }
+                }
+
+                secondDotCenter?.let { cx ->
+                    if (secondDotWidth > 0f) {
+                        val half = (secondDotWidth / 2f) + sepPadPx
+                        gaps += (cx - half) to (cx + half)
                     }
                 }
 
