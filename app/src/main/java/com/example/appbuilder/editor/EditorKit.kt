@@ -325,7 +325,7 @@ private fun BoxScope.MainBottomBar(
     )
 
     // parametri linea
-    val underlineInsetY = 6.dp     // distanza dal bordo inferiore
+    val underlineInsetY = 0.dp     // distanza dal bordo inferiore
     val underlineStroke = 1.dp     // spessore linea
 
     Surface(
