@@ -1,6 +1,9 @@
 package com.example.appbuilder.editor
 
-
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ExperimentalMaterial3Api
 import com.example.appbuilder.icons.EditorIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.unit.IntOffset
@@ -303,7 +306,7 @@ fun EditorMenusOnly(
 
     // Conferma all’uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
-   
+
 
     Box(
         Modifier
@@ -442,21 +445,48 @@ fun EditorMenusOnly(
             )
         }
 
-        // Dialog: Salva impostazioni come preset
+// Dialog: Salva impostazioni come preset
         if (showSaveDialog) {
-            onClick = {
-                val root = menuPath.firstOrNull() ?: "Contenitore"
-                val name = newPresetName.trim()
-                if (name.isNotBlank()) {
-                    savePreset(root, name)     // aggiorna o crea lo stile con i valori correnti
-                    // Le impostazioni correnti sono già quelle a schermo: niente altro da fare
+            AlertDialog(
+                onDismissRequest = { showSaveDialog = false },
+                title = { Text("Salva come stile") },
+                text = {
+                    Column {
+                        Text("Dai un nome allo stile corrente. Se esiste già, verrà aggiornato.")
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newPresetName,
+                            onValueChange = { newPresetName = it },
+                            singleLine = true,
+                            label = { Text("Nome stile") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val root = menuPath.firstOrNull() ?: "Contenitore"
+                        val name = newPresetName.trim()
+                        if (name.isNotBlank()) {
+                            savePreset(root, name) // crea/aggiorna con i valori correnti
+                        }
+                        newPresetName = ""
+                        dirty = false
+                        showSaveDialog = false
+                        showConfirm = false
+                        menuPath = emptyList()
+                    }) {
+                        Text("Salva")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        newPresetName = ""
+                        showSaveDialog = false
+                    }) {
+                        Text("Annulla")
+                    }
                 }
-                newPresetName = ""
-                dirty = false
-                showSaveDialog = false
-                showConfirm = false
-                menuPath = emptyList()
-            }
+            )
         }
     }
 }
@@ -791,7 +821,7 @@ private fun BoxScope.MainMenuBar(
 ) {
     val dy = with(LocalDensity.current) {
         (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) +
-        BARS_GAP + SAFE_BOTTOM_MARGIN
+                BARS_GAP + SAFE_BOTTOM_MARGIN
     }
     Surface(
         color = Color(0xFF111621),
@@ -1054,6 +1084,7 @@ private fun ContainerLevel(
     onPick: (String, String) -> Unit,
     saved: Map<String, MutableList<String>>
 ) {
+    fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
     when (path.getOrNull(1)) {
         null -> {
             fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
@@ -1246,8 +1277,7 @@ private fun TextLevel(
         contentDescription = "Scegli default",
         current = (selections[key(path, "default")] as? String) ?: saved["Testo"]?.firstOrNull(),
         options = saved["Testo"].orEmpty(),
-        onSelected = { onPick("default", it) }
-    // STILE (accanto al "Scegli default")
+        onSelected = { onPick("default", it) })
     IconDropdown(
         icon = ImageVector.vectorResource(id = R.drawable.ic_style),
         contentDescription = "Stile",
@@ -1255,7 +1285,6 @@ private fun TextLevel(
         options = saved["Testo"].orEmpty(),
         onSelected = { onPick("style", it) }
     )
-
     /* Variante senza risorsa:
     IconDropdown(
         icon = Icons.Outlined.Style,
