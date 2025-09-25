@@ -303,32 +303,39 @@ private fun BoxScope.MainBottomBar(
     var showCreateMenu by remember { mutableStateOf(false) }
     var showListMenu by remember { mutableStateOf(false) }
 
-    // misure utili per linea/etichette
+    // densità e misure contenitore
     val localDensity = LocalDensity.current
     var containerHeightPx by remember { mutableStateOf(0f) }
     var containerLeftInRoot by remember { mutableStateOf(0f) }
-    var firstDotWidth by remember { mutableStateOf(0f) }
-    var secondDotWidth by remember { mutableStateOf(0f) }
-    var firstBlockCenter by remember { mutableStateOf<Float?>(null) }  // 4 icone a sinistra
-    var firstDotCenter by remember { mutableStateOf<Float?>(null) }    // puntino 1
-    var secondDotCenter by remember { mutableStateOf<Float?>(null) }   // puntino 2
-    var lastBlockCenter by remember { mutableStateOf<Float?>(null) }   // icone progetti
 
+    // misure per etichette
+    var firstBlockCenter by remember { mutableStateOf<Float?>(null) }   // 4 icone sinistra
+    var lastBlockCenter by remember { mutableStateOf<Float?>(null) }    // icone progetti
     var wElementi by remember { mutableStateOf(0f) }
     var wPagine by remember { mutableStateOf(0f) }
     var wProgressi by remember { mutableStateOf(0f) }
 
-    // stile etichette
+    // misure per "gap tra gruppi" (più affidabile dei puntini)
+    var firstBlockRightEdge by remember { mutableStateOf<Float?>(null) }      // destra blocco 1
+    var middleBlockLeftEdge by remember { mutableStateOf<Float?>(null) }      // sinistra blocco Pagine&Menù
+    var preSecondBlockRightEdge by remember { mutableStateOf<Float?>(null) }  // destra blocco Crea+Lista
+    var lastBlockLeftEdge by remember { mutableStateOf<Float?>(null) }        // sinistra blocco Progetti
+
+    // misure dei puntini (se servono in futuro)
+    var firstDotCenter by remember { mutableStateOf<Float?>(null) }
+    var secondDotCenter by remember { mutableStateOf<Float?>(null) }
+
+    // stile etichette (BIANCO)
     val labelStyle = MaterialTheme.typography.labelSmall.copy(
         fontSize = 10.sp,
         fontWeight = FontWeight.Medium,
         color = Color.White
     )
 
-    // parametri linea
-    val underlineInsetY = 2.dp     // distanza dal bordo inferiore
-    val underlineStroke = 1.dp     // spessore linea
-    val separatorPad = 6.dp // deve combaciare con lo spacedBy(...) tra i gruppi
+    // parametri linea a filo del bordo inferiore
+    val underlineStroke = 1.dp // spessore
+    val extraGapPad = 2.dp     // piccolo margine extra su entrambi i lati dei gap
+
     Surface(
         color = Color(0xFF0D1117),
         contentColor = Color.White,
@@ -339,7 +346,7 @@ private fun BoxScope.MainBottomBar(
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
-            .height(BOTTOM_BAR_HEIGHT + 8.dp) // barra leggermente più alta SENZA scalare icone/puntini/linea/testo
+            .height(BOTTOM_BAR_HEIGHT + 8.dp) // più alta di poco senza scalare icone/puntini/cerchi/linea/testo
             .onGloballyPositioned { onMeasured(it.size.height) }
     ) {
         val scroll = rememberScrollState()
@@ -368,9 +375,10 @@ private fun BoxScope.MainBottomBar(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.onGloballyPositioned { coords ->
-                            val pos = coords.positionInRoot()
-                            firstBlockCenter = pos.x + coords.size.width / 2f - containerLeftInRoot
-                     firstDotWidth = coords.size.width.toFloat()
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            firstBlockCenter = left + width / 2f
+                            firstBlockRightEdge = left + width
                         }
                     ) {
                         ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo)
@@ -379,16 +387,24 @@ private fun BoxScope.MainBottomBar(
                         ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate)
                     }
 
-                    // PUNTINO 1 (misurato)
+                    // PUNTINO 1
                     Box(
                         modifier = Modifier.onGloballyPositioned { coords ->
-                            val pos = coords.positionInRoot()
-                            firstDotCenter = pos.x + coords.size.width / 2f - containerLeftInRoot
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            firstDotCenter = left + width / 2f
                         }
                     ) { dividerDot() }
 
                     // BLOCCO INTERMEDIO (PAGINE E MENÙ)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            middleBlockLeftEdge = left
+                        }
+                    ) {
                         ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties)
                         ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout)
                         ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile)
@@ -398,34 +414,44 @@ private fun BoxScope.MainBottomBar(
                 // --------- GRUPPO DESTRO ---------
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
 
-                    // CREA
-                    Box {
-                        ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
-                        DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
-                            DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { showCreateMenu = false; onCreate() })
-                            DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { showCreateMenu = false })
-                            DropdownMenuItem(text = { Text("Menù laterale") }, onClick = { showCreateMenu = false })
-                            DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { showCreateMenu = false })
+                    // BLOCCO PRE-SECONDO PUNTINO: CREA + LISTA
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            preSecondBlockRightEdge = left + width
+                        }
+                    ) {
+                        // CREA
+                        Box {
+                            ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
+                            DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
+                                DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { showCreateMenu = false; onCreate() })
+                                DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { showCreateMenu = false })
+                                DropdownMenuItem(text = { Text("Menù laterale") }, onClick = { showCreateMenu = false })
+                                DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { showCreateMenu = false })
+                            }
+                        }
+                        // LISTA
+                        Box {
+                            ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true; onOpenList() })
+                            DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
+                                DropdownMenuItem(text = { Text("Pagine…") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Avvisi…") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Menu laterali…") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Menu centrali…") }, onClick = { showListMenu = false })
+                            }
                         }
                     }
 
-                    // LISTA
-                    Box {
-                        ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true; onOpenList() })
-                        DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
-                            DropdownMenuItem(text = { Text("Pagine…") }, onClick = { showListMenu = false })
-                            DropdownMenuItem(text = { Text("Avvisi…") }, onClick = { showListMenu = false })
-                            DropdownMenuItem(text = { Text("Menu laterali…") }, onClick = { showListMenu = false })
-                            DropdownMenuItem(text = { Text("Menu centrali…") }, onClick = { showListMenu = false })
-                        }
-                    }
-
-                    // PUNTINO 2 (misurato)
+                    // PUNTINO 2
                     Box(
                         modifier = Modifier.onGloballyPositioned { coords ->
-                            val pos = coords.positionInRoot()
-                            secondDotCenter = pos.x + coords.size.width / 2f - containerLeftInRoot
-                    firstDotWidth = coords.size.width.toFloat()
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            secondDotCenter = left + width / 2f
                         }
                     ) { dividerDot() }
 
@@ -434,8 +460,10 @@ private fun BoxScope.MainBottomBar(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.onGloballyPositioned { coords ->
-                            val pos = coords.positionInRoot()
-                            lastBlockCenter = pos.x + coords.size.width / 2f - containerLeftInRoot
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            lastBlockCenter = left + width / 2f
+                            lastBlockLeftEdge = left
                         }
                     ) {
                         ToolbarIconButton(Icons.Outlined.Save, "Salva progetto", onClick = onSaveProject)
@@ -445,54 +473,44 @@ private fun BoxScope.MainBottomBar(
                 }
             }
 
-            // ---------- LINEA BIANCA con "gap" sotto alle etichette ----------
+            // ---------- LINEA BIANCA con "gap" sotto etichette e tra gruppi ----------
             androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                val y = containerHeightPx - with(localDensity) { underlineInsetY.toPx() }
                 val stroke = with(localDensity) { underlineStroke.toPx() }
+                val y = containerHeightPx - stroke / 2f
+                val pad = with(localDensity) { 6.dp.toPx() }
+                val extra = with(localDensity) { extraGapPad.toPx() }
 
-                // calcolo intervalli-gap dove NON disegnare la linea (sotto le etichette)
                 val gaps = mutableListOf<Pair<Float, Float>>()
 
-                // ELEMENTI (centrata sotto il primo blocco di 4 icone)
+                // Gap etichette (elementi / pagine e menù / progressi)
                 firstBlockCenter?.let { cx ->
                     if (wElementi > 0f) {
-                        val pad = with(localDensity) { 6.dp.toPx() }
                         gaps += (cx - wElementi / 2f - pad) to (cx + wElementi / 2f + pad)
                     }
                 }
-
-                // PAGINE E MENÙ (centrata tra puntino 1 e puntino 2)
                 if (firstDotCenter != null && secondDotCenter != null && wPagine > 0f) {
                     val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
-                    val pad = with(localDensity) { 6.dp.toPx() }
                     gaps += (cx - wPagine / 2f - pad) to (cx + wPagine / 2f + pad)
                 }
-
-                // PROGRESSI (sotto l’ultimo blocco)
                 lastBlockCenter?.let { cx ->
                     if (wProgressi > 0f) {
-                        val pad = with(localDensity) { 6.dp.toPx() }
                         gaps += (cx - wProgressi / 2f - pad) to (cx + wProgressi / 2f + pad)
                     }
                 }
-                // --- GAP NEGLI SPAZI DEI SEPARATORI (puntini) ---
-                val sepPadPx = with(localDensity) { separatorPad.toPx() }
 
-                firstDotCenter?.let { cx ->
-                    if (firstDotWidth > 0f) {
-                        val half = (firstDotWidth / 2f) + sepPadPx
-                        gaps += (cx - half) to (cx + half)
-                    }
+                // Gap "spazio tra gruppi" (sempre presenti, indipendenti dal dot size)
+                if (firstBlockRightEdge != null && middleBlockLeftEdge != null) {
+                    val s = (firstBlockRightEdge!! - extra).coerceAtLeast(0f)
+                    val e = (middleBlockLeftEdge!! + extra).coerceAtMost(size.width)
+                    if (e > s) gaps += s to e
+                }
+                if (preSecondBlockRightEdge != null && lastBlockLeftEdge != null) {
+                    val s = (preSecondBlockRightEdge!! - extra).coerceAtLeast(0f)
+                    val e = (lastBlockLeftEdge!! + extra).coerceAtMost(size.width)
+                    if (e > s) gaps += s to e
                 }
 
-                secondDotCenter?.let { cx ->
-                    if (secondDotWidth > 0f) {
-                        val half = (secondDotWidth / 2f) + sepPadPx
-                        gaps += (cx - half) to (cx + half)
-                    }
-                }
-
-                // ordina e disegna i segmenti bianchi tra i gap
+                // Disegno i segmenti bianchi (unione implicita dei gap)
                 gaps.sortBy { it.first }
                 var x0 = 0f
                 for ((gs, ge) in gaps) {
@@ -519,7 +537,7 @@ private fun BoxScope.MainBottomBar(
                 }
             }
 
-            // ---------- ETICHETTE (baseline allineata alla linea) ----------
+            // ---------- ETICHETTE (baseline allineata alla linea inferiore) ----------
             // "elementi"
             if (firstBlockCenter != null) {
                 var baselineElemPx by remember { mutableStateOf(0f) }
@@ -531,14 +549,13 @@ private fun BoxScope.MainBottomBar(
                         .align(Alignment.TopStart)
                         .onGloballyPositioned { wElementi = it.size.width.toFloat() }
                         .offset {
-                            val lineY = containerHeightPx - with(localDensity) { underlineInsetY.toPx() }
+                            val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
                             val y = (lineY - baselineElemPx).toInt()
                             val x = ((firstBlockCenter ?: 0f) - wElementi / 2f).toInt()
                             IntOffset(x, y)
                         }
                 )
             }
-
             // "pagine e menù"
             if (firstDotCenter != null && secondDotCenter != null) {
                 var baselinePagPx by remember { mutableStateOf(0f) }
@@ -551,14 +568,13 @@ private fun BoxScope.MainBottomBar(
                         .onGloballyPositioned { wPagine = it.size.width.toFloat() }
                         .offset {
                             val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
-                            val lineY = containerHeightPx - with(localDensity) { underlineInsetY.toPx() }
+                            val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
                             val y = (lineY - baselinePagPx).toInt()
                             val x = (cx - wPagine / 2f).toInt()
                             IntOffset(x, y)
                         }
                 )
             }
-
             // "progressi"
             if (lastBlockCenter != null) {
                 var baselineProgPx by remember { mutableStateOf(0f) }
@@ -570,7 +586,7 @@ private fun BoxScope.MainBottomBar(
                         .align(Alignment.TopStart)
                         .onGloballyPositioned { wProgressi = it.size.width.toFloat() }
                         .offset {
-                            val lineY = containerHeightPx - with(localDensity) { underlineInsetY.toPx() }
+                            val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
                             val y = (lineY - baselineProgPx).toInt()
                             val x = ((lastBlockCenter ?: 0f) - wProgressi / 2f).toInt()
                             IntOffset(x, y)
@@ -580,6 +596,7 @@ private fun BoxScope.MainBottomBar(
         }
     }
 }
+
 
 /* Barretta categorie (sopra la barra principale), icone-only */
 @Composable
@@ -1003,13 +1020,6 @@ private fun TextLevel(
     IconDropdown(EditorIcons.Brush, "Colore",
         current = (selections[key(path, "tcolor")] as? String) ?: "Nero",
         options = listOf("Nero", "Bianco", "Blu", "Verde", "Rosso"),
-        onSelected = { onPick("Colore", it) }
-    )
-
-    // NUOVO: Colore (menù testo) — brush
-    IconDropdown(EditorIcons.Brush, "Colore",
-        current = (selections[key(path, "textColor")] as? String) ?: "Predefinito",
-        options = listOf("Predefinito", "Primario", "Secondario", "Rosso", "Verde", "Blu"),
         onSelected = { onPick("Colore", it) }
     )
 
