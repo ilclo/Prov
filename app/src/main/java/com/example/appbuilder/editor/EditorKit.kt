@@ -173,6 +173,14 @@ fun EditorMenusOnly(
             "Testo" to mutableMapOf()
         )
     }
+    BackHandler(enabled = menuPath.isNotEmpty()) {
+        if (menuPath.size == 1 && dirty) {
+            showConfirm = true
+        } else {
+            menuPath = menuPath.dropLast(1)
+            lastChanged = null
+        }
+    }
 
     // Elenco chiavi COMPLETE + default per ciascun root (usiamo le stesse label del menu)
     fun keysForRoot(root: String): List<Pair<String, Any?>> {
@@ -364,7 +372,8 @@ fun EditorMenusOnly(
                 onSaveProject = { /* stub */ },
                 onOpenProject = { /* stub */ },
                 onNewProject = { /* stub */ },
-                onMeasured = { actionsBarHeightPx = it }
+                onMeasured = { actionsBarHeightPx = it },
+                discontinuousBottom = menuPath.isEmpty() // ⟵ Home = discontinuo; con path (se visibile) = continuo
             )
             MainMenuBar(
                 onLayout = { menuPath = listOf("Layout") },
@@ -541,7 +550,8 @@ private fun BoxScope.MainBottomBar(
     onSaveProject: () -> Unit,
     onOpenProject: () -> Unit,
     onNewProject: () -> Unit,
-    onMeasured: (Int) -> Unit
+    onMeasured: (Int) -> Unit,
+    discontinuousBottom: Boolean = true // ⟵ NEW
 ) {
     // --- stato locale ---
     var showCreateMenu by remember { mutableStateOf(false) }
@@ -717,32 +727,61 @@ private fun BoxScope.MainBottomBar(
                 }
             }
 
-            // ---------- LINEA BIANCA con "gap" sotto etichette e tra gruppi ----------
+            // ---------- BORDO BIANCO: top/sinistra/destra SEMPRE continui; bottom condizionale ----------
             androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
                 val stroke = with(localDensity) { underlineStroke.toPx() }
                 val y = containerHeightPx - stroke / 2f
                 val pad = with(localDensity) { 6.dp.toPx() }
                 val extra = with(localDensity) { extraGapPad.toPx() }
 
+                // TOP
+                drawLine(
+                    color = Color.White,
+                    start = androidx.compose.ui.geometry.Offset(0f, stroke / 2f),
+                    end   = androidx.compose.ui.geometry.Offset(size.width, stroke / 2f),
+                    strokeWidth = stroke,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                // LEFT
+                drawLine(
+                    color = Color.White,
+                    start = androidx.compose.ui.geometry.Offset(stroke / 2f, 0f),
+                    end   = androidx.compose.ui.geometry.Offset(stroke / 2f, size.height),
+                    strokeWidth = stroke
+                )
+                // RIGHT
+                drawLine(
+                    color = Color.White,
+                    start = androidx.compose.ui.geometry.Offset(size.width - stroke / 2f, 0f),
+                    end   = androidx.compose.ui.geometry.Offset(size.width - stroke / 2f, size.height),
+                    strokeWidth = stroke
+                )
+
+                if (!discontinuousBottom) {
+                    // PATH ATTIVO → bordo inferiore CONTINUO
+                    drawLine(
+                        color = Color.White,
+                        start = androidx.compose.ui.geometry.Offset(0f, y),
+                        end   = androidx.compose.ui.geometry.Offset(size.width, y),
+                        strokeWidth = stroke,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    return@Canvas
+                }
+
+                // STATO HOME → bordo inferiore con GAP sotto le scritte e tra i gruppi (come ora)
                 val gaps = mutableListOf<Pair<Float, Float>>()
 
-                // Gap etichette (elementi / pagine e menù / progressi)
                 firstBlockCenter?.let { cx ->
-                    if (wElementi > 0f) {
-                        gaps += (cx - wElementi / 2f - pad) to (cx + wElementi / 2f + pad)
-                    }
+                    if (wElementi > 0f) gaps += (cx - wElementi / 2f - pad) to (cx + wElementi / 2f + pad)
                 }
                 if (firstDotCenter != null && secondDotCenter != null && wPagine > 0f) {
                     val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
                     gaps += (cx - wPagine / 2f - pad) to (cx + wPagine / 2f + pad)
                 }
                 lastBlockCenter?.let { cx ->
-                    if (wProgressi > 0f) {
-                        gaps += (cx - wProgressi / 2f - pad) to (cx + wProgressi / 2f + pad)
-                    }
+                    if (wProgressi > 0f) gaps += (cx - wProgressi / 2f - pad) to (cx + wProgressi / 2f + pad)
                 }
-
-                // Gap "spazio tra gruppi" (sempre presenti, indipendenti dal dot size)
                 if (firstBlockRightEdge != null && middleBlockLeftEdge != null) {
                     val s = (firstBlockRightEdge!! - extra).coerceAtLeast(0f)
                     val e = (middleBlockLeftEdge!! + extra).coerceAtMost(size.width)
@@ -754,7 +793,6 @@ private fun BoxScope.MainBottomBar(
                     if (e > s) gaps += s to e
                 }
 
-                // Disegno i segmenti bianchi (unione implicita dei gap)
                 gaps.sortBy { it.first }
                 var x0 = 0f
                 for ((gs, ge) in gaps) {
@@ -763,7 +801,7 @@ private fun BoxScope.MainBottomBar(
                         drawLine(
                             color = Color.White,
                             start = androidx.compose.ui.geometry.Offset(x0, y),
-                            end = androidx.compose.ui.geometry.Offset(startX, y),
+                            end   = androidx.compose.ui.geometry.Offset(startX, y),
                             strokeWidth = stroke,
                             cap = androidx.compose.ui.graphics.StrokeCap.Round
                         )
@@ -774,13 +812,12 @@ private fun BoxScope.MainBottomBar(
                     drawLine(
                         color = Color.White,
                         start = androidx.compose.ui.geometry.Offset(x0, y),
-                        end = androidx.compose.ui.geometry.Offset(size.width, y),
+                        end   = androidx.compose.ui.geometry.Offset(size.width, y),
                         strokeWidth = stroke,
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                 }
             }
-
             // ---------- ETICHETTE (baseline allineata alla linea inferiore) ----------
             // "elementi"
             if (firstBlockCenter != null) {
@@ -1393,29 +1430,29 @@ private fun TextLevel(
         icon = EditorIcons.Italic
     )
 
-    // dropdown (font / weight / size / evidenzia)
+    // dropdown (font / weight / size / evidenzia / colore) — chiavi allineate a keysForRoot("Testo")
     IconDropdown(EditorIcons.Highlight, "Evidenzia",
-        current = (selections[key(path, "highlight")] as? String) ?: "Nessuna",
+        current = (selections[key(path, "Evidenzia")] as? String) ?: "Nessuna",
         options = listOf("Nessuna", "Marker", "Oblique", "Scribble"),
         onSelected = { onPick("Evidenzia", it) }
     )
     IconDropdown(EditorIcons.CustomTypography, "Font",
-        current = (selections[key(path, "font")] as? String) ?: "System",
+        current = (selections[key(path, "Font")] as? String) ?: "System",
         options = listOf("System", "Inter", "Roboto", "SF Pro"),
         onSelected = { onPick("Font", it) }
     )
     IconDropdown(EditorIcons.Bold, "Peso",
-        current = (selections[key(path, "weight")] as? String) ?: "Regular",
+        current = (selections[key(path, "Weight")] as? String) ?: "Regular",
         options = listOf("Light", "Regular", "Medium", "Bold"),
         onSelected = { onPick("Weight", it) }
     )
     IconDropdown(EditorIcons.Size, "Size",
-        current = (selections[key(path, "size")] as? String) ?: "16sp",
+        current = (selections[key(path, "Size")] as? String) ?: "16sp",
         options = listOf("12sp", "14sp", "16sp", "18sp", "22sp"),
         onSelected = { onPick("Size", it) }
     )
     IconDropdown(EditorIcons.Brush, "Colore",
-        current = (selections[key(path, "tcolor")] as? String) ?: "Nero",
+        current = (selections[key(path, "Colore")] as? String) ?: "Nero",
         options = listOf("Nero", "Bianco", "Blu", "Verde", "Rosso"),
         onSelected = { onPick("Colore", it) }
     )
