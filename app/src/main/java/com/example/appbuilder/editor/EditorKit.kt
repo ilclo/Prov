@@ -312,7 +312,7 @@ private fun BoxScope.MainBottomBar(
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
-            .height(BOTTOM_BAR_HEIGHT)
+            .height(BOTTOM_BAR_HEIGHT + 8.dp)
             .onGloballyPositioned { onMeasured(it.size.height) }
     ) {
         val scroll = rememberScrollState()
@@ -327,11 +327,19 @@ private fun BoxScope.MainBottomBar(
         var wPagine by remember { mutableStateOf(0f) }
         var wProgetti by remember { mutableStateOf(0f) }
 
+        val density = LocalDensity.current
+        var boxHeightPx by remember { mutableStateOf(0f) }
+        val density = LocalDensity.current
+        var boxHeightPx by remember { mutableStateOf(0f) }
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onGloballyPositioned { boxLeftRoot = it.positionInRoot().x }
-        ) {
+             modifier = Modifier
+                 .fillMaxSize()
+                . { boxLeftRoot = it.positionInRoot().x }
+                .onGloballyPositioned {
+                    boxLeftRoot = it.positionInRoot().x
+                    boxHeightPx = it.size.height.toFloat()
+                }
+         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -483,52 +491,61 @@ private fun BoxScope.MainBottomBar(
             )
 
             // "elementi" – centrata sotto le 4 icone
+
             if (firstBlockCenter != null) {
+                var baselineElemPx by remember { mutableStateOf(0f) }
                 Text(
                     "elementi",
                     style = labelStyle,
+                    onTextLayout = { tlr -> baselineElemPx = tlr.getLineBaseline(0).toFloat() },
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(bottom = underlineInsetY + 2.dp)
+                        .align(Alignment.TopStart)
                         .onGloballyPositioned { wElementi = it.size.width.toFloat() }
                         .offset {
+                            val lineY = boxHeightPx - with(density) { underlineInsetY.toPx() }
+                            val y = (lineY - baselineElemPx).toInt() // baseline allineata alla linea
                             val x = ((firstBlockCenter ?: 0f) - wElementi / 2f).toInt()
-                            IntOffset(x, 0)
+                            IntOffset(x, y)
                         }
-                        .padding(horizontal = 4.dp)
                 )
             }
             // "pagine e menù" – centrata tra puntino 1 e puntino 2
+
             if (firstDotCenter != null && secondDotCenter != null) {
+                var baselinePagPx by remember { mutableStateOf(0f) }
                 Text(
                     "pagine e menù",
                     style = labelStyle,
+                    onTextLayout = { tlr -> baselinePagPx = tlr.getLineBaseline(0).toFloat() },
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(bottom = underlineInsetY + 2.dp)
+                        .align(Alignment.TopStart)
                         .onGloballyPositioned { wPagine = it.size.width.toFloat() }
                         .offset {
-                            val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
+                            val cx = (firstDotCenter!!  secondDotCenter!!) / 2f
+                            val lineY = boxHeightPx - with(density) { underlineInsetY.toPx() }
+                            val y = (lineY - baselinePagPx).toInt()
                             val x = (cx - wPagine / 2f).toInt()
-                            IntOffset(x, 0)
+                            IntOffset(x, y)
                         }
-                        .padding(horizontal = 4.dp)
                 )
             }
             // "progetti" – centrata sotto le ultime icone
+
             if (lastBlockCenter != null) {
+                var baselineProgPx by remember { mutableStateOf(0f) }
                 Text(
-                    "progetti",
+                    "progressi",
                     style = labelStyle,
+                    onTextLayout = { tlr -> baselineProgPx = tlr.getLineBaseline(0).toFloat() },
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(bottom = underlineInsetY + 2.dp)
+                        .align(Alignment.TopStart)
                         .onGloballyPositioned { wProgetti = it.size.width.toFloat() }
                         .offset {
+                            val lineY = boxHeightPx - with(density) { underlineInsetY.toPx() }
+                            val y = (lineY - baselineProgPx).toInt()
                             val x = ((lastBlockCenter ?: 0f) - wProgetti / 2f).toInt()
-                            IntOffset(x, 0)
+                            IntOffset(x, y)
                         }
-                        .padding(horizontal = 4.dp)
                 )
             }
         }
@@ -647,7 +664,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(start = 12.dp, top = 0.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
-            .height(BOTTOM_BAR_HEIGHT)
+            .height(BOTTOM_BAR_HEIGHT + 8.dp)
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
