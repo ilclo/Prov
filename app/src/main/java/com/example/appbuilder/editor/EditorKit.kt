@@ -82,7 +82,8 @@ import com.example.appbuilder.R
 
 
 /* ---- BARS: altezze fisse + gap ---- */
-private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (uguale in Home e Submenu)
+private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
+private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (stessa in Home e Submenu)
 private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / submenu)
 private val BARS_GAP = 14.dp                 // distacco tra le due barre (+2dp di “aria”)
 private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto al bordo schermo
@@ -578,11 +579,16 @@ private fun BoxScope.MainBottomBar(
     var firstDotCenter by remember { mutableStateOf<Float?>(null) }
     var secondDotCenter by remember { mutableStateOf<Float?>(null) }
 
-    // stile etichette (BIANCO)
+    // --- varia colore linea (scritte + linea) ---
+    val lineAccent = Color.White // varia colore linea
+    // --- alza etichette di poco rispetto alla linea ---
+    val labelLift = 1.dp
+
+    // stile etichette (usa lineAccent)
     val labelStyle = MaterialTheme.typography.labelSmall.copy(
         fontSize = 10.sp,
         fontWeight = FontWeight.Medium,
-        color = Color.White
+        color = lineAccent
     )
 
     // parametri linea a filo del bordo inferiore
@@ -599,7 +605,7 @@ private fun BoxScope.MainBottomBar(
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
-            .height(BOTTOM_BAR_HEIGHT + 8.dp) // più alta di poco senza scalare icone/puntini/cerchi/linea/testo
+            .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
             .onGloballyPositioned { onMeasured(it.size.height) }
     ) {
         val scroll = rememberScrollState()
@@ -733,24 +739,47 @@ private fun BoxScope.MainBottomBar(
                 val pad = with(localDensity) { 6.dp.toPx() }
                 val extra = with(localDensity) { extraGapPad.toPx() }
 
-                // TOP
+                // TOP (curvo + segmento) — segue gli angoli arrotondati della Surface
+                val corner = with(localDensity) { 18.dp.toPx() } // deve combaciare con RoundedCornerShape(topStart/topEnd)
+                val topY = stroke / 2f
+                // segmento centrale
                 drawLine(
-                    color = Color.White,
-                    start = androidx.compose.ui.geometry.Offset(0f, stroke / 2f),
-                    end   = androidx.compose.ui.geometry.Offset(size.width, stroke / 2f),
+                    color = lineAccent,
+                    start = androidx.compose.ui.geometry.Offset(corner, topY),
+                    end   = androidx.compose.ui.geometry.Offset(size.width - corner, topY),
                     strokeWidth = stroke,
-                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    cap = androidx.compose.ui.graphics.StrokeCap.Butt
+                )
+                // arco top-left (180° → 270°)
+                drawArc(
+                    color = lineAccent,
+                    startAngle = 180f,
+                    sweepAngle = 90f,
+                    useCenter = false,
+                    topLeft = androidx.compose.ui.geometry.Offset(stroke / 2f, stroke / 2f),
+                    size = androidx.compose.ui.geometry.Size(2 * corner - stroke, 2 * corner - stroke),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+                )
+                // arco top-right (270° → 360°)
+                drawArc(
+                    color = lineAccent,
+                    startAngle = 270f,
+                    sweepAngle = 90f,
+                    useCenter = false,
+                    topLeft = androidx.compose.ui.geometry.Offset(size.width - (2 * corner) + stroke / 2f, stroke / 2f),
+                    size = androidx.compose.ui.geometry.Size(2 * corner - stroke, 2 * corner - stroke),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
                 )
                 // LEFT
                 drawLine(
-                    color = Color.White,
+                    color = lineAccent,
                     start = androidx.compose.ui.geometry.Offset(stroke / 2f, 0f),
                     end   = androidx.compose.ui.geometry.Offset(stroke / 2f, size.height),
                     strokeWidth = stroke
                 )
                 // RIGHT
                 drawLine(
-                    color = Color.White,
+                    color = lineAccent,
                     start = androidx.compose.ui.geometry.Offset(size.width - stroke / 2f, 0f),
                     end   = androidx.compose.ui.geometry.Offset(size.width - stroke / 2f, size.height),
                     strokeWidth = stroke
@@ -759,7 +788,7 @@ private fun BoxScope.MainBottomBar(
                 if (!discontinuousBottom) {
                     // PATH ATTIVO → bordo inferiore CONTINUO
                     drawLine(
-                        color = Color.White,
+                        color = lineAccent,
                         start = androidx.compose.ui.geometry.Offset(0f, y),
                         end   = androidx.compose.ui.geometry.Offset(size.width, y),
                         strokeWidth = stroke,
@@ -798,7 +827,7 @@ private fun BoxScope.MainBottomBar(
                     val startX = gs.coerceAtLeast(0f)
                     if (startX > x0) {
                         drawLine(
-                            color = Color.White,
+                            color = lineAccent,
                             start = androidx.compose.ui.geometry.Offset(x0, y),
                             end   = androidx.compose.ui.geometry.Offset(startX, y),
                             strokeWidth = stroke,
@@ -809,7 +838,7 @@ private fun BoxScope.MainBottomBar(
                 }
                 if (x0 < size.width) {
                     drawLine(
-                        color = Color.White,
+                        color = lineAccent,
                         start = androidx.compose.ui.geometry.Offset(x0, y),
                         end   = androidx.compose.ui.geometry.Offset(size.width, y),
                         strokeWidth = stroke,
@@ -830,7 +859,7 @@ private fun BoxScope.MainBottomBar(
                         .onGloballyPositioned { wElementi = it.size.width.toFloat() }
                         .offset {
                             val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                            val y = (lineY - baselineElemPx).toInt()
+                            val y = (lineY - baselineElemPx - with(localDensity) { labelLift.toPx() }).toInt()
                             val x = ((firstBlockCenter ?: 0f) - wElementi / 2f).toInt()
                             IntOffset(x, y)
                         }
@@ -937,7 +966,7 @@ private fun BoxScope.SubMenuBar(
     onPick: (label: String, value: String) -> Unit,
     savedPresets: Map<String, MutableList<String>>
 ) {
-    val offsetY = with(LocalDensity.current) { (BOTTOM_BAR_HEIGHT + BARS_GAP + SAFE_BOTTOM_MARGIN).roundToPx() }
+    val offsetY = with(LocalDensity.current) { (BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA + BARS_GAP + SAFE_BOTTOM_MARGIN).roundToPx() }
     Surface(
         color = Color(0xFF0F141E),
         contentColor = Color.White,
@@ -989,7 +1018,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(start = 12.dp, top = 0.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
-            .height(BOTTOM_BAR_HEIGHT + 8.dp)
+            .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
