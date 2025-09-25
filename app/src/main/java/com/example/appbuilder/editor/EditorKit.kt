@@ -486,7 +486,7 @@ fun EditorMenusOnly(
             )
         }
 
-// Dialog: Salva impostazioni come preset
+        // Dialog: Salva impostazioni come preset
         if (showSaveDialog) {
             AlertDialog(
                 onDismissRequest = { showSaveDialog = false },
@@ -580,7 +580,7 @@ private fun BoxScope.MainBottomBar(
     var secondDotCenter by remember { mutableStateOf<Float?>(null) }
 
     // --- varia colore linea (scritte + linea) ---
-    val lineAccent = Color(0xFF7F6EA7) // varia colore linea
+    val lineAccent = Color(0xFF218494) // varia colore linea
     // --- alza etichette di poco rispetto alla linea ---
     val labelLift = 4.dp
 
@@ -878,7 +878,7 @@ private fun BoxScope.MainBottomBar(
                         .offset {
                             val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
                             val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                            val y = (lineY - baselineElemPx - with(localDensity) { labelLift.toPx() }).toInt()
+                            val y = (lineY - baselinePagPx - with(localDensity) { labelLift.toPx() }).toInt()
                             val x = (cx - wPagine / 2f).toInt()
                             IntOffset(x, y)
                         }
@@ -896,7 +896,7 @@ private fun BoxScope.MainBottomBar(
                         .onGloballyPositioned { wProgressi = it.size.width.toFloat() }
                         .offset {
                             val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                     val y = (lineY - baselineElemPx - with(localDensity) { labelLift.toPx() }).toInt()
+                            val y = (lineY - baselineProgPx - with(localDensity) { labelLift.toPx() }).toInt()
                             val x = ((lastBlockCenter ?: 0f) - wProgressi / 2f).toInt()
                             IntOffset(x, y)
                         }
