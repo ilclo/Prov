@@ -582,7 +582,7 @@ private fun BoxScope.MainBottomBar(
     // --- varia colore linea (scritte + linea) ---
     val lineAccent = Color(0xFF7F6EA7) // varia colore linea
     // --- alza etichette di poco rispetto alla linea ---
-    val labelLift = 6.dp
+    val labelLift = 4.dp
 
     // stile etichette (usa lineAccent)
     val labelStyle = MaterialTheme.typography.labelSmall.copy(
@@ -878,7 +878,7 @@ private fun BoxScope.MainBottomBar(
                         .offset {
                             val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
                             val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                            val y = (lineY - baselinePagPx).toInt()
+                            val y = (lineY - baselineElemPx - with(localDensity) { labelLift.toPx() }).toInt()
                             val x = (cx - wPagine / 2f).toInt()
                             IntOffset(x, y)
                         }
@@ -896,7 +896,7 @@ private fun BoxScope.MainBottomBar(
                         .onGloballyPositioned { wProgressi = it.size.width.toFloat() }
                         .offset {
                             val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                            val y = (lineY - baselineProgPx).toInt()
+                     val y = (lineY - baselineElemPx - with(localDensity) { labelLift.toPx() }).toInt()
                             val x = ((lastBlockCenter ?: 0f) - wProgressi / 2f).toInt()
                             IntOffset(x, y)
                         }
