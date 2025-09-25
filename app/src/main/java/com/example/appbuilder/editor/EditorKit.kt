@@ -72,6 +72,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.appbuilder.R
+
 
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (uguale in Home e Submenu)
@@ -115,35 +119,180 @@ fun EditorMenusOnly(
     // Ultima opzione interessata (per mostrare info extra nel path)
     var lastChanged by remember { mutableStateOf<String?>(null) }
 
-    // Preset salvati (solo demo, in memoria) per le voci "Scegli default"
-    val savedPresets = remember { mutableStateMapOf(
-        "Layout" to mutableListOf("Nessuno", "Default chiaro", "Default scuro"),
-        "Contenitore" to mutableListOf("Nessuno", "Card base", "Hero"),
-        "Testo" to mutableListOf("Nessuno", "Titolo", "Sottotitolo", "Body")
-    )}
 
-    // Dialog salvataggio stile
-    var showSaveDialog by remember { mutableStateOf(false) }
-    var newPresetName by remember { mutableStateOf("") }
+    // Preset salvati (nomi da mostrare nelle tendine)
+    val savedPresets = remember {
+        mutableStateMapOf(
+            "Layout" to mutableListOf("Nessuno", "Default chiaro", "Default scuro"),
+            "Contenitore" to mutableListOf("Nessuno", "Card base", "Hero"),
+            "Testo" to mutableListOf("Nessuno", "Titolo", "Sottotitolo", "Body")
+        )
+    }
 
-    // Conferma all’uscita dai sottomenu verso la home
-    var showConfirm by remember { mutableStateOf(false) }
+    // Valori dei preset/stili: root -> (nome -> mappa configurazioni)
+    val presetValues = remember {
+        mutableStateMapOf<String, MutableMap<String, Map<String, Any?>>>(
+            "Layout" to mutableMapOf(),
+            "Contenitore" to mutableMapOf(),
+            "Testo" to mutableMapOf()
+        )
+    }
 
-    // Gestione “indietro” hardware/gesto
-    BackHandler(enabled = menuPath.isNotEmpty() || showConfirm || showSaveDialog) {
-        when {
-            showSaveDialog -> showSaveDialog = false
-            showConfirm -> showConfirm = false
-            menuPath.isNotEmpty() -> {
-                // se sto tornando alla home e ho modifiche → conferma
-                if (menuPath.size == 1 && dirty) showConfirm = true
-                else {
-                    menuPath = menuPath.dropLast(1)
-                    lastChanged = null  // ← azzera info extra su navigazione
-                }
-            }
+    // Elenco chiavi COMPLETE + default per ciascun root (usiamo le stesse label del menu)
+    fun keysForRoot(root: String): List<Pair<String, Any?>> {
+        fun k(vararg segs: String) = segs.joinToString(" / ")
+        return when (root) {
+            "Testo" -> listOf(
+                k("Testo","Sottolinea") to false,
+                k("Testo","Corsivo") to false,
+                k("Testo","Evidenzia") to "Nessuna",
+                k("Testo","Font") to "System",
+                k("Testo","Weight") to "Regular",
+                k("Testo","Size") to "16sp",
+                k("Testo","Colore") to "Nero",
+            )
+            "Contenitore" -> listOf(
+                k("Contenitore","scroll") to "Assente",
+                k("Contenitore","shape") to "Rettangolo",
+                k("Contenitore","variant") to "Full",
+                k("Contenitore","b_thick") to "1dp",
+                k("Contenitore","tipo") to "Normale",
+                k("Contenitore","Colore","col1") to "Bianco",
+                k("Contenitore","Colore","col2") to "Grigio chiaro",
+                k("Contenitore","Colore","grad") to "Orizzontale",
+                k("Contenitore","Colore","fx") to "Vignettatura",
+                k("Contenitore","Aggiungi foto","crop") to "Nessuno",
+                k("Contenitore","Aggiungi foto","frame") to "Sottile",
+                k("Contenitore","Aggiungi foto","filtro") to "Nessuno",
+                k("Contenitore","Aggiungi foto","fitCont") to "Cover",
+                k("Contenitore","Aggiungi album","cropAlbum") to "Nessuno",
+                k("Contenitore","Aggiungi album","frameAlbum") to "Sottile",
+                k("Contenitore","Aggiungi album","filtroAlbum") to "Nessuno",
+                k("Contenitore","Aggiungi album","fit") to "Cover",
+                k("Contenitore","Aggiungi album","anim") to "Slide",
+                k("Contenitore","Aggiungi album","speed") to "Media",
+            )
+            "Layout" -> listOf(
+                k("Layout","Colore","col1") to "Bianco",
+                k("Layout","Colore","col2") to "Grigio chiaro",
+                k("Layout","Colore","grad") to "Orizzontale",
+                k("Layout","Colore","fx") to "Vignettatura",
+                k("Layout","Aggiungi foto","crop") to "Nessuno",
+                k("Layout","Aggiungi foto","frame") to "Sottile",
+                k("Layout","Aggiungi foto","filtro") to "Nessuno",
+                k("Layout","Aggiungi foto","fit") to "Cover",
+                k("Layout","Aggiungi album","cropAlbum") to "Nessuno",
+                k("Layout","Aggiungi album","frameAlbum") to "Sottile",
+                k("Layout","Aggiungi album","filtroAlbum") to "Nessuno",
+                k("Layout","Aggiungi album","fit") to "Cover",
+                k("Layout","Aggiungi album","anim") to "Slide",
+                k("Layout","Aggiungi album","speed") to "Media",
+            )
+            else -> emptyList()
         }
     }
+
+    fun collectConfig(root: String): Map<String, Any?> =
+        keysForRoot(root).associate { (k, def) -> k to (menuSelections[k] ?: def) }
+
+    fun applyConfig(config: Map<String, Any?>) {
+        config.forEach { (k, v) -> menuSelections[k] = v }
+    }
+
+    fun savePreset(root: String, name: String) {
+        val normalized = name.trim()
+        if (normalized.isBlank()) return
+        val list = savedPresets.getOrPut(root) { mutableListOf("Nessuno") }
+        // mantieni "Nessuno", rimuovi eventuali duplicati (case-insensitive), poi aggiungi
+        list.removeAll { it.equals(normalized, ignoreCase = true) }
+        list.add(normalized)
+        val store = presetValues.getOrPut(root) { mutableMapOf() }
+        store[normalized] = collectConfig(root)
+    }
+
+    fun applyPresetByName(root: String, name: String) {
+        val cfg = presetValues[root]?.get(name) ?: return
+        applyConfig(cfg)
+    }
+
+    fun resolveAndApply(root: String) {
+        val defaultKey = key(listOf(root), "default")
+        val styleKey = key(listOf(root), "style")
+        val defSel = (menuSelections[defaultKey] as? String)?.trim().orEmpty()
+        val styleSel = (menuSelections[styleKey] as? String)?.trim().orEmpty()
+        when {
+            styleSel.isNotEmpty() && !styleSel.equals("Nessuno", true) && presetValues[root]?.containsKey(styleSel) == true ->
+                applyPresetByName(root, styleSel)
+            defSel.isNotEmpty() && !defSel.equals("Nessuno", true) && presetValues[root]?.containsKey(defSel) == true ->
+                applyPresetByName(root, defSel)
+            else ->
+                applyConfig(keysForRoot(root).associate { (k, def) -> k to def })
+        }
+    }
+
+    // Seeding di alcuni preset iniziali (così "Default/Titolo/..." agiscono subito)
+    LaunchedEffect(Unit) {
+        fun ensure(root: String, name: String, values: Map<String, Any?>) {
+            val store = presetValues.getOrPut(root) { mutableMapOf() }
+            if (store[name] == null) store[name] = values
+        }
+        // TESTO
+        ensure("Testo", "Titolo", mapOf(
+            key(listOf("Testo"),"Sottolinea") to false,
+            key(listOf("Testo"),"Corsivo") to false,
+            key(listOf("Testo"),"Evidenzia") to "Nessuna",
+            key(listOf("Testo"),"Font") to "Inter",
+            key(listOf("Testo"),"Weight") to "Bold",
+            key(listOf("Testo"),"Size") to "22sp",
+            key(listOf("Testo"),"Colore") to "Bianco",
+        ))
+        ensure("Testo", "Sottotitolo", mapOf(
+            key(listOf("Testo"),"Sottolinea") to false,
+            key(listOf("Testo"),"Corsivo") to false,
+            key(listOf("Testo"),"Evidenzia") to "Nessuna",
+            key(listOf("Testo"),"Font") to "Inter",
+            key(listOf("Testo"),"Weight") to "Medium",
+            key(listOf("Testo"),"Size") to "18sp",
+            key(listOf("Testo"),"Colore") to "Bianco",
+        ))
+        ensure("Testo", "Body", mapOf(
+            key(listOf("Testo"),"Sottolinea") to false,
+            key(listOf("Testo"),"Corsivo") to false,
+            key(listOf("Testo"),"Evidenzia") to "Nessuna",
+            key(listOf("Testo"),"Font") to "Inter",
+            key(listOf("Testo"),"Weight") to "Regular",
+            key(listOf("Testo"),"Size") to "16sp",
+            key(listOf("Testo"),"Colore") to "Nero",
+        ))
+        // CONTENITORE
+        ensure("Contenitore", "Card base", mapOf(
+            key(listOf("Contenitore"),"scroll") to "Assente",
+            key(listOf("Contenitore"),"shape") to "Rettangolo",
+            key(listOf("Contenitore"),"variant") to "Outlined",
+            key(listOf("Contenitore"),"b_thick") to "1dp",
+            key(listOf("Contenitore","Colore"),"col1") to "Bianco",
+            key(listOf("Contenitore","Colore"),"col2") to "Grigio chiaro",
+        ))
+        ensure("Contenitore", "Hero", mapOf(
+            key(listOf("Contenitore"),"variant") to "Full",
+            key(listOf("Contenitore","Colore"),"col1") to "Ciano",
+            key(listOf("Contenitore","Colore"),"grad") to "Orizzontale",
+        ))
+        // LAYOUT
+        ensure("Layout", "Default chiaro", mapOf(
+            key(listOf("Layout","Colore"),"col1") to "Bianco",
+            key(listOf("Layout","Colore"),"col2") to "Grigio chiaro",
+            key(listOf("Layout","Colore"),"grad") to "Orizzontale",
+            key(listOf("Layout","Colore"),"fx") to "Vignettatura",
+        ))
+        ensure("Layout", "Default scuro", mapOf(
+            key(listOf("Layout","Colore"),"col1") to "Nero",
+            key(listOf("Layout","Colore"),"col2") to "Grigio",
+            key(listOf("Layout","Colore"),"grad") to "Verticale",
+            key(listOf("Layout","Colore"),"fx") to "Noise",
+        ))
+    }
+
 
     // Misuro l’altezza della barra azioni per distanziare la barra categorie
     var actionsBarHeightPx by remember { mutableStateOf(0) }
@@ -206,14 +355,59 @@ fun EditorMenusOnly(
                     lastChanged = null
                 },
                 onToggle = { label, value ->
+                    val root = menuPath.firstOrNull() ?: "Contenitore"
                     menuSelections[key(menuPath, label)] = value
                     lastChanged = "$label: ${if (value) "ON" else "OFF"}"
                     dirty = true
+                    // Se c'era uno STILE attivo, qualsiasi modifica manuale lo annulla (Default resta)
+                    val styleKey = key(listOf(root), "style")
+                    val styleVal = (menuSelections[styleKey] as? String).orEmpty()
+                    if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
+                        menuSelections[styleKey] = "Nessuno"
+                    }
                 },
                 onPick = { label, value ->
-                    menuSelections[key(menuPath, label)] = value
+                    val root = menuPath.firstOrNull() ?: "Contenitore"
+                    val fullKey = key(menuPath, label)
+                    menuSelections[fullKey] = value
                     lastChanged = "$label: $value"
                     dirty = true
+
+                    when (label) {
+                        "default" -> {
+                            val name = value
+                            if (name.equals("Nessuno", true)) {
+                                // Applica eventuale stile, altrimenti reset a default base
+                                resolveAndApply(root)
+                            } else {
+                                // Applica prima il Default...
+                                applyPresetByName(root, name)
+                                // ...poi se c'è uno Stile diverso da Nessuno → lo Stile vince
+                                val styleVal = (menuSelections[key(listOf(root), "style")] as? String).orEmpty()
+                                if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true) && !styleVal.equals(name, true)) {
+                                    applyPresetByName(root, styleVal)
+                                }
+                            }
+                        }
+                        "style" -> {
+                            val name = value
+                            if (name.equals("Nessuno", true)) {
+                                // Se tolgo lo stile: applica default se presente, altrimenti default base
+                                resolveAndApply(root)
+                            } else {
+                                // Stile applicato istantaneamente e con precedenza
+                                applyPresetByName(root, name)
+                            }
+                        }
+                        else -> {
+                            // Modifica puntuale: Stile → Nessuno (Default resta selezionato)
+                            val styleKey = key(listOf(root), "style")
+                            val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
+                            if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
+                                menuSelections[styleKey] = "Nessuno"
+                            }
+                        }
+                    }
                 },
                 savedPresets = savedPresets
             )
@@ -242,39 +436,19 @@ fun EditorMenusOnly(
 
         // Dialog: Salva impostazioni come preset
         if (showSaveDialog) {
-            val root = menuPath.firstOrNull() ?: "Contenitore"
-            AlertDialog(
-                onDismissRequest = { showSaveDialog = false },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val bucket = savedPresets.getOrPut(root) { mutableListOf() }
-                            // se esiste chiedo "sovrascrivere?"
-                            if (bucket.any { it.equals(newPresetName, ignoreCase = true) }) {
-                                // sovrascrivo: in demo rimuovo e riaggiungo in coda
-                                bucket.removeAll { it.equals(newPresetName, ignoreCase = true) }
-                            }
-                            if (newPresetName.isNotBlank()) bucket.add(newPresetName.trim())
-                            newPresetName = ""
-                            dirty = false
-                            showSaveDialog = false
-                            showConfirm = false
-                            menuPath = emptyList()
-                        }
-                    ) { Text("Salva") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showSaveDialog = false }) { Text("Annulla") }
-                },
-                title = { Text("Salva impostazioni come stile") },
-                text = {
-                    OutlinedTextField(
-                        value = newPresetName,
-                        onValueChange = { newPresetName = it },
-                        label = { Text("Nome stile") }
-                    )
+            onClick = {
+                val root = menuPath.firstOrNull() ?: "Contenitore"
+                val name = newPresetName.trim()
+                if (name.isNotBlank()) {
+                    savePreset(root, name)     // aggiorna o crea lo stile con i valori correnti
+                    // Le impostazioni correnti sono già quelle a schermo: niente altro da fare
                 }
-            )
+                newPresetName = ""
+                dirty = false
+                showSaveDialog = false
+                showConfirm = false
+                menuPath = emptyList()
+            }
         }
     }
 }
@@ -755,6 +929,13 @@ private fun LayoutLevel(
                 options = saved["Layout"].orEmpty(),
                 onSelected = { onPick("default", it) }
             )
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_style),
+                contentDescription = "Stile",
+                current = get("style") ?: "Nessuno",
+                options = saved["Layout"].orEmpty(),
+                onSelected = { onPick("style", it) }
+            )           
         }
         "Colore" -> {
             IconDropdown(EditorIcons.Colors1, "Colore 1",
@@ -886,6 +1067,13 @@ private fun ContainerLevel(
                 current = get("default") ?: saved["Contenitore"]?.firstOrNull(),
                 options = saved["Contenitore"].orEmpty(),
                 onSelected = { onPick("default", it) }
+            )
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_style),
+                contentDescription = "Stile",
+                current = get("style") ?: "Nessuno",
+                options = saved["Contenitore"].orEmpty(),
+                onSelected = { onPick("style", it) }
             )
         }
         "Colore" -> {
@@ -1030,6 +1218,12 @@ private fun TextLevel(
         current = (selections[key(path, "default")] as? String) ?: saved["Testo"]?.firstOrNull(),
         options = saved["Testo"].orEmpty(),
         onSelected = { onPick("default", it) }
+    IconDropdown(
+        icon = ImageVector.vectorResource(id = R.drawable.ic_style),
+        contentDescription = "Stile",
+        current = (selections[key(path, "style")] as? String) ?: saved["Testo"]?.firstOrNull(),
+        options = saved["Testo"].orEmpty(),
+        onSelected = { onPick("style", it) }
     )
 }
 
