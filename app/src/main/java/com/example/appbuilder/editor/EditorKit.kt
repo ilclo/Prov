@@ -1445,25 +1445,6 @@ private fun TextLevel(
     */
 }
 
-/* ---------- AGGIUNGI ---------- */
-@Composable
-private fun AddLevel(
-    path: List<String>,
-    selections: MutableMap<String, Any?>,
-    onEnter: (String) -> Unit
-) {
-    if (path.getOrNull(1) == null) {
-        ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
-        ToolbarIconButton(Icons.Outlined.ToggleOn, "Toggle") { onEnter("Toggle") }
-        ToolbarIconButton(Icons.Outlined.LinearScale, "Slider") { onEnter("Slider") }
-    } else {
-        // placeholder: solo navigazione visiva
-        ElevatedCard(
-            modifier = Modifier.size(40.dp),
-            shape = CircleShape
-        ) {}
-    }
-}
 
 /* =========================================================================================
  *  WIDGET MENU — pulsanti a icona, toggle con bordo spesso, dropdown con badge
