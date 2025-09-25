@@ -154,7 +154,8 @@ fun EditorMenusOnly(
     var dirty by remember { mutableStateOf(false) }
     // Ultima opzione interessata (per mostrare info extra nel path)
     var lastChanged by remember { mutableStateOf<String?>(null) }
-
+    // Conferma all’uscita dai sottomenu verso la home
+    var showConfirm by remember { mutableStateOf(false) }
 
     // Preset salvati (nomi da mostrare nelle tendine)
     val savedPresets = remember {
@@ -344,8 +345,6 @@ fun EditorMenusOnly(
     var showSaveDialog by remember { mutableStateOf(false) }
     var newPresetName by remember { mutableStateOf("") }
 
-    // Conferma all’uscita dai sottomenu verso la home
-    var showConfirm by remember { mutableStateOf(false) }
 
 
     Box(
