@@ -110,6 +110,38 @@ fun EditorDemoScreen() {
  *  ROOT — solo menù (nessuna azione applicata)
  * ========================================================================================= */
 
+/* ---------- AGGIUNGI ---------- */
+@Composable
+private fun AddLevel(
+    path: List<String>,
+    selections: MutableMap<String, Any?>,
+    onEnter: (String) -> Unit
+) {
+    if (path.getOrNull(1) == null) {
+        ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
+        ToolbarIconButton(Icons.Outlined.ToggleOn, "Toggle") { onEnter("Toggle") }
+        ToolbarIconButton(Icons.Outlined.LinearScale, "Slider") { onEnter("Slider") }
+
+        // NEW: divider vertical & horizontal (Outlined-only, con fallback XML)
+        ToolbarIconButton(
+            icon = ImageVector.vectorResource(id = R.drawable.ic_align_flex_end),
+            contentDescription = "Divisore verticale",
+            onClick = { onEnter("Divisore verticale") }
+        )
+        ToolbarIconButton(
+            icon = ImageVector.vectorResource(id = R.drawable.ic_horizontal_rule),
+            contentDescription = "Divisore orizzontale",
+            onClick = { onEnter("Divisore orizzontale") }
+        )
+    } else {
+        // placeholder: solo navigazione visiva
+        ElevatedCard(
+            modifier = Modifier.size(40.dp),
+            shape = CircleShape
+        ) {}
+    }
+}
+
 @Composable
 fun EditorMenusOnly(
     state: EditorShellState
@@ -945,6 +977,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
  * ========================================================================================= */
 
 /* ---------- LAYOUT ---------- */
+/* ---------- LAYOUT ---------- */
 @Composable
 private fun LayoutLevel(
     path: List<String>,
@@ -956,12 +989,36 @@ private fun LayoutLevel(
 ) {
     fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
 
+    // Aree "wrappate" del Layout che devono riusare SOLO i sottomenu whitelist (Colore/Immagini)
+    val layoutAreas = setOf("Bottom bar", "Top bar", "Menù centrale", "Menù laterale")
+
     when (path.getOrNull(1)) {
         null -> {
-            fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
-
+            // ROOT Layout
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
+
+            // NEW: aree che riusano i sottomenu del Layout (whitelist)
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_call_to_action),
+                contentDescription = "Bottom bar",
+                onClick = { onEnter("Bottom bar") }
+            )
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_ad_units),
+                contentDescription = "Top bar",
+                onClick = { onEnter("Top bar") }
+            )
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_view_day),
+                contentDescription = "Menù centrale",
+                onClick = { onEnter("Menù centrale") }
+            )
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_view_sidebar),
+                contentDescription = "Menù laterale",
+                onClick = { onEnter("Menù laterale") }
+            )
 
             // DEFAULT
             IconDropdown(
@@ -971,8 +1028,7 @@ private fun LayoutLevel(
                 options = saved["Layout"].orEmpty(),
                 onSelected = { onPick("default", it) }
             )
-
-            // STILE (usa vettore custom)  — se NON hai ic_style.xml, vedi la variante sotto
+            // STILE (Outlined custom o Material)
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_style),
                 contentDescription = "Stile",
@@ -980,7 +1036,6 @@ private fun LayoutLevel(
                 options = saved["Layout"].orEmpty(),
                 onSelected = { onPick("style", it) }
             )
-
             /* Variante senza risorsa:
             IconDropdown(
                 icon = Icons.Outlined.Style,
@@ -991,6 +1046,99 @@ private fun LayoutLevel(
             )
             */
         }
+
+        // ----- WRAPPER AREE: whitelist solo Colore/Immagini (+ sottomenu relativi) -----
+        in layoutAreas -> {
+            when (path.getOrNull(2)) {
+                null -> {
+                    // Mostra SOLO le voci consentite (whitelist), non tutte quelle presenti/future
+                    ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
+                    ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
+                }
+                "Colore" -> {
+                    IconDropdown(EditorIcons.Colors1, "Colore 1",
+                        current = get("col1") ?: "Bianco",
+                        options = listOf("Bianco", "Grigio", "Nero", "Ciano"),
+                        onSelected = { onPick("col1", it) }
+                    )
+                    IconDropdown(EditorIcons.Colors2, "Colore 2",
+                        current = get("col2") ?: "Grigio chiaro",
+                        options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
+                        onSelected = { onPick("col2", it) }
+                    )
+                    IconDropdown(EditorIcons.Gradient, "Gradiente",
+                        current = get("grad") ?: "Orizzontale",
+                        options = listOf("Orizzontale", "Verticale"),
+                        onSelected = { onPick("grad", it) }
+                    )
+                    IconDropdown(EditorIcons.Functions, "Effetti",
+                        current = get("fx") ?: "Vignettatura",
+                        options = listOf("Vignettatura", "Noise", "Strisce"),
+                        onSelected = { onPick("fx", it) }
+                    )
+                }
+                "Immagini" -> {
+                    ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine") { onEnter("Aggiungi foto") }
+                    ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album") { onEnter("Aggiungi album") }
+                }
+                "Aggiungi foto" -> {
+                    IconDropdown(EditorIcons.Crop, "Crop",
+                        current = get("crop") ?: "Nessuno",
+                        options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
+                        onSelected = { onPick("crop", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Cornice",
+                        current = get("frame") ?: "Sottile",
+                        options = listOf("Nessuna", "Sottile", "Marcata"),
+                        onSelected = { onPick("frame", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Filtri",
+                        current = get("filtro") ?: "Nessuno",
+                        options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
+                        onSelected = { onPick("filtro", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Adattamento",
+                        current = get("fit") ?: "Cover",
+                        options = listOf("Cover", "Contain", "Fill"),
+                        onSelected = { onPick("fit", it) }
+                    )
+                }
+                "Aggiungi album" -> {
+                    IconDropdown(EditorIcons.Crop, "Crop",
+                        current = get("cropAlbum") ?: "Nessuno",
+                        options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
+                        onSelected = { onPick("cropAlbum", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Cornice",
+                        current = get("frameAlbum") ?: "Sottile",
+                        options = listOf("Nessuna", "Sottile", "Marcata"),
+                        onSelected = { onPick("frameAlbum", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Filtri album",
+                        current = get("filtroAlbum") ?: "Nessuno",
+                        options = listOf("Nessuno", "Tutte foto stesso filtro"),
+                        onSelected = { onPick("filtroAlbum", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Adattamento",
+                        current = get("fit") ?: "Cover",
+                        options = listOf("Cover", "Contain", "Fill"),
+                        onSelected = { onPick("fit", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Animazione",
+                        current = get("anim") ?: "Slide",
+                        options = listOf("Slide", "Fade", "Page flip"),
+                        onSelected = { onPick("anim", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Velocità",
+                        current = get("speed") ?: "Media",
+                        options = listOf("Lenta", "Media", "Veloce"),
+                        onSelected = { onPick("speed", it) }
+                    )
+                }
+            }
+        }
+
+        // ----- Layout “piano” (già esistente) -----
         "Colore" -> {
             IconDropdown(EditorIcons.Colors1, "Colore 1",
                 current = get("col1") ?: "Bianco",
@@ -1056,9 +1204,9 @@ private fun LayoutLevel(
                 onSelected = { onPick("filtroAlbum", it) }
             )
             IconDropdown(EditorIcons.Layout, "Adattamento",
-                current = get("fitAlbum") ?: "Cover",
+                current = get("fit") ?: "Cover",
                 options = listOf("Cover", "Contain", "Fill"),
-                onSelected = { onPick("fitAlbum", it) }
+                onSelected = { onPick("fit", it) }
             )
             IconDropdown(EditorIcons.Layout, "Animazione",
                 current = get("anim") ?: "Slide",
@@ -1073,6 +1221,7 @@ private fun LayoutLevel(
         }
     }
 }
+
 
 /* ---------- CONTENITORE ---------- */
 @Composable
