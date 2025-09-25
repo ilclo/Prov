@@ -580,7 +580,7 @@ private fun BoxScope.MainBottomBar(
     var secondDotCenter by remember { mutableStateOf<Float?>(null) }
 
     // --- varia colore linea (scritte + linea) ---
-    val lineAccent = Color(0x7F6EA7) // varia colore linea
+    val lineAccent = Color(0xFF7F6EA7) // varia colore linea
     // --- alza etichette di poco rispetto alla linea ---
     val labelLift = 6.dp
 
