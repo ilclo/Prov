@@ -580,9 +580,9 @@ private fun BoxScope.MainBottomBar(
     var secondDotCenter by remember { mutableStateOf<Float?>(null) }
 
     // --- varia colore linea (scritte + linea) ---
-    val lineAccent = Color(0xFF218494) // varia colore linea
+    val lineAccent = Color(0xFF111621) // varia colore linea
     // --- alza etichette di poco rispetto alla linea ---
-    val labelLift = 4.dp
+    val labelLift = 3.dp
 
     // stile etichette (usa lineAccent)
     val labelStyle = MaterialTheme.typography.labelSmall.copy(
@@ -888,7 +888,7 @@ private fun BoxScope.MainBottomBar(
             if (lastBlockCenter != null) {
                 var baselineProgPx by remember { mutableStateOf(0f) }
                 Text(
-                    "progressi",
+                    "progetti",
                     style = labelStyle,
                     onTextLayout = { tlr -> baselineProgPx = tlr.getLineBaseline(0).toFloat() },
                     modifier = Modifier
