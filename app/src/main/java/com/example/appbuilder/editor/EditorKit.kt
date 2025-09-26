@@ -3,7 +3,6 @@ package com.example.appbuilder.editor
 // layout helpers
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Divider
@@ -18,10 +17,8 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,7 +26,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -61,7 +57,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -93,6 +88,10 @@ import androidx.compose.material.icons.outlined.ViewSidebar
 import androidx.compose.material.icons.outlined.ViewDay
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material3.ElevatedButton
+
 
 
 /* ---- BARS: altezze fisse + gap ---- */
@@ -204,6 +203,32 @@ private fun AddLevel(
         }
     }
 }
+
+@Composable
+private fun WizardChip(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(100),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+        tonalElevation = if (selected) 2.dp else 0.dp,
+        shadowElevation = if (selected) 1.dp else 0.dp
+    ) {
+        Text(
+            label,
+            modifier = Modifier
+                .clickable { onClick() }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            color = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
 
 @Composable
 private fun DeckIconLarge(
@@ -406,16 +431,19 @@ private fun CreationWizardOverlay(
                 OutlinedTextField(value = "", onValueChange = {}, label = { Text("ID (opzionale)") })
                 OutlinedTextField(value = "", onValueChange = {}, label = { Text("Descrizione") }, placeholder = { Text("n/a") })
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AssistChip(false, "Nessuna") {}
-                    AssistChip(false, "Verticale") {}
-                    AssistChip(false, "Orizzontale") {}
+                    WizardChip(selected = false, label = "Nessuna") { /* TODO */ }
+                    WizardChip(selected = false, label = "Verticale") { /* TODO */ }
+                    WizardChip(selected = false, label = "Orizzontale") { /* TODO */ }
                 }
+
                 Divider()
+
                 Text("Associazioni", style = MaterialTheme.typography.titleSmall)
+
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AssistChip(false, "Wizard Path") {}
-                    AssistChip(false, "Manuale") {}
-                    AssistChip(false, "Pick visivo") {}
+                    WizardChip(selected = false, label = "Wizard Path") { /* TODO */ }
+                    WizardChip(selected = false, label = "Manuale") { /* TODO */ }
+                    WizardChip(selected = false, label = "Pick visivo") { /* TODO */ }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(
@@ -664,6 +692,7 @@ fun EditorMenusOnly(
                 )
             )
     ) {
+
         if (menuPath.isEmpty()) {
             // HOME: due barre sempre visibili
             MainBottomBar(
