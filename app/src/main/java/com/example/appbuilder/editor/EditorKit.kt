@@ -1,35 +1,22 @@
 package com.example.appbuilder.editor
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+// layout helpers
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Divider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.example.appbuilder.icons.EditorIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
@@ -44,6 +31,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -73,6 +61,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -83,68 +72,21 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.appbuilder.R
 
-enum class Lang { IT, EN }
-
-// Semplice “local” per propagare la lingua nelle nuove UI.
-// In futuro potrai sostituirlo con strings.xml senza toccare l’API di t("chiave").
-val LocalLang = compositionLocalOf { Lang.IT }
-
-private object Strings {
-    val it = mapOf(
-        "gallery" to "Galleria componenti",
-        "demo_dropdown" to "Menù a tendina",
-        "demo_list" to "Lista",
-        "demo_tabs" to "Tab",
-        "demo_dividers" to "Divisori",
-        "demo_buttons" to "Pulsanti",
-        "loading" to "Caricamento…",
-        "empty" to "Nessun elemento",
-        "error" to "Errore di rete",
-        "toggle_loading" to "Loading",
-        "toggle_empty" to "Empty",
-        "toggle_error" to "Error",
-        "select_city" to "Seleziona città",
-        "it" to "IT",
-        "en" to "EN"
-    )
-    val en = mapOf(
-        "gallery" to "Component gallery",
-        "demo_dropdown" to "Dropdown",
-        "demo_list" to "List",
-        "demo_tabs" to "Tabs",
-        "demo_dividers" to "Dividers",
-        "demo_buttons" to "Buttons",
-        "loading" to "Loading…",
-        "empty" to "No items",
-        "error" to "Network error",
-        "toggle_loading" to "Loading",
-        "toggle_empty" to "Empty",
-        "toggle_error" to "Error",
-        "select_city" to "Select a city",
-        "it" to "IT",
-        "en" to "EN"
-    )
-}
-
-@Composable
-private fun t(key: String): String {
-    return when (LocalLang.current) {
-        Lang.IT -> Strings.it
-        Lang.EN -> Strings.en
-    }[key] ?: key
-}
 
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
@@ -176,6 +118,7 @@ fun EditorDemoScreen() {
  *  ROOT — solo menù (nessuna azione applicata)
  * ========================================================================================= */
 
+/* ---------- AGGIUNGI ---------- */
 @Composable
 private fun AddLevel(
     path: List<String>,
@@ -1764,275 +1707,4 @@ private fun dividerDot() {
             .clip(CircleShape)
             .background(Color(0xFF233049))
     )
-}
-
-
-@Composable
-private fun ComponentGallery() {
-    // Lingua locale alla galleria (solo qui per ora)
-    var lang by rememberSaveable { mutableStateOf(Lang.IT) }
-    CompositionLocalProvider(LocalLang provides lang) {
-        var loading by rememberSaveable { mutableStateOf(false) }
-        var empty by rememberSaveable { mutableStateOf(false) }
-        var error by rememberSaveable { mutableStateOf(false) }
-
-        Column(Modifier.fillMaxSize().padding(16.dp)) {
-            // Titolo + switch lingua
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    t("gallery"),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        onClick = { lang = Lang.IT },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = if (lang == Lang.IT) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        )
-                    ) { Text(t("it")) }
-                    TextButton(
-                        onClick = { lang = Lang.EN },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = if (lang == Lang.EN) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        )
-                    ) { Text(t("en")) }
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Knobs per stati della LISTA
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AssistChip(loading, t("toggle_loading")) { loading = !loading }
-                AssistChip(empty, t("toggle_empty")) { empty = !empty }
-                AssistChip(error, t("toggle_error")) { error = !error }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item { SectionTitle(t("demo_dropdown")) }
-                item { DemoDropdown(t("select_city")) }
-
-                item { SectionTitle(t("demo_list")) }
-                item { DemoList(loading = loading, empty = empty, error = error) }
-
-                item { SectionTitle(t("demo_tabs")) }
-                item { DemoTabs() }
-
-                item { SectionTitle(t("demo_dividers")) }
-                item { DemoDividers() }
-
-                item { SectionTitle(t("demo_buttons")) }
-                item { DemoButtons() }
-            }
-        }
-    }
-}
-
-/* ---------- Pezzi UI utili ---------- */
-
-@Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall.copy(
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
-        )
-    )
-    Spacer(Modifier.height(6.dp))
-}
-
-@Composable
-private fun AssistChip(active: Boolean, label: String, onClick: () -> Unit) {
-    Surface(
-        tonalElevation = if (active) 2.dp else 0.dp,
-        shadowElevation = if (active) 1.dp else 0.dp,
-        shape = RoundedCornerShape(100),
-        color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-    ) {
-        Text(
-            label,
-            modifier = Modifier
-                .clickable { onClick() }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            color = if (active) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-/* ---------- Demo: Dropdown semplice ---------- */
-@Composable
-private fun DemoDropdown(label: String) {
-    val items = listOf("Roma", "Milano", "Torino", "Napoli", "Bologna")
-    var expanded by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf(items.first()) }
-
-    Box {
-        OutlinedButton(onClick = { expanded = true }) {
-            Text("$label: $selected")
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            items.forEach { city ->
-                DropdownMenuItem(
-                    text = { Text(city) },
-                    onClick = { selected = city; expanded = false }
-                )
-            }
-        }
-    }
-}
-
-/* ---------- Demo: Lista con stati (loading/empty/error) ---------- */
-@Composable
-private fun DemoList(loading: Boolean, empty: Boolean, error: Boolean) {
-    val demoItems = listOf("Elemento A", "Elemento B", "Elemento C", "Elemento D")
-    when {
-        loading -> LoadingSkeletonList()
-        error -> ErrorCard(t("error"))
-        empty -> EmptyCard(t("empty"))
-        else -> {
-            Surface(
-                tonalElevation = 1.dp,
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                LazyColumn {
-                    items(demoItems) { item ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFF1B2334),
-                                modifier = Modifier.size(30.dp)
-                            ) { /* leading circle */ }
-                            Spacer(Modifier.width(10.dp))
-                            Text(item, style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LoadingSkeletonList() {
-    val shimmer = rememberInfiniteTransition(label = "skeleton")
-        .animateFloat(
-            initialValue = 0.3f, targetValue = 0.8f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(800, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ), label = "alpha"
-        )
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        repeat(4) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
-                    .alpha(shimmer.value)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ErrorCard(text: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        shape = RoundedCornerShape(10.dp)
-    ) {
-        Text(text, modifier = Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onErrorContainer)
-    }
-}
-
-@Composable
-private fun EmptyCard(text: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        shape = RoundedCornerShape(10.dp)
-    ) {
-        Text(text, modifier = Modifier.padding(14.dp))
-    }
-}
-
-/* ---------- Demo: Tabs ---------- */
-@Composable
-private fun DemoTabs() {
-    var tab by remember { mutableStateOf(0) }
-    val labels = listOf("Uno", "Due", "Tre")
-    Column {
-        TabRow(selectedTabIndex = tab) {
-            labels.forEachIndexed { i, s ->
-                Tab(selected = tab == i, onClick = { tab = i }, text = { Text(s) })
-            }
-        }
-        when (tab) {
-            0 -> Text("Contenuto Uno", Modifier.padding(12.dp))
-            1 -> Text("Contenuto Due", Modifier.padding(12.dp))
-            2 -> Text("Contenuto Tre", Modifier.padding(12.dp))
-        }
-    }
-}
-
-/* ---------- Demo: Divisori ---------- */
-@Composable
-private fun DemoDividers() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Orizzontale
-        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-        // Verticale
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f).height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)))
-            Spacer(Modifier.width(12.dp))
-            Box(Modifier.width(1.dp).height(24.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)))
-            Spacer(Modifier.width(12.dp))
-            Box(Modifier.weight(1f).height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)))
-        }
-    }
-}
-
-/* ---------- Demo: Pulsanti con evidenziazione ---------- */
-@Composable
-private fun DemoButtons() {
-    var pressed by remember { mutableStateOf(false) }
-    val alpha by rememberInfiniteTransition(label = "btn").animateFloat(
-        initialValue = 0.0f, targetValue = if (pressed) 0.12f else 0.0f,
-        animationSpec = tween(180), label = "btnAlpha"
-    )
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        ElevatedButton(onClick = { pressed = !pressed }) { Text("Primary") }
-        OutlinedButton(onClick = { pressed = !pressed }) { Text("Outlined") }
-        Surface(
-            shape = CircleShape,
-            color = Color(0xFF1B2334) // come i “cerchi” delle icone
-        ) {
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha), CircleShape)
-                    .clickable { pressed = !pressed },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Outlined.Star, contentDescription = null)
-            }
-        }
-    }
 }
