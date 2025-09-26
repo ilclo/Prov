@@ -373,7 +373,7 @@ fun EditorMenusOnly(
         AppEngine.data.register(
             HttpTextSource(
                 id = "src_citta",
-                url = "https://example.com/lista",
+                url = "http://127.0.0.1:8080/",
                 separator = '|'
             )
         )
