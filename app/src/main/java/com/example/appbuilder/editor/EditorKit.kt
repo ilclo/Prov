@@ -189,6 +189,14 @@ private fun AddLevel(
     }
 }
 
+@Composable
+private fun ComponentGallery() {
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Galleria componenti", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(12.dp))
+        Text("Qui inseriremo le demo (dropdown, lista, tabs, ecc.).")
+    }
+}
 
 @Composable
 fun EditorMenusOnly(
