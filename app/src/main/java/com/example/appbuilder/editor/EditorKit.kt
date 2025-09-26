@@ -693,52 +693,49 @@ fun EditorMenusOnly(
             )
     ) {
 
+        
         if (menuPath.isEmpty()) {
-            // HOME: due barre sempre visibili
-            MainBottomBar(
-                onUndo = { /* stub */ },
-                onRedo = { /* stub */ },
-                onSaveFile = { /* stub */ },
-                onDelete = { /* stub */ },
-                onDuplicate = { /* stub */ },
-                onProperties = { /* stub */ },
-                onLayout = { menuPath = listOf("Layout") },
-                onCreate = { /* dropdown nella bar stessa */ },
-                onOpenList = { /* stub */ },
-                onSaveProject = { /* stub */ },
-                onOpenProject = { /* stub */ },
-                onNewProject = { /* stub */ },
-                onMeasured = { actionsBarHeightPx = it },
-                discontinuousBottom = menuPath.isEmpty() // ⟵ Home = discontinuo; con path (se visibile) = continuo
-            )
-            MainMenuBar(
-                onLayout = { menuPath = listOf("Layout") },
-                onContainer = { menuPath = listOf("Contenitore") },
-                onText = { menuPath = listOf("Testo") },
-                onAdd = { menuPath = listOf("Aggiungi") },
-                bottomBarHeightPx = actionsBarHeightPx
-            )
-
+            // HOME
             if (!wizardVisible) {
-                MainBottomBar( /* come ora */ )
-
+                // 1) PRIMA BARRA (una sola volta, con tutti i parametri richiesti)
+                MainBottomBar(
+                    onUndo = { },
+                    onRedo = { },
+                    onSaveFile = { },
+                    onDelete = { },
+                    onDuplicate = { },
+                    onProperties = { },
+                    onLayout = { /* se vuoi, passa al deck root oppure apri Layout */ },
+                    onCreate = { /* puoi aprire wizardVisible = true qui se vuoi */ },
+                    onOpenList = { },
+                    onSaveProject = { },
+                    onOpenProject = { },
+                    onNewProject = { },
+                    onMeasured = { actionsBarHeightPx = it }
+                )
+        
+                // 2) SECONDA BARRA
                 if (!classicEditing) {
-                    // SECONDA BARRA in modalità DECK ROOT
+                    // Modalità DECK ROOT (Pagina / MenùL / MenùC / Avviso)
                     SecondBarDeckRoot(
                         expanded = deckExpanded,
-                        onToggleRoot = { root -> deckExpanded = if (deckExpanded == root) null else root },
+                        onToggleRoot = { root ->
+                            deckExpanded = if (deckExpanded == root) null else root
+                        },
                         pages = demoPages,
                         menuL = demoMenuL,
                         menuC = demoMenuC,
                         alerts = demoAlerts,
-                        onAddInRoot = { root -> wizardVisible = true /* apri wizard; memorizza root se vuoi */ },
+                        onAddInRoot = { _ ->
+                            wizardVisible = true    // apri wizard overlay
+                        },
                         onOpenItem = { _, _ ->
-                            classicEditing = true                      // entra nell’editor classico
+                            classicEditing = true   // entra nell’editor classico
                             deckExpanded = null
                         }
                     )
                 } else {
-                    // SECONDA BARRA in modalità EDITOR CLASSICO: riusa la tua MainMenuBar
+                    // Modalità EDITOR CLASSICO: riusa la tua seconda barra + pulsante "?"
                     Box(Modifier.fillMaxWidth()) {
                         MainMenuBar(
                             onLayout = { menuPath = listOf("Layout") },
@@ -749,21 +746,23 @@ fun EditorMenusOnly(
                         )
                         MetaHelpButton(
                             onClick = { classicMetaOpen = true },
-                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 12.dp)
                         )
                     }
                 }
             }
-
-            // WIZARD OVERLAY (sovraimpressione, barre nascoste)
+        
+            // 3) WIZARD OVERLAY (barre non visibili quando è aperto)
             CreationWizardOverlay(
                 visible = wizardVisible,
-                root = deckExpanded,                 // opzionale: mostra titolo coerente
+                root = deckExpanded,
                 onDismiss = { wizardVisible = false }
             )
-
+        
         } else {
-            // IN MENU: mostro pannello di livello corrente + breadcrumb
+            // IN MENU: pannello livello corrente + breadcrumb (come prima)
             SubMenuBar(
                 path = menuPath,
                 selections = menuSelections,
@@ -771,19 +770,17 @@ fun EditorMenusOnly(
                     if (menuPath.size == 1 && dirty) showConfirm = true
                     else {
                         menuPath = menuPath.dropLast(1)
-                        lastChanged = null   // ← niente “scia” nel breadcrumb
+                        lastChanged = null
                     }
                 },
                 onEnter = { label ->
-                    // Sibling foglia nello stesso ramo (immagini)
                     val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
                     menuPath = when {
                         menuPath.lastOrNull() == label -> menuPath
                         menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
-                            menuPath.dropLast(1) + label   // ← sostituisci, non accumulare
+                            menuPath.dropLast(1) + label
                         else -> menuPath + label
                     }
-                    // Navigazione ≠ scelta: non mostrare nel breadcrumb
                     lastChanged = null
                 },
                 onToggle = { label, value ->
@@ -791,7 +788,6 @@ fun EditorMenusOnly(
                     menuSelections[key(menuPath, label)] = value
                     lastChanged = "$label: ${if (value) "ON" else "OFF"}"
                     dirty = true
-                    // Se c'era uno STILE attivo, qualsiasi modifica manuale lo annulla (Default resta)
                     val styleKey = key(listOf(root), "style")
                     val styleVal = (menuSelections[styleKey] as? String).orEmpty()
                     if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
@@ -804,17 +800,13 @@ fun EditorMenusOnly(
                     menuSelections[fullKey] = value
                     lastChanged = "$label: $value"
                     dirty = true
-
                     when (label) {
                         "default" -> {
                             val name = value
                             if (name.equals("Nessuno", true)) {
-                                // Applica eventuale stile, altrimenti reset a default base
                                 resolveAndApply(root)
                             } else {
-                                // Applica prima il Default...
                                 applyPresetByName(root, name)
-                                // ...poi se c'è uno Stile diverso da Nessuno → lo Stile vince
                                 val styleVal = (menuSelections[key(listOf(root), "style")] as? String).orEmpty()
                                 if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true) && !styleVal.equals(name, true)) {
                                     applyPresetByName(root, styleVal)
@@ -824,15 +816,12 @@ fun EditorMenusOnly(
                         "style" -> {
                             val name = value
                             if (name.equals("Nessuno", true)) {
-                                // Se tolgo lo stile: applica default se presente, altrimenti default base
                                 resolveAndApply(root)
                             } else {
-                                // Stile applicato istantaneamente e con precedenza
                                 applyPresetByName(root, name)
                             }
                         }
                         else -> {
-                            // Modifica puntuale: Stile → Nessuno (Default resta selezionato)
                             val styleKey = key(listOf(root), "style")
                             val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
                             if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
@@ -846,7 +835,6 @@ fun EditorMenusOnly(
             BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
         }
 
-        // Barra di conferma quando risalgo con modifiche
         if (showConfirm) {
             ConfirmBar(
                 onCancel = {
