@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -82,7 +81,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.appbuilder.R
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.ViewSidebar
@@ -92,7 +90,6 @@ import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.ElevatedButton
-
 
 
 /* ---- BARS: altezze fisse + gap ---- */
