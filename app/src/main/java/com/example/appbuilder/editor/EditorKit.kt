@@ -1,5 +1,7 @@
 package com.example.appbuilder.editor
 
+import com.example.appbuilder.AppEngine
+import com.example.appbuilder.eca.ActionHandler
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.unit.dp
@@ -281,7 +283,14 @@ fun EditorMenusOnly(
         fun ensure(root: String, name: String, values: Map<String, Any?>) {
             val store = presetValues.getOrPut(root) { mutableMapOf() }
             if (store[name] == null) store[name] = values
+            
         }
+        AppEngine.init(object : ActionHandler {
+            override fun showBanner(text: String) { /* TODO: snackbar/toast */ }
+            override fun openMenu(name: String) { /* TODO: apri menù nella tua UI */ }
+            override fun navigate(path: String) { /* TODO: cambia pagina */ }
+            override fun swapTemplate(component: String, template: String) { /* TODO: cambia aspetto */ }
+        })
         // TESTO
         ensure("Testo", "Titolo", mapOf(
             key(listOf("Testo"),"Sottolinea") to false,
