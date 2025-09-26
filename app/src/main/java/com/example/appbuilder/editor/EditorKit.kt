@@ -83,8 +83,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -178,45 +176,76 @@ fun EditorDemoScreen() {
  *  ROOT — solo menù (nessuna azione applicata)
  * ========================================================================================= */
 
-/* ---------- AGGIUNGI ---------- */
 @Composable
 private fun AddLevel(
     path: List<String>,
     selections: MutableMap<String, Any?>,
     onEnter: (String) -> Unit
 ) {
-    if (path.getOrNull(1) == null) {
-        ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
-        ToolbarIconButton(Icons.Outlined.ToggleOn, "Toggle") { onEnter("Toggle") }
-        ToolbarIconButton(Icons.Outlined.LinearScale, "Slider") { onEnter("Slider") }
+    when (path.getOrNull(1)) {
+        // ROOT "Aggiungi": solo icone
+        null -> {
+            ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
+            ToolbarIconButton(Icons.Outlined.ToggleOn, "Toggle") { onEnter("Toggle") }
+            ToolbarIconButton(Icons.Outlined.LinearScale, "Slider") { onEnter("Slider") }
 
-        // NEW: divider vertical & horizontal (Outlined-only, con fallback XML)
-        ToolbarIconButton(
-            icon = ImageVector.vectorResource(id = R.drawable.ic_align_flex_end),
-            contentDescription = "Divisore verticale",
-            onClick = { onEnter("Divisore verticale") }
-        )
-        ToolbarIconButton(
-            icon = ImageVector.vectorResource(id = R.drawable.ic_horizontal_rule),
-            contentDescription = "Divisore orizzontale",
-            onClick = { onEnter("Divisore orizzontale") }
-        )
-        ToolbarIconButton(
-            icon = Icons.Outlined.ViewModule,     // outlined
-            contentDescription = "Galleria",
-            onClick = { onEnter("Galleria") }
-        )
+            // Divider vertical & horizontal (Outlined / fallback XML)
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_align_flex_end),
+                contentDescription = "Divisore verticale",
+                onClick = { onEnter("Divisore verticale") }
+            )
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_horizontal_rule),
+                contentDescription = "Divisore orizzontale",
+                onClick = { onEnter("Divisore orizzontale") }
+            )
+
+            // Galleria componenti
+            ToolbarIconButton(
+                icon = Icons.Outlined.Widgets, // outlined
+                contentDescription = "Galleria",
+                onClick = { onEnter("Galleria") }
+            )
+        }
+
+        // Galleria componenti (demo visiva)
         "Galleria" -> {
             ComponentGallery()
         }
-    } else {
-        // placeholder: solo navigazione visiva
-        ElevatedCard(
-            modifier = Modifier.size(40.dp),
-            shape = CircleShape
-        ) {}
+
+        // Anteprime semplici per i divider
+        "Divisore verticale" -> {
+            Row(
+                modifier = Modifier
+                    .height(40.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                )
+            }
+        }
+        "Divisore orizzontale" -> {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            }
+        }
+
+        // Placeholder per altre voci future
+        else -> {
+            ElevatedCard(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape
+            ) {}
+        }
     }
 }
+
 
 @Composable
 fun EditorMenusOnly(
