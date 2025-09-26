@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.example.appbuilder.ui
 
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,7 @@ import com.example.appbuilder.data.DataState
 import com.example.appbuilder.eca.Event
 import com.example.appbuilder.eca.RuleEngine
 import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.material3.ExperimentalMaterial3Api
 
 /**
  * Simple bound dropdown MVP:
