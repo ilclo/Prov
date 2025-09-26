@@ -2,6 +2,11 @@ package com.example.appbuilder.editor
 
 import com.example.appbuilder.AppEngine
 import com.example.appbuilder.eca.ActionHandler
+import com.example.appbuilder.core.Binding
+import com.example.appbuilder.core.RefreshPolicy
+import com.example.appbuilder.data.HttpTextSource
+import com.example.appbuilder.data.FakeFolderSource
+import com.example.appbuilder.ui.BoundDropdown
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.unit.dp
@@ -280,18 +285,10 @@ fun EditorMenusOnly(
 
     // Seeding di alcuni preset iniziali (così "Default/Titolo/..." agiscono subito)
     LaunchedEffect(Unit) {
-        AppEngine.init(object : ActionHandler {
-            override fun showBanner(text: String) { /* TODO: snackbar/toast */ }
-            override fun openMenu(name: String) { /* TODO: apri menù nella tua UI */ }
-            override fun navigate(path: String) { /* TODO: cambia pagina */ }
-            override fun swapTemplate(component: String, template: String) { /* TODO: cambia aspetto */ }
-        })
         fun ensure(root: String, name: String, values: Map<String, Any?>) {
             val store = presetValues.getOrPut(root) { mutableMapOf() }
             if (store[name] == null) store[name] = values
-            
         }
-
         // TESTO
         ensure("Testo", "Titolo", mapOf(
             key(listOf("Testo"),"Sottolinea") to false,
@@ -356,6 +353,49 @@ fun EditorMenusOnly(
     var showSaveDialog by remember { mutableStateOf(false) }
     var newPresetName by remember { mutableStateOf("") }
 
+    // 1) Inizializza RuleEngine con un handler minimo
+    LaunchedEffect(Unit) {
+        AppEngine.init(object : ActionHandler {
+            override fun showBanner(text: String) {
+                // TODO: collega a Snackbar/Toast; per ora mettiamo nel breadcrumb
+                // (volendo puoi usare uno State hoisting per uno SnackbarHost)
+            }
+            override fun openMenu(name: String) {
+                // esempio: apri direttamente il menù richiesto
+                // menuPath è nello scope di EditorMenusOnly, quindi lo puoi usare:
+                // Nota: se vuoi agganciare nomi diversi, fai una mappa qui
+            }
+            override fun navigate(path: String) { /* TODO se serve */ }
+            override fun swapTemplate(component: String, template: String) { /* TODO in Sprint 2 */ }
+        })
+    }
+
+    // 2) Registra fonti dati + binding MVP (esempio: lista città + clip mock)
+    LaunchedEffect(Unit) {
+        // SORGENTI
+        AppEngine.data.register(
+            HttpTextSource(
+                id = "src_citta",
+                url = "https://example.com/lista",
+                separator = '|'
+            )
+        )
+        AppEngine.data.register(
+            FakeFolderSource(
+                id = "src_clip",
+                items = listOf("demo.mp4", "cover.jpg", "intro.mov")  // mock
+            )
+        )
+
+        // BINDING (componentPath -> source)
+        AppEngine.bindings.set(
+            Binding(
+                componentPath = "Home/DropdownCitta",
+                sourceId = "src_citta",
+                refresh = RefreshPolicy.ON_ENTER_PAGE
+            )
+        )
+    }
 
 
     Box(
