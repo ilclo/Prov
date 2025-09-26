@@ -86,6 +86,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.appbuilder.R
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddCircle
+import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.ViewSidebar
+import androidx.compose.material.icons.outlined.ViewDay
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.outlined.HelpOutline
 
 
 /* ---- BARS: altezze fisse + gap ---- */
@@ -94,6 +101,15 @@ private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (s
 private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / submenu)
 private val BARS_GAP = 14.dp                 // distacco tra le due barre (+2dp di “aria”)
 private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto al bordo schermo
+// Root deck della SECONDA barra
+private enum class DeckRoot { PAGINA, MENU_LATERALE, MENU_CENTRALE, AVVISO }
+
+// Elemento mostrato come mini-icona con badge ID
+private data class DeckItem(
+    val id: String,                          // mostrare 5..8 char (clamp grafico)
+    val icon: ImageVector                    // icona outlined coerente con la classe
+)
+
 
 
 /* =========================================================================================
@@ -190,6 +206,232 @@ private fun AddLevel(
 }
 
 @Composable
+private fun DeckIconLarge(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    // cerchio come i tuoi bottoni circolari
+    Surface(
+        shape = CircleShape,
+        color = Color(0xFF1B2334), // stesso tono dei “cerchi” icone attuali
+        tonalElevation = if (selected) 2.dp else 0.dp,
+        shadowElevation = if (selected) 1.dp else 0.dp
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+            Icon(icon, contentDescription = contentDescription)
+        }
+    }
+}
+
+@Composable
+private fun DeckMiniIcon(
+    icon: ImageVector,
+    id: String,
+    onClick: () -> Unit
+) {
+    val shownId = id.take(8) // clamp a 8 (se meno di 5, mostri comunque tutto)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(min = 48.dp)
+    ) {
+        Surface(shape = CircleShape, color = Color(0xFF1B2334)) {
+            IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+                Icon(icon, contentDescription = shownId)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            shownId,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun DeckPlusButton(onClick: () -> Unit) {
+    Surface(shape = CircleShape, color = Color(0xFF1B2334)) {
+        IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Outlined.AddCircle, contentDescription = "Nuovo")
+        }
+    }
+}
+
+@Composable
+private fun SecondBarDeckRoot(
+    expanded: DeckRoot?,                                 // quale root è espansa (null = nessuna)
+    onToggleRoot: (DeckRoot) -> Unit,                   // tap icona grande → espande/chiude
+    pages: List<DeckItem>,
+    menuL: List<DeckItem>,
+    menuC: List<DeckItem>,
+    alerts: List<DeckItem>,
+    onAddInRoot: (DeckRoot) -> Unit,                    // tap c+ → wizard
+    onOpenItem: (DeckRoot, DeckItem) -> Unit,           // tap mini → entra editor classico
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth().height(56.dp),
+        color = Color(0xFF111621) // stesso colore della top bar “home”
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 1) PAGINA
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DeckIconLarge(
+                    icon = Icons.Outlined.Article,
+                    contentDescription = "Pagina",
+                    selected = expanded == DeckRoot.PAGINA
+                ) { onToggleRoot(DeckRoot.PAGINA) }
+
+                if (expanded == DeckRoot.PAGINA) {
+                    DeckPlusButton { onAddInRoot(DeckRoot.PAGINA) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        pages.forEach { item ->
+                            DeckMiniIcon(icon = Icons.Outlined.Article, id = item.id) {
+                                onOpenItem(DeckRoot.PAGINA, item)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2) MENÙ LATERALE
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DeckIconLarge(
+                    icon = Icons.Outlined.ViewSidebar,
+                    contentDescription = "Menù laterale",
+                    selected = expanded == DeckRoot.MENU_LATERALE
+                ) { onToggleRoot(DeckRoot.MENU_LATERALE) }
+
+                if (expanded == DeckRoot.MENU_LATERALE) {
+                    DeckPlusButton { onAddInRoot(DeckRoot.MENU_LATERALE) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        menuL.forEach { item ->
+                            DeckMiniIcon(icon = Icons.Outlined.ViewSidebar, id = item.id) {
+                                onOpenItem(DeckRoot.MENU_LATERALE, item)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3) MENÙ CENTRALE
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DeckIconLarge(
+                    icon = Icons.Outlined.ViewDay,
+                    contentDescription = "Menù centrale",
+                    selected = expanded == DeckRoot.MENU_CENTRALE
+                ) { onToggleRoot(DeckRoot.MENU_CENTRALE) }
+
+                if (expanded == DeckRoot.MENU_CENTRALE) {
+                    DeckPlusButton { onAddInRoot(DeckRoot.MENU_CENTRALE) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        menuC.forEach { item ->
+                            DeckMiniIcon(icon = Icons.Outlined.ViewDay, id = item.id) {
+                                onOpenItem(DeckRoot.MENU_CENTRALE, item)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4) AVVISI
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DeckIconLarge(
+                    icon = Icons.Outlined.WarningAmber,
+                    contentDescription = "Avvisi",
+                    selected = expanded == DeckRoot.AVVISO
+                ) { onToggleRoot(DeckRoot.AVVISO) }
+
+                if (expanded == DeckRoot.AVVISO) {
+                    DeckPlusButton { onAddInRoot(DeckRoot.AVVISO) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        alerts.forEach { item ->
+                            DeckMiniIcon(icon = Icons.Outlined.WarningAmber, id = item.id) {
+                                onOpenItem(DeckRoot.AVVISO, item)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetaHelpButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(shape = CircleShape, color = Color(0xFF1B2334), modifier = modifier) {
+        IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Outlined.HelpOutline, contentDescription = "Info elemento")
+        }
+    }
+}
+
+@Composable
+private fun CreationWizardOverlay(
+    visible: Boolean,
+    root: DeckRoot?,                 // PAGINA / MENU_LATERALE / MENU_CENTRALE / AVVISO (per titolo)
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+    Box(
+        Modifier.fillMaxSize().background(Color(0xCC000000)) // scrim nero
+    ) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
+        ) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    when (root) {
+                        DeckRoot.PAGINA -> "Nuova pagina"
+                        DeckRoot.MENU_LATERALE -> "Nuovo menù laterale"
+                        DeckRoot.MENU_CENTRALE -> "Nuovo menù centrale"
+                        DeckRoot.AVVISO -> "Nuovo avviso"
+                        else -> "Nuovo elemento"
+                    },
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                // Campi solo UI (placeholder, niente logica qui)
+                OutlinedTextField(value = "", onValueChange = {}, label = { Text("Nome (opzionale)") })
+                OutlinedTextField(value = "", onValueChange = {}, label = { Text("ID (opzionale)") })
+                OutlinedTextField(value = "", onValueChange = {}, label = { Text("Descrizione") }, placeholder = { Text("n/a") })
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AssistChip(false, "Nessuna") {}
+                    AssistChip(false, "Verticale") {}
+                    AssistChip(false, "Orizzontale") {}
+                }
+                Divider()
+                Text("Associazioni", style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AssistChip(false, "Wizard Path") {}
+                    AssistChip(false, "Manuale") {}
+                    AssistChip(false, "Pick visivo") {}
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Annulla") }
+                    Spacer(Modifier.width(4.dp))
+                    ElevatedButton(onClick = onDismiss) { Text("Crea") } // in questa fase non salva
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ComponentGallery() {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Galleria componenti", style = MaterialTheme.typography.titleMedium)
@@ -212,6 +454,16 @@ fun EditorMenusOnly(
     var lastChanged by remember { mutableStateOf<String?>(null) }
     // Conferma all’uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
+    var deckExpanded by remember { mutableStateOf<DeckRoot?>(null) }
+    var wizardVisible by remember { mutableStateOf(false) }
+    var classicEditing by remember { mutableStateOf(false) }          // false = deck root, true = editor classico
+    var classicMetaOpen by remember { mutableStateOf(false) }         // pannello ? (potrai aprire un bottom sheet)
+    val demoPages  = remember { listOf(DeckItem("pg001", Icons.Outlined.Article), DeckItem("pg002", Icons.Outlined.Article)) }
+    val demoMenuL  = remember { listOf(DeckItem("ml001", Icons.Outlined.ViewSidebar)) }
+    val demoMenuC  = remember { listOf(DeckItem("mc001", Icons.Outlined.ViewDay)) }
+    val demoAlerts = remember { listOf(DeckItem("al001", Icons.Outlined.WarningAmber)) }
+
+
 
     // Preset salvati (nomi da mostrare nelle tendine)
     val savedPresets = remember {
@@ -437,6 +689,50 @@ fun EditorMenusOnly(
                 onAdd = { menuPath = listOf("Aggiungi") },
                 bottomBarHeightPx = actionsBarHeightPx
             )
+
+            if (!wizardVisible) {
+                MainBottomBar( /* come ora */ )
+
+                if (!classicEditing) {
+                    // SECONDA BARRA in modalità DECK ROOT
+                    SecondBarDeckRoot(
+                        expanded = deckExpanded,
+                        onToggleRoot = { root -> deckExpanded = if (deckExpanded == root) null else root },
+                        pages = demoPages,
+                        menuL = demoMenuL,
+                        menuC = demoMenuC,
+                        alerts = demoAlerts,
+                        onAddInRoot = { root -> wizardVisible = true /* apri wizard; memorizza root se vuoi */ },
+                        onOpenItem = { _, _ ->
+                            classicEditing = true                      // entra nell’editor classico
+                            deckExpanded = null
+                        }
+                    )
+                } else {
+                    // SECONDA BARRA in modalità EDITOR CLASSICO: riusa la tua MainMenuBar
+                    Box(Modifier.fillMaxWidth()) {
+                        MainMenuBar(
+                            onLayout = { menuPath = listOf("Layout") },
+                            onContainer = { menuPath = listOf("Contenitore") },
+                            onText = { menuPath = listOf("Testo") },
+                            onAdd = { menuPath = listOf("Aggiungi") },
+                            bottomBarHeightPx = actionsBarHeightPx
+                        )
+                        MetaHelpButton(
+                            onClick = { classicMetaOpen = true },
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)
+                        )
+                    }
+                }
+            }
+
+            // WIZARD OVERLAY (sovraimpressione, barre nascoste)
+            CreationWizardOverlay(
+                visible = wizardVisible,
+                root = deckExpanded,                 // opzionale: mostra titolo coerente
+                onDismiss = { wizardVisible = false }
+            )
+
         } else {
             // IN MENU: mostro pannello di livello corrente + breadcrumb
             SubMenuBar(
