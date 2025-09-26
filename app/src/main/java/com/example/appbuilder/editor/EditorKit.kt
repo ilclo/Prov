@@ -280,17 +280,18 @@ fun EditorMenusOnly(
 
     // Seeding di alcuni preset iniziali (così "Default/Titolo/..." agiscono subito)
     LaunchedEffect(Unit) {
-        fun ensure(root: String, name: String, values: Map<String, Any?>) {
-            val store = presetValues.getOrPut(root) { mutableMapOf() }
-            if (store[name] == null) store[name] = values
-            
-        }
         AppEngine.init(object : ActionHandler {
             override fun showBanner(text: String) { /* TODO: snackbar/toast */ }
             override fun openMenu(name: String) { /* TODO: apri menù nella tua UI */ }
             override fun navigate(path: String) { /* TODO: cambia pagina */ }
             override fun swapTemplate(component: String, template: String) { /* TODO: cambia aspetto */ }
         })
+        fun ensure(root: String, name: String, values: Map<String, Any?>) {
+            val store = presetValues.getOrPut(root) { mutableMapOf() }
+            if (store[name] == null) store[name] = values
+            
+        }
+
         // TESTO
         ensure("Testo", "Titolo", mapOf(
             key(listOf("Testo"),"Sottolinea") to false,
