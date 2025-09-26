@@ -164,6 +164,7 @@ fun EditorMenusOnly(
     var lastChanged by remember { mutableStateOf<String?>(null) }
     // Conferma all’uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
+    var engineReady by remember { mutableStateOf(false) }
 
     // Preset salvati (nomi da mostrare nelle tendine)
     val savedPresets = remember {
@@ -353,22 +354,18 @@ fun EditorMenusOnly(
     var showSaveDialog by remember { mutableStateOf(false) }
     var newPresetName by remember { mutableStateOf("") }
 
-    // 1) Inizializza RuleEngine con un handler minimo
+
+
     LaunchedEffect(Unit) {
         AppEngine.init(object : ActionHandler {
-            override fun showBanner(text: String) {
-                // TODO: collega a Snackbar/Toast; per ora mettiamo nel breadcrumb
-                // (volendo puoi usare uno State hoisting per uno SnackbarHost)
-            }
-            override fun openMenu(name: String) {
-                // esempio: apri direttamente il menù richiesto
-                // menuPath è nello scope di EditorMenusOnly, quindi lo puoi usare:
-                // Nota: se vuoi agganciare nomi diversi, fai una mappa qui
-            }
-            override fun navigate(path: String) { /* TODO se serve */ }
-            override fun swapTemplate(component: String, template: String) { /* TODO in Sprint 2 */ }
+            override fun showBanner(text: String) { /* TODO snackbar */ }
+            override fun openMenu(name: String) { /* hook al tuo menuPath se vuoi */ }
+            override fun navigate(path: String) { }
+            override fun swapTemplate(component: String, template: String) { }
         })
+        engineReady = true // <— aggiungi questa riga
     }
+
 
     // 2) Registra fonti dati + binding MVP (esempio: lista città + clip mock)
     LaunchedEffect(Unit) {
@@ -432,6 +429,22 @@ fun EditorMenusOnly(
                 onAdd = { menuPath = listOf("Aggiungi") },
                 bottomBarHeightPx = actionsBarHeightPx
             )
+            // Anteprima in alto a sinistra (solo quando il motore è pronto)
+            if (engineReady) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp)
+                ) {
+                    // Usa la sorgente HTTP (src_citta) — ricordati INTERNET e un URL valido
+                    BoundDropdown(
+                        binding = Binding("Home/DropdownCitta", "src_citta"),
+                        data = AppEngine.data,
+                        engine = AppEngine.engine,
+                        label = "Seleziona città"
+                    )
+                }
+            }
         } else {
             // IN MENU: mostro pannello di livello corrente + breadcrumb
             SubMenuBar(
