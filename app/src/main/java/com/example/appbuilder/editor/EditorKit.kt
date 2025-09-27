@@ -108,7 +108,9 @@ private data class DeckItem(
     val icon: ImageVector                    // icona outlined coerente con la classe
 )
 
-
+private val DECK_HIGHLIGHT = Color(0xFF58A6FF)    // colore bordo icona madre selezionata
+private val DECK_BADGE_BG  = Color(0xFF22304B)    // stendardetto ID figlio (bg)
+private val DECK_BADGE_TXT = Color.White          // stendardetto ID figlio (testo)
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
@@ -485,6 +487,7 @@ fun EditorMenusOnly(
     var wizardVisible by remember { mutableStateOf(false) }
     var classicEditing by remember { mutableStateOf(false) }          // false = deck root, true = editor classico
     var classicMetaOpen by remember { mutableStateOf(false) }         // pannello ? (potrai aprire un bottom sheet)
+    var deckOpen by remember { mutableStateOf<String?>(null) } // "pagina" | "menuL" | "menuC" | "avviso" | null
     val demoPages  = remember { listOf(DeckItem("pg001", Icons.Outlined.Article), DeckItem("pg002", Icons.Outlined.Article)) }
     val demoMenuL  = remember { listOf(DeckItem("ml001", Icons.Outlined.ViewSidebar)) }
     val demoMenuC  = remember { listOf(DeckItem("mc001", Icons.Outlined.ViewDay)) }
@@ -1301,6 +1304,7 @@ private fun BoxScope.MainMenuBar(
             .height(TOP_BAR_HEIGHT)
     ) {
         val scroll = rememberScrollState()
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1310,10 +1314,169 @@ private fun BoxScope.MainMenuBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
-            ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer)
-            ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
-            ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
+            // -------- ICONA MADRE: PAGINA --------
+            MotherIcon(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_page),
+                contentDescription = "Pagina",
+                selected = deckOpen == "pagina",
+                onClick = {
+                    deckOpen = if (deckOpen == "pagina") null else "pagina"
+                }
+            )
+            if (deckOpen == "pagina") {
+                CPlusIcon(onClick = { /* stub: wizard non ancora implementato */ })
+                ChildIconWithBadge(
+                    icon = ImageVector.vectorResource(id = R.drawable.ic_page),
+                    id = "pg001",          // figlio di esempio (facilissimo da rimuovere)
+                    onClick = {
+                        // vai al menù radice "classico" IDENTICO a prima
+                        onLayout()
+                        deckOpen = null
+                    }
+                )
+            }
+
+            // -------- ICONA MADRE: MENÙ LATERALE --------
+            MotherIcon(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_menu_laterale),
+                contentDescription = "Menù laterale",
+                selected = deckOpen == "menuL",
+                onClick = {
+                    deckOpen = if (deckOpen == "menuL") null else "menuL"
+                }
+            )
+            if (deckOpen == "menuL") {
+                CPlusIcon(onClick = { /* stub */ })
+                ChildIconWithBadge(
+                    icon = ImageVector.vectorResource(id = R.drawable.ic_menu_laterale),
+                    id = "ml001",
+                    onClick = {
+                        onLayout()
+                        deckOpen = null
+                    }
+                )
+            }
+
+            // -------- ICONA MADRE: MENÙ CENTRALE --------
+            MotherIcon(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_menu_centrale),
+                contentDescription = "Menù centrale",
+                selected = deckOpen == "menuC",
+                onClick = {
+                    deckOpen = if (deckOpen == "menuC") null else "menuC"
+                }
+            )
+            if (deckOpen == "menuC") {
+                CPlusIcon(onClick = { /* stub */ })
+                ChildIconWithBadge(
+                    icon = ImageVector.vectorResource(id = R.drawable.ic_menu_centrale),
+                    id = "mc001",
+                    onClick = {
+                        onLayout()
+                        deckOpen = null
+                    }
+                )
+            }
+
+            // -------- ICONA MADRE: AVVISO --------
+            MotherIcon(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_avviso),
+                contentDescription = "Avviso",
+                selected = deckOpen == "avviso",
+                onClick = {
+                    deckOpen = if (deckOpen == "avviso") null else "avviso"
+                }
+            )
+            if (deckOpen == "avviso") {
+                CPlusIcon(onClick = { /* stub */ })
+                ChildIconWithBadge(
+                    icon = ImageVector.vectorResource(id = R.drawable.ic_avviso),
+                    id = "al001",
+                    onClick = {
+                        onLayout()
+                        deckOpen = null
+                    }
+                )
+            }
+        }
+    }
+}
+
+
+
+@Composable
+private fun MotherIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    ringColor: Color = DECK_HIGHLIGHT           // colore passabile come variabile
+) {
+    Surface(
+        shape = CircleShape,
+        color = Color(0xFF1B2334),
+        contentColor = Color.White,
+        tonalElevation = if (selected) 6.dp else 0.dp,
+        shadowElevation = if (selected) 6.dp else 0.dp,
+        border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, ringColor) else null
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.size(42.dp)) {
+            Icon(icon, contentDescription = contentDescription)
+        }
+    }
+}
+
+@Composable
+private fun CPlusIcon(
+    onClick: () -> Unit,
+    icon: ImageVector = ImageVector.vectorResource(id = R.drawable.ic_add_circle)
+) {
+    Surface(
+        shape = CircleShape,
+        color = Color(0xFF1B2334),
+        contentColor = Color.White
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+            Icon(icon, contentDescription = "Nuovo")
+        }
+    }
+}
+
+/**
+ * Icona figlia con "stendardetto" ID sotto.
+ * Lo stendardetto è posizionato come nei tuoi badge (offset in basso)
+ * in modo che l’icona sopra non "salti" verso l’alto.
+ */
+@Composable
+private fun ChildIconWithBadge(
+    icon: ImageVector,
+    id: String,
+    onClick: () -> Unit,
+    badgeBg: Color = DECK_BADGE_BG,
+    badgeTxt: Color = DECK_BADGE_TXT
+) {
+    val shown = id.take(8) // 5..8 OK; se meno di 5, mostri la stringa com’è
+    Box(contentAlignment = Alignment.Center) {
+        // icona figlia — stesso stile del c+
+        Surface(shape = CircleShape, color = Color(0xFF1B2334), contentColor = Color.White) {
+            IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+                Icon(icon, contentDescription = shown)
+            }
+        }
+        // stendardetto (come i tuoi badge) — sotto l’icona, senza spostarla
+        Surface(
+            color = badgeBg,
+            contentColor = badgeTxt,
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset { IntOffset(0, 14) } // stessa tecnica dei tuoi badge in IconDropdown
+        ) {
+            Text(
+                text = shown,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                fontSize = 10.sp
+            )
         }
     }
 }
