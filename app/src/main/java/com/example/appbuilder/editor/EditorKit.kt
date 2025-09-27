@@ -214,7 +214,7 @@ private fun WizardChip(
     Surface(
         shape = RoundedCornerShape(100),
         color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
         tonalElevation = if (selected) 2.dp else 0.dp,
         shadowElevation = if (selected) 1.dp else 0.dp
     ) {
@@ -224,7 +224,7 @@ private fun WizardChip(
                 .clickable { onClick() }
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             color = if (selected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+            else MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium
         )
     }
@@ -695,7 +695,7 @@ fun EditorMenusOnly(
             )
     ) {
 
-        
+
         if (menuPath.isEmpty()) {
             // HOME
             if (!wizardVisible) {
@@ -715,7 +715,7 @@ fun EditorMenusOnly(
                     onNewProject = { },
                     onMeasured = { actionsBarHeightPx = it }
                 )
-        
+
                 // 2) SECONDA BARRA
                 if (!classicEditing) {
                     // Modalità DECK ROOT (Pagina / MenùL / MenùC / Avviso)
@@ -755,14 +755,14 @@ fun EditorMenusOnly(
                     }
                 }
             }
-        
+
             // 3) WIZARD OVERLAY (barre non visibili quando è aperto)
             CreationWizardOverlay(
                 visible = wizardVisible,
                 root = deckExpanded,
                 onDismiss = { wizardVisible = false }
             )
-        
+
         } else {
             // IN MENU: pannello livello corrente + breadcrumb (come prima)
             SubMenuBar(
@@ -1289,7 +1289,7 @@ private fun BoxScope.MainMenuBar(
     val dy = with(LocalDensity.current) {
         (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) +
                 BARS_GAP + SAFE_BOTTOM_MARGIN
-    var deckOpen by remember { mutableStateOf<String?>(null) } // "pagina" | "menuL" | "menuC" | "avviso" | null
+
     }
     Surface(
         color = Color(0xFF111621),
@@ -1315,7 +1315,7 @@ private fun BoxScope.MainMenuBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // -------- ICONA MADRE: PAGINA --------
+            var deckOpen by remember { mutableStateOf<String?>(null) } // "pagina" | "menuL" | "menuC" | "avviso" | null
             MotherIcon(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_page),
                 contentDescription = "Pagina",
