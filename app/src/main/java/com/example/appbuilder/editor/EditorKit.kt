@@ -1289,6 +1289,7 @@ private fun BoxScope.MainMenuBar(
     val dy = with(LocalDensity.current) {
         (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) +
                 BARS_GAP + SAFE_BOTTOM_MARGIN
+    var deckOpen by remember { mutableStateOf<String?>(null) } // "pagina" | "menuL" | "menuC" | "avviso" | null
     }
     Surface(
         color = Color(0xFF111621),
