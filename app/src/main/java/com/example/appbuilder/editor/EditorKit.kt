@@ -399,25 +399,17 @@ fun EditorMenusOnly(
                 discontinuousBottom = menuPath.isEmpty() // ⟵ Home = discontinuo; con path (se visibile) = continuo
             )
 
-            // PRIMA BARRA: la tua MainBottomBar — INVARIATA (già presente sopra)
-
-            // SECONDA BARRA (come ora: stessa posizione/altezza/stile di MainMenuBar)
             if (!classicEditing) {
-                // Modalità DECK (icone madre + cluster). NESSUN wizard: c+ è stub.
                 CompositionLocalProvider(
                     LocalSecondBarMode provides SecondBarMode.Deck,
-                    LocalDeckState provides DeckState(
-                        openKey = deckOpen,
-                        toggle = { key -> deckOpen = if (deckOpen == key) null else key }
-                    ),
+                    LocalDeckState provides DeckState(openKey = deckOpen, toggle = { key -> deckOpen = if (deckOpen == key) null else key }),
                     LocalDeckController provides DeckController { root ->
-                        // TAP FIGLIA → entra nella vecchia root dei menù (Contenitore/Testo/Layout/Aggiungi)
                         classicEditing = true
-                        editingClass = root    // ci serve dopo per il flag del sotto-menù Layout
+                        editingClass = root
                         deckOpen = null
                     }
                 ) {
-                    MainMenuBar(   // <— riusiamo il TUO contenitore, quindi estetica identica
+                    MainMenuBar(
                         onLayout = { menuPath = listOf("Layout") },
                         onContainer = { menuPath = listOf("Contenitore") },
                         onText = { menuPath = listOf("Testo") },
