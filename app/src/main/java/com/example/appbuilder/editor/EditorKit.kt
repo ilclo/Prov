@@ -87,6 +87,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.verticalScroll
+
+
+
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
 private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (stessa in Home e Submenu)
@@ -94,6 +102,8 @@ private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / sub
 private val BARS_GAP = 14.dp                 // distacco tra le due barre (+2dp di “aria”)
 private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto al bordo schermo
 private val LocalExitClassic = staticCompositionLocalOf<() -> Unit> { {} }
+// Accento per i wizard "Crea …"
+private val WIZ_AZURE = Color(0xFF58A6FF)   // azzurro (come DECK_HIGHLIGHT)
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
@@ -1922,8 +1932,10 @@ private fun BoxScope.CreationWizardOverlay(
     onCreate: (WizardResult) -> Unit
 ) {
     if (!visible) return
-    val darkBg = Color(0xFF0D1117) // stile GitHub scuro
+    val darkBg  = Color(0xFF0D1117) // stile GitHub scuro
     val panelBg = Color(0xFF131A24)
+
+    var showIdHelp by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier
@@ -1938,7 +1950,8 @@ private fun BoxScope.CreationWizardOverlay(
         var id by remember { mutableStateOf("") }
         var idEdited by remember { mutableStateOf(false) }
 
-        // associazione
+        // associazione (ora dietro flag)
+        var assocEnabled by remember { mutableStateOf(false) }
         var assocMode by remember { mutableStateOf("manual") } // "manual" | "tap3s"
         var assocId by remember { mutableStateOf("") }
 
@@ -1957,32 +1970,21 @@ private fun BoxScope.CreationWizardOverlay(
             DeckRoot.AVVISO -> "al"
             else -> "pg"
         }
-
         fun sanitize(s: String) = s.filter { it.isLetterOrDigit() }
         fun autoIdFrom(name: String, root: DeckRoot?): String {
             val p = prefixFor(root)
             val base = sanitize(name).lowercase()
             val candidate = if (base.length >= 5) base.take(8) else (base + "001").take(8)
             val withPrefix = (p + candidate).take(8)
-            // garantiamo min 5
             return if (withPrefix.length < 5) (withPrefix + "0".repeat(5 - withPrefix.length)) else withPrefix
         }
-
         LaunchedEffect(name, target) {
-            // aggiorno ID auto se l’utente non ha “bloccato” l’ID
-            if (!idEdited) {
-                id = autoIdFrom(name, target)
-            }
+            if (!idEdited) id = autoIdFrom(name, target)
         }
 
         // header
         Column(Modifier.fillMaxSize()) {
-            // Barra superiore del wizard
-            Surface(
-                color = panelBg,
-                tonalElevation = 6.dp,
-                shadowElevation = 8.dp
-            ) {
+            Surface(color = panelBg, tonalElevation = 6.dp, shadowElevation = 8.dp) {
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -2000,164 +2002,290 @@ private fun BoxScope.CreationWizardOverlay(
                         else -> "Nuovo elemento"
                     }
                     Text(title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { /* help globale, se vuoi */ }) {
-                        Icon(Icons.Outlined.HelpOutline, contentDescription = "Aiuto")
+                    IconButton(onClick = { showIdHelp = true }) {
+                        Icon(Icons.Outlined.HelpOutline, contentDescription = "Regole ID")
                     }
                 }
             }
 
-            // Corpo pannello
-            Column(
-                Modifier
+            // pannello centrale
+            Surface(
+                color = panelBg,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 8.dp,
+                shadowElevation = 8.dp,
+                modifier = Modifier
                     .padding(16.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(panelBg)
-                    .padding(16.dp)
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nome") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = id,
-                    onValueChange = {
-                        id = sanitize(it).take(8)
-                        idEdited = true
-                    },
-                    label = { Text("ID (5–8 caratteri, auto se vuoto o troppo corto)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Descrizione (opzionale)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Associazione
-                Text("Associazione (mostrare elemento collegato)", fontWeight = FontWeight.SemiBold)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = assocMode == "manual", onClick = { assocMode = "manual" })
-                        Text("ID manuale")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = assocMode == "tap3s", onClick = { assocMode = "tap3s" })
-                        Text("Seleziona a schermo (3s)")
-                        IconButton(onClick = { /* tooltip/modal di aiuto */ }) {
-                            Icon(Icons.Outlined.HelpOutline, contentDescription = "Come funziona")
-                        }
-                    }
-                }
-                if (assocMode == "manual") {
-                    OutlinedTextField(
-                        value = assocId,
-                        onValueChange = { assocId = sanitize(it).take(16) },
-                        label = { Text("ID elemento associato") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
-                    Text(
-                        "Entra in modalità selezione tenendo premuto 3s sul componente desiderato. (stub)",
-                        fontSize = 12.sp,
-                        color = Color(0xFF9BA3AF)
-                    )
-                    OutlinedButton(onClick = { /* TODO: abilita modalità selezione */ }) {
-                        Text("Avvia selezione (stub)")
-                    }
-                }
-
-                // Campi specifici per tipo
-                when (target) {
-                    DeckRoot.PAGINA -> {
-                        Text("Opzioni pagina", fontWeight = FontWeight.SemiBold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Scrollabilità:")
-                            OptionPill(selected = scroll == "Nessuna", onClick = { scroll = "Nessuna" }, label = "Nessuna")
-                            OptionPill(selected = scroll == "Verticale", onClick = { scroll = "Verticale" }, label = "Verticale")
-                            OptionPill(selected = scroll == "Orizzontale", onClick = { scroll = "Orizzontale" }, label = "Orizzontale")
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Switch(checked = setAsHome, onCheckedChange = { setAsHome = it })
-                            Text("Imposta come Home")
-                        }
-                    }
-                    DeckRoot.MENU_LATERALE -> {
-                        Text("Opzioni menù laterale", fontWeight = FontWeight.SemiBold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Lato:")
-                            OptionPill(selected = side == "Sinistra", onClick = { side = "Sinistra" }, label = "Sinistra")
-                            OptionPill(selected = side == "Destra",   onClick = { side = "Destra"   }, label = "Destra")
-                            OptionPill(selected = side == "Alto",     onClick = { side = "Alto"     }, label = "Alto")
-                            OptionPill(selected = side == "Basso",    onClick = { side = "Basso"    }, label = "Basso")
-                        }
-                    }
-                    DeckRoot.MENU_CENTRALE -> {
-                        Text("Opzioni menù centrale", fontWeight = FontWeight.SemiBold)
-                        Text("Nessuna opzione speciale per ora.", color = Color(0xFF9BA3AF), fontSize = 12.sp)
-                    }
-                    DeckRoot.AVVISO -> {
-                        Text("Opzioni avviso", fontWeight = FontWeight.SemiBold)
-                        OutlinedButton(onClick = { /* apri ECA mode (stub) */ }) {
-                            Text("Apri Event–Condition–Action mode (stub)")
-                        }
-                    }
-                    else -> Unit
-                }
-            }
-
-            // footer
-            Row(
-                Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                    Text("Annulla")
-                }
-                Button(
-                    onClick = {
-                        val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
-                        val finalName = if (name.isBlank()) finalId else name
-                        onCreate(
-                            WizardResult(
-                                root = target ?: DeckRoot.PAGINA,
-                                id = finalId,
-                                name = finalName,
-                                description = description.ifBlank { "n/a" },
-                                assocId = assocId.takeIf { assocMode == "manual" && it.isNotBlank() },
-                                scroll = scroll,
-                                setAsHome = (target == DeckRoot.PAGINA && setAsHome),
-                                side = (target == DeckRoot.MENU_LATERALE).let { if (it) side else null }
+                Column(
+                    Modifier
+                        .padding(16.dp)
+                        .fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // --- Associazione (fissa in alto, fuori dallo scorrimento dei campi) ---
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.Checkbox(
+                            checked = assocEnabled,
+                            onCheckedChange = { assocEnabled = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = WIZ_AZURE,
+                                checkmarkColor = Color.Black
                             )
                         )
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Crea")
+                        Text("Abilita associazione")
+                    }
+                    if (assocEnabled) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(
+                                    selected = assocMode == "manual",
+                                    onClick = { assocMode = "manual" },
+                                    colors = RadioButtonDefaults.colors(selectedColor = WIZ_AZURE)
+                                )
+                                Text("ID manuale")
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(
+                                    selected = assocMode == "tap3s",
+                                    onClick = { assocMode = "tap3s" },
+                                    colors = RadioButtonDefaults.colors(selectedColor = WIZ_AZURE)
+                                )
+                                Text("Seleziona a schermo (3s)")
+                            }
+                        }
+                        if (assocMode == "manual") {
+                            OutlinedTextField(
+                                value = assocId,
+                                onValueChange = { assocId = sanitize(it).take(16) },
+                                singleLine = true,
+                                label = { Text("ID elemento associato") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = TextFieldDefaults.outlinedTextFieldColors(
+                                    textColor = Color.White,
+                                    cursorColor = WIZ_AZURE,
+                                    focusedBorderColor = WIZ_AZURE,
+                                    focusedLabelColor = WIZ_AZURE,
+                                    unfocusedLabelColor = Color(0xFF9BA3AF),
+                                    unfocusedBorderColor = Color(0xFF2A3B5B)
+                                )
+                            )
+                        } else {
+                            Text(
+                                "Tieni premuto 3s sul componente desiderato (modalità stub).",
+                                fontSize = 12.sp,
+                                color = Color(0xFF9BA3AF)
+                            )
+                            OutlinedButton(
+                                onClick = { /* TODO: abilita selezione */ },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, WIZ_AZURE)
+                            ) { Text("Avvia selezione") }
+                        }
+                    }
+
+                    // --- Campi (scroll verticale) ---
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Nome") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                textColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedBorderColor = WIZ_AZURE,
+                                focusedLabelColor = WIZ_AZURE,
+                                unfocusedLabelColor = Color(0xFF9BA3AF),
+                                unfocusedBorderColor = Color(0xFF2A3B5B)
+                            )
+                        )
+                        OutlinedTextField(
+                            value = id,
+                            onValueChange = {
+                                id = sanitize(it).take(8)
+                                idEdited = true
+                            },
+                            label = { Text("ID (5–8 caratteri, auto se vuoto o troppo corto)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                textColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedBorderColor = WIZ_AZURE,
+                                focusedLabelColor = WIZ_AZURE,
+                                unfocusedLabelColor = Color(0xFF9BA3AF),
+                                unfocusedBorderColor = Color(0xFF2A3B5B)
+                            )
+                        )
+                        OutlinedTextField(
+                            value = description,
+                            onValueChange = { description = it },
+                            label = { Text("Descrizione (opzionale)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                textColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedBorderColor = WIZ_AZURE,
+                                focusedLabelColor = WIZ_AZURE,
+                                unfocusedLabelColor = Color(0xFF9BA3AF),
+                                unfocusedBorderColor = Color(0xFF2A3B5B)
+                            )
+                        )
+
+                        // Campi specifici per tipo
+                        when (target) {
+                            DeckRoot.PAGINA -> {
+                                Text("Opzioni pagina", fontWeight = FontWeight.SemiBold)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                                ) {
+                                    Text("Scrollabilità:")
+                                    OptionPill(selected = scroll == "Nessuna", onClick = { scroll = "Nessuna" }, label = "Nessuna")
+                                    OptionPill(selected = scroll == "Verticale", onClick = { scroll = "Verticale" }, label = "Verticale")
+                                    OptionPill(selected = scroll == "Orizzontale", onClick = { scroll = "Orizzontale" }, label = "Orizzontale")
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Switch(
+                                        checked = setAsHome,
+                                        onCheckedChange = { setAsHome = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = WIZ_AZURE,
+                                            checkedTrackColor = WIZ_AZURE.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                    Text("Imposta come Home")
+                                }
+                            }
+                            DeckRoot.MENU_LATERALE -> {
+                                Text("Opzioni menù laterale", fontWeight = FontWeight.SemiBold)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                                ) {
+                                    Text("Lato:")
+                                    OptionPill(selected = side == "Sinistra", onClick = { side = "Sinistra" }, label = "Sinistra")
+                                    OptionPill(selected = side == "Destra",   onClick = { side = "Destra"   }, label = "Destra")
+                                    OptionPill(selected = side == "Alto",     onClick = { side = "Alto"     }, label = "Alto")
+                                    OptionPill(selected = side == "Basso",    onClick = { side = "Basso"    }, label = "Basso")
+                                }
+                            }
+                            DeckRoot.MENU_CENTRALE -> {
+                                Text("Opzioni menù centrale", fontWeight = FontWeight.SemiBold)
+                                Text("Nessuna opzione speciale per ora.", color = Color(0xFF9BA3AF), fontSize = 12.sp)
+                            }
+                            DeckRoot.AVVISO -> {
+                                Text("Opzioni avviso", fontWeight = FontWeight.SemiBold)
+                                OutlinedButton(
+                                    onClick = { /* apri ECA mode (stub) */ },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, WIZ_AZURE)
+                                ) {
+                                    Text("Apri Event–Condition–Action mode (stub)")
+                                }
+                            }
+                            else -> Unit
+                        }
+                    }
+
+                    // footer fisso
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, WIZ_AZURE)
+                        ) {
+                            Text("Annulla")
+                        }
+                        Button(
+                            onClick = {
+                                val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
+                                val finalName = if (name.isBlank()) finalId else name
+                                onCreate(
+                                    WizardResult(
+                                        root = target ?: DeckRoot.PAGINA,
+                                        id = finalId,
+                                        name = finalName,
+                                        description = description.ifBlank { "n/a" },
+                                        assocId = if (assocEnabled && assocMode == "manual" && assocId.isNotBlank()) assocId else null,
+                                        scroll = scroll,
+                                        setAsHome = (target == DeckRoot.PAGINA && setAsHome),
+                                        side = if (target == DeckRoot.MENU_LATERALE) side else null
+                                    )
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black)
+                        ) {
+                            Text("Crea")
+                        }
+                    }
                 }
+            }
+
+            // Dialog help regole ID
+            if (showIdHelp) {
+                AlertDialog(
+                    onDismissRequest = { showIdHelp = false },
+                    title = { Text("Regole per l'ID") },
+                    text = {
+                        Text(
+                            "• Se compili l'ID, viene usato quello.\n" +
+                            "• Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
+                            "• Se Nome è corto o vuoto: il sistema completa fino a 5–8 caratteri.\n" +
+                            "• L'ID deve essere univoco."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = { showIdHelp = false },
+                            colors = ButtonDefaults.textButtonColors(contentColor = WIZ_AZURE)
+                        ) { Text("OK") }
+                    }
+                )
             }
         }
     }
 }
 
+
 @Composable
 private fun OptionPill(selected: Boolean, onClick: () -> Unit, label: String) {
+    val borderClr = if (selected) WIZ_AZURE else Color(0xFF2A3B5B)
+    val txtClr    = if (selected) WIZ_AZURE else Color.White
     OutlinedButton(
         onClick = onClick,
-        border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null
-    ) { Text(label) }
+        modifier = Modifier
+            .height(36.dp)
+            .padding(vertical = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, borderClr),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = txtClr)
+    ) {
+        Text(label, maxLines = 1, softWrap = false)
+    }
 }
+
 
 private data class WizardResult(
     val root: DeckRoot,
