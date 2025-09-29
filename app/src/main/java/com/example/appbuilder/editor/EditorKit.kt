@@ -78,6 +78,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.appbuilder.R
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.material.icons.outlined.HelpOutline
 
 
 /* ---- BARS: altezze fisse + gap ---- */
@@ -142,6 +145,24 @@ private fun AddLevel(
     }
 }
 
+// ===== DECK: tipi & CompositionLocal =====
+private enum class DeckRoot { PAGINA, MENU_LATERALE, MENU_CENTRALE, AVVISO }
+private enum class SecondBarMode { Deck, Classic }
+
+private data class DeckState(val openKey: String?, val toggle: (String) -> Unit)
+private data class DeckController(val openChild: (DeckRoot) -> Unit)
+
+// Locals per pilotare MainMenuBar senza cambiare la sua firma
+private val LocalSecondBarMode = compositionLocalOf { SecondBarMode.Deck }
+private val LocalDeckState = compositionLocalOf { DeckState(null) { _ -> } }
+private val LocalDeckController = compositionLocalOf { DeckController { _ -> } }
+private val LocalIsPageContext = compositionLocalOf { false }
+
+// ===== Token colore (variabili facili da cambiare) =====
+private val DECK_HIGHLIGHT = Color(0xFF58A6FF) // bordo icona madre quando cluster aperto
+private val DECK_BADGE_BG  = Color(0xFF22304B) // stendardetto ID figlio (bg)
+private val DECK_BADGE_TXT = Color.White       // stendardetto ID figlio (testo)
+
 @Composable
 fun EditorMenusOnly(
     state: EditorShellState
@@ -158,24 +179,8 @@ fun EditorMenusOnly(
     var lastChanged by remember { mutableStateOf<String?>(null) }
     // Conferma all’uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
+    var classicEditing by remember { mutableStateOf(false) } // false = Deck, true = Classic (vecchia root)
     // MODE della seconda barra: "deck" (icone madre + cluster) oppure "classic" (vecchia root)
-    private enum class SecondBarMode { Deck, Classic }
-    private data class DeckState(val openKey: String?, val toggle: (String) -> Unit)
-    private data class DeckController(val openChild: (DeckRoot) -> Unit)
-
-    // CompositionLocal per pilotare MainMenuBar senza cambiare la sua firma
-    private val LocalSecondBarMode = compositionLocalOf { SecondBarMode.Deck }
-    private val LocalDeckState = compositionLocalOf { DeckState(null) { _ -> } }
-    private val LocalDeckController = compositionLocalOf { DeckController { _ -> } }
-
-    // Flag globale (predisposizione) per mostrare "Top/Bottom bar" solo su Pagine nel sotto-menù Layout
-    private val LocalIsPageContext = compositionLocalOf { false }
-
-    // Colori parametrici (li puoi spostare "in alto" come tuoi token)
-    private val DECK_HIGHLIGHT = Color(0xFF58A6FF) // bordo icona madre quando cluster aperto
-    private val DECK_BADGE_BG  = Color(0xFF22304B) // stendardetto ID figlio (bg)
-    private val DECK_BADGE_TXT = Color.White       // stendardetto ID figlio (testo)
-
     // Preset salvati (nomi da mostrare nelle tendine)
     val savedPresets = remember {
         mutableStateMapOf(
@@ -432,170 +437,161 @@ fun EditorMenusOnly(
                     )
                 }
             }
-
-            MainMenuBar(
-                onLayout = { menuPath = listOf("Layout") },
-                onContainer = { menuPath = listOf("Contenitore") },
-                onText = { menuPath = listOf("Testo") },
-                onAdd = { menuPath = listOf("Aggiungi") },
-                bottomBarHeightPx = actionsBarHeightPx
-            )
-
         } else {
-                val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
-                CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
-                    SubMenuBar(
-                        path = menuPath,
-                        selections = menuSelections,
+            val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
+            CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
+                SubMenuBar(
+                    path = menuPath,
+                    selections = menuSelections,
 
 
-                        onBack = {
-                            if (menuPath.size == 1 && dirty) showConfirm = true
-                            else {
-                                menuPath = menuPath.dropLast(1)
-                                lastChanged = null   // ← niente “scia” nel breadcrumb
-                            }
-                        },
-                        onEnter = { label ->
-                            // Sibling foglia nello stesso ramo (immagini)
-                            val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
-                            menuPath = when {
-                                menuPath.lastOrNull() == label -> menuPath
-                                menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
-                                    menuPath.dropLast(1) + label   // ← sostituisci, non accumulare
-                                else -> menuPath + label
-                            }
-                            // Navigazione ≠ scelta: non mostrare nel breadcrumb
-                            lastChanged = null
-                        },
-                        onToggle = { label, value ->
-                            val root = menuPath.firstOrNull() ?: "Contenitore"
-                            menuSelections[key(menuPath, label)] = value
-                            lastChanged = "$label: ${if (value) "ON" else "OFF"}"
-                            dirty = true
-                            // Se c'era uno STILE attivo, qualsiasi modifica manuale lo annulla (Default resta)
-                            val styleKey = key(listOf(root), "style")
-                            val styleVal = (menuSelections[styleKey] as? String).orEmpty()
-                            if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
-                                menuSelections[styleKey] = "Nessuno"
-                            }
-                        },
-                        onPick = { label, value ->
-                            val root = menuPath.firstOrNull() ?: "Contenitore"
-                            val fullKey = key(menuPath, label)
-                            menuSelections[fullKey] = value
-                            lastChanged = "$label: $value"
-                            dirty = true
+                    onBack = {
+                        if (menuPath.size == 1 && dirty) showConfirm = true
+                        else {
+                            menuPath = menuPath.dropLast(1)
+                            lastChanged = null   // ← niente “scia” nel breadcrumb
+                        }
+                    },
+                    onEnter = { label ->
+                        // Sibling foglia nello stesso ramo (immagini)
+                        val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
+                        menuPath = when {
+                            menuPath.lastOrNull() == label -> menuPath
+                            menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
+                                menuPath.dropLast(1) + label   // ← sostituisci, non accumulare
+                            else -> menuPath + label
+                        }
+                        // Navigazione ≠ scelta: non mostrare nel breadcrumb
+                        lastChanged = null
+                    },
+                    onToggle = { label, value ->
+                        val root = menuPath.firstOrNull() ?: "Contenitore"
+                        menuSelections[key(menuPath, label)] = value
+                        lastChanged = "$label: ${if (value) "ON" else "OFF"}"
+                        dirty = true
+                        // Se c'era uno STILE attivo, qualsiasi modifica manuale lo annulla (Default resta)
+                        val styleKey = key(listOf(root), "style")
+                        val styleVal = (menuSelections[styleKey] as? String).orEmpty()
+                        if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
+                            menuSelections[styleKey] = "Nessuno"
+                        }
+                    },
+                    onPick = { label, value ->
+                        val root = menuPath.firstOrNull() ?: "Contenitore"
+                        val fullKey = key(menuPath, label)
+                        menuSelections[fullKey] = value
+                        lastChanged = "$label: $value"
+                        dirty = true
 
-                            when (label) {
-                                "default" -> {
-                                    val name = value
-                                    if (name.equals("Nessuno", true)) {
-                                        // Applica eventuale stile, altrimenti reset a default base
-                                        resolveAndApply(root)
-                                    } else {
-                                        // Applica prima il Default...
-                                        applyPresetByName(root, name)
-                                        // ...poi se c'è uno Stile diverso da Nessuno → lo Stile vince
-                                        val styleVal = (menuSelections[key(listOf(root), "style")] as? String).orEmpty()
-                                        if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true) && !styleVal.equals(name, true)) {
-                                            applyPresetByName(root, styleVal)
-                                        }
-                                    }
-                                }
-                                "style" -> {
-                                    val name = value
-                                    if (name.equals("Nessuno", true)) {
-                                        // Se tolgo lo stile: applica default se presente, altrimenti default base
-                                        resolveAndApply(root)
-                                    } else {
-                                        // Stile applicato istantaneamente e con precedenza
-                                        applyPresetByName(root, name)
-                                    }
-                                }
-                                else -> {
-                                    // Modifica puntuale: Stile → Nessuno (Default resta selezionato)
-                                    val styleKey = key(listOf(root), "style")
-                                    val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
-                                    if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
-                                        menuSelections[styleKey] = "Nessuno"
+                        when (label) {
+                            "default" -> {
+                                val name = value
+                                if (name.equals("Nessuno", true)) {
+                                    // Applica eventuale stile, altrimenti reset a default base
+                                    resolveAndApply(root)
+                                } else {
+                                    // Applica prima il Default...
+                                    applyPresetByName(root, name)
+                                    // ...poi se c'è uno Stile diverso da Nessuno → lo Stile vince
+                                    val styleVal = (menuSelections[key(listOf(root), "style")] as? String).orEmpty()
+                                    if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true) && !styleVal.equals(name, true)) {
+                                        applyPresetByName(root, styleVal)
                                     }
                                 }
                             }
-                        },
-                        savedPresets = savedPresets
-                    )
-                    BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
-                }
-
-                // Barra di conferma quando risalgo con modifiche
-                if (showConfirm) {
-                    ConfirmBar(
-                        onCancel = {
-                            // scarto le modifiche effimere
-                            dirty = false
-                            lastChanged = null
-                            showConfirm = false
-                            menuPath = emptyList()
-                        },
-                        onOk = {
-                            // accetto (in questa demo non applichiamo a un documento reale)
-                            dirty = false
-                            showConfirm = false
-                            menuPath = emptyList()
-                        },
-                        onSavePreset = { showSaveDialog = true }
-                    )
-                }
-
-                // Dialog: Salva impostazioni come preset
-                if (showSaveDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showSaveDialog = false },
-                        title = { Text("Salva come stile") },
-                        text = {
-                            Column {
-                                Text("Dai un nome allo stile corrente. Se esiste già, verrà aggiornato.")
-                                Spacer(Modifier.height(8.dp))
-                                OutlinedTextField(
-                                    value = newPresetName,
-                                    onValueChange = { newPresetName = it },
-                                    singleLine = true,
-                                    label = { Text("Nome stile") }
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                val root = menuPath.firstOrNull() ?: "Contenitore"
-                                val name = newPresetName.trim()
-                                if (name.isNotBlank()) {
-                                    savePreset(root, name) // crea/aggiorna con i valori correnti
+                            "style" -> {
+                                val name = value
+                                if (name.equals("Nessuno", true)) {
+                                    // Se tolgo lo stile: applica default se presente, altrimenti default base
+                                    resolveAndApply(root)
+                                } else {
+                                    // Stile applicato istantaneamente e con precedenza
+                                    applyPresetByName(root, name)
                                 }
-                                newPresetName = ""
-                                dirty = false
-                                showSaveDialog = false
-                                showConfirm = false
-                                menuPath = emptyList()
-                            }) {
-                                Text("Salva")
                             }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = {
-                                newPresetName = ""
-                                showSaveDialog = false
-                            }) {
-                                Text("Annulla")
-
+                            else -> {
+                                // Modifica puntuale: Stile → Nessuno (Default resta selezionato)
+                                val styleKey = key(listOf(root), "style")
+                                val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
+                                if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
+                                    menuSelections[styleKey] = "Nessuno"
+                                }
                             }
                         }
-                    )
-                }
+                    },
+                    savedPresets = savedPresets
+                )
+                BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
+            }
+
+            // Barra di conferma quando risalgo con modifiche
+            if (showConfirm) {
+                ConfirmBar(
+                    onCancel = {
+                        // scarto le modifiche effimere
+                        dirty = false
+                        lastChanged = null
+                        showConfirm = false
+                        menuPath = emptyList()
+                    },
+                    onOk = {
+                        // accetto (in questa demo non applichiamo a un documento reale)
+                        dirty = false
+                        showConfirm = false
+                        menuPath = emptyList()
+                    },
+                    onSavePreset = { showSaveDialog = true }
+                )
+            }
+
+            // Dialog: Salva impostazioni come preset
+            if (showSaveDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSaveDialog = false },
+                    title = { Text("Salva come stile") },
+                    text = {
+                        Column {
+                            Text("Dai un nome allo stile corrente. Se esiste già, verrà aggiornato.")
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = newPresetName,
+                                onValueChange = { newPresetName = it },
+                                singleLine = true,
+                                label = { Text("Nome stile") }
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val root = menuPath.firstOrNull() ?: "Contenitore"
+                            val name = newPresetName.trim()
+                            if (name.isNotBlank()) {
+                                savePreset(root, name) // crea/aggiorna con i valori correnti
+                            }
+                            newPresetName = ""
+                            dirty = false
+                            showSaveDialog = false
+                            showConfirm = false
+                            menuPath = emptyList()
+                        }) {
+                            Text("Salva")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            newPresetName = ""
+                            showSaveDialog = false
+                        }) {
+                            Text("Annulla")
+
+                        }
+                    }
+                )
             }
         }
-    }  
-}  
+    }
+}
+
 
 /* =========================================================================================
  *  BARRA PRINCIPALE (icone stile GitHub, scura, sempre visibile in HOME)
@@ -1248,6 +1244,7 @@ private fun LayoutLevel(
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
 
             // NEW: aree che riusano i sottomenu del Layout (whitelist)
+
             ToolbarIconButton(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_call_to_action),
                 contentDescription = "Bottom bar",
