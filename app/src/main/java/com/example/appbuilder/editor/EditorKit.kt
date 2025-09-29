@@ -434,6 +434,30 @@ fun EditorMenusOnly(
                         onText = { menuPath = listOf("Testo") },
                         onAdd = { menuPath = listOf("Aggiungi") },
                         bottomBarHeightPx = actionsBarHeightPx
+                        // icone standard
+                        ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
+                        ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer)
+                        ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
+                        ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
+                        ToolbarIconButton(
+                            icon = ImageVector.vectorResource(id = R.drawable.ic_question),
+                            contentDescription = "Info",
+                            onClick = { /* stub */ }
+                        )
+
+                        // SOLO in contesto pagina: Top/Bottom bar
+                        if (LocalIsPageContext.current) {
+                            ToolbarIconButton(
+                                icon = ImageVector.vectorResource(id = R.drawable.ic_ad_units),
+                                contentDescription = "Top bar",
+                                onClick = { /* per ora puoi anche richiamare onLayout(), o lasciare stub */ }
+                            )
+                            ToolbarIconButton(
+                                icon = ImageVector.vectorResource(id = R.drawable.ic_call_to_action),
+                                contentDescription = "Bottom bar",
+                                onClick = { /* idem */ }
+                            )
+                        }
                     )
                 }
             }
@@ -996,67 +1020,78 @@ private fun BoxScope.MainMenuBar(
     ) {
         val scroll = rememberScrollState()
 
-        when (LocalSecondBarMode.current) {
-            SecondBarMode.Classic -> {
-                // VECCHIA ROOT — INVARIATA + icona "?"
-                ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
-                ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer)
-                ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
-                ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .horizontalScroll(scroll)
+                .padding(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
 
-                // "?" — deve chiamarsi ic_question.xml (stub, nessuna azione)
-                ToolbarIconButton(
-                    icon = ImageVector.vectorResource(id = R.drawable.ic_question),
-                    contentDescription = "Info",
-                    onClick = { /* stub: nessuna azione */ }
-                )
-            }
+            when (LocalSecondBarMode.current) {
+                SecondBarMode.Classic -> {
+                    // VECCHIA ROOT — INVARIATA + icona "?"
+                    ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
+                    ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer)
+                    ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
+                    ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
 
-            SecondBarMode.Deck -> {
-                // NUOVA ROOT — MADRI + CLUSTER, con hiding delle madri a destra
-                val deck = LocalDeckState.current
-                val controller = LocalDeckController.current
+                    // "?" — deve chiamarsi ic_question.xml (stub, nessuna azione)
+                    ToolbarIconButton(
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_question),
+                        contentDescription = "Info",
+                        onClick = { /* stub: nessuna azione */ }
+                    )
+                }
 
-                // Ordine e mapping: serve per stabilire cosa "sta a destra"
-                data class Mother(val key: String, val iconRes: Int, val root: DeckRoot, val sampleId: String)
-                val mothers = listOf(
-                    Mother("pagina", R.drawable.ic_page, DeckRoot.PAGINA, "pg001"),
-                    Mother("menuL", R.drawable.ic_menu_laterale, DeckRoot.MENU_LATERALE, "ml001"),
-                    Mother("menuC", R.drawable.ic_menu_centrale, DeckRoot.MENU_CENTRALE, "mc001"),
-                    Mother("avviso", R.drawable.ic_avviso, DeckRoot.AVVISO, "al001")
-                )
-                val activeIdx = mothers.indexOfFirst { it.key == deck.openKey }  // -1 = nessun cluster aperto
+                SecondBarMode.Deck -> {
+                    // NUOVA ROOT — MADRI + CLUSTER, con hiding delle madri a destra
+                    val deck = LocalDeckState.current
+                    val controller = LocalDeckController.current
 
-                mothers.forEachIndexed { idx, m ->
-                    val showMother = (activeIdx == -1) || (idx <= activeIdx)   // nascondi madri a destra
-                    if (showMother) {
-                        MotherIcon(
-                            icon = ImageVector.vectorResource(id = m.iconRes),
-                            contentDescription = when (m.root) {
-                                DeckRoot.PAGINA -> "Pagina"
-                                DeckRoot.MENU_LATERALE -> "Menù laterale"
-                                DeckRoot.MENU_CENTRALE -> "Menù centrale"
-                                DeckRoot.AVVISO -> "Avviso"
-                            },
-                            selected = deck.openKey == m.key,
-                            onClick = { deck.toggle(m.key) },
-                            ringColor = DECK_HIGHLIGHT
-                        )
+                    // Ordine e mapping: serve per stabilire cosa "sta a destra"
+                    data class Mother(val key: String, val iconRes: Int, val root: DeckRoot, val sampleId: String)
+                    val mothers = listOf(
+                        Mother("pagina", R.drawable.ic_page, DeckRoot.PAGINA, "pg001"),
+                        Mother("menuL", R.drawable.ic_menu_laterale, DeckRoot.MENU_LATERALE, "ml001"),
+                        Mother("menuC", R.drawable.ic_menu_centrale, DeckRoot.MENU_CENTRALE, "mc001"),
+                        Mother("avviso", R.drawable.ic_avviso, DeckRoot.AVVISO, "al001")
+                    )
+                    val activeIdx = mothers.indexOfFirst { it.key == deck.openKey }  // -1 = nessun cluster aperto
 
-                        if (deck.openKey == m.key) {
-                            // c+ (stub) + UNA figlia d'esempio (facile da rimuovere quando implementeremo la creazione)
-                            CPlusIcon(onClick = { /* stub: wizard non ancora implementato */ })
-
-                            ChildIconWithBadge(
+                    mothers.forEachIndexed { idx, m ->
+                        val showMother = (activeIdx == -1) || (idx <= activeIdx)   // nascondi madri a destra
+                        if (showMother) {
+                            MotherIcon(
                                 icon = ImageVector.vectorResource(id = m.iconRes),
-                                id = m.sampleId,
-                                onClick = {
-                                    // TAP FIGLIA → entra nella vecchia root (Classic)
-                                    controller.openChild(m.root)
+                                contentDescription = when (m.root) {
+                                    DeckRoot.PAGINA -> "Pagina"
+                                    DeckRoot.MENU_LATERALE -> "Menù laterale"
+                                    DeckRoot.MENU_CENTRALE -> "Menù centrale"
+                                    DeckRoot.AVVISO -> "Avviso"
                                 },
-                                badgeBg = DECK_BADGE_BG,
-                                badgeTxt = DECK_BADGE_TXT
+                                selected = deck.openKey == m.key,
+                                onClick = { deck.toggle(m.key) },
+                                ringColor = DECK_HIGHLIGHT
                             )
+
+                            if (deck.openKey == m.key) {
+                                // c+ (stub) + UNA figlia d'esempio (facile da rimuovere quando implementeremo la creazione)
+                                CPlusIcon(onClick = { /* stub: wizard non ancora implementato */ })
+
+                                ChildIconWithBadge(
+                                    icon = ImageVector.vectorResource(id = m.iconRes),
+                                    id = m.sampleId,
+                                    onClick = {
+                                        // TAP FIGLIA → entra nella vecchia root (Classic)
+                                        controller.openChild(m.root)
+                                    },
+                                    badgeBg = DECK_BADGE_BG,
+                                    badgeTxt = DECK_BADGE_TXT
+                                )
+                            }
                         }
                     }
                 }
@@ -1254,16 +1289,6 @@ private fun LayoutLevel(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_ad_units),
                 contentDescription = "Top bar",
                 onClick = { onEnter("Top bar") }
-            )
-            ToolbarIconButton(
-                icon = ImageVector.vectorResource(id = R.drawable.ic_view_day),
-                contentDescription = "Menù centrale",
-                onClick = { onEnter("Menù centrale") }
-            )
-            ToolbarIconButton(
-                icon = ImageVector.vectorResource(id = R.drawable.ic_view_sidebar),
-                contentDescription = "Menù laterale",
-                onClick = { onEnter("Menù laterale") }
             )
 
             // DEFAULT
