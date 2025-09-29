@@ -381,28 +381,30 @@ fun EditorMenusOnly(
             )
     ) {
         if (menuPath.isEmpty()) {
-            // HOME: due barre sempre visibili
             MainBottomBar(
-                onUndo = { /* stub */ },
-                onRedo = { /* stub */ },
-                onSaveFile = { /* stub */ },
-                onDelete = { /* stub */ },
-                onDuplicate = { /* stub */ },
-                onProperties = { /* stub */ },
+                onUndo = { /* … */ },
+                onRedo = { /* … */ },
+                onSaveFile = { /* … */ },
+                onDelete = { /* … */ },
+                onDuplicate = { /* … */ },
+                onProperties = { /* … */ },
                 onLayout = { menuPath = listOf("Layout") },
-                onCreate = { /* dropdown nella bar stessa */ },
-                onOpenList = { /* stub */ },
-                onSaveProject = { /* stub */ },
-                onOpenProject = { /* stub */ },
-                onNewProject = { /* stub */ },
+                onCreate = { /* … */ },
+                onOpenList = { /* … */ },
+                onSaveProject = { /* … */ },
+                onOpenProject = { /* … */ },
+                onNewProject = { /* … */ },
                 onMeasured = { actionsBarHeightPx = it },
-                discontinuousBottom = menuPath.isEmpty() // ⟵ Home = discontinuo; con path (se visibile) = continuo
+                discontinuousBottom = menuPath.isEmpty()
             )
 
             if (!classicEditing) {
                 CompositionLocalProvider(
                     LocalSecondBarMode provides SecondBarMode.Deck,
-                    LocalDeckState provides DeckState(openKey = deckOpen, toggle = { key -> deckOpen = if (deckOpen == key) null else key }),
+                    LocalDeckState provides DeckState(
+                        openKey = deckOpen,
+                        toggle = { key -> deckOpen = if (deckOpen == key) null else key }
+                    ),
                     LocalDeckController provides DeckController { root ->
                         classicEditing = true
                         editingClass = root
@@ -418,7 +420,6 @@ fun EditorMenusOnly(
                     )
                 }
             } else {
-                // Modalità CLASSIC (vecchia root) + icona "?": ic_question — stub
                 CompositionLocalProvider(LocalSecondBarMode provides SecondBarMode.Classic) {
                     MainMenuBar(
                         onLayout = { menuPath = listOf("Layout") },
@@ -426,33 +427,11 @@ fun EditorMenusOnly(
                         onText = { menuPath = listOf("Testo") },
                         onAdd = { menuPath = listOf("Aggiungi") },
                         bottomBarHeightPx = actionsBarHeightPx
-                        // icone standard
-                        ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
-                        ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer)
-                        ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
-                        ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
-                        ToolbarIconButton(
-                            icon = ImageVector.vectorResource(id = R.drawable.ic_question),
-                            contentDescription = "Info",
-                            onClick = { /* stub */ }
-                        )
-
-                        // SOLO in contesto pagina: Top/Bottom bar
-                        if (LocalIsPageContext.current) {
-                            ToolbarIconButton(
-                                icon = ImageVector.vectorResource(id = R.drawable.ic_ad_units),
-                                contentDescription = "Top bar",
-                                onClick = { /* per ora puoi anche richiamare onLayout(), o lasciare stub */ }
-                            )
-                            ToolbarIconButton(
-                                icon = ImageVector.vectorResource(id = R.drawable.ic_call_to_action),
-                                contentDescription = "Bottom bar",
-                                onClick = { /* idem */ }
-                            )
-                        }
                     )
                 }
             }
+        }
+
         } else {
             val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
             CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
