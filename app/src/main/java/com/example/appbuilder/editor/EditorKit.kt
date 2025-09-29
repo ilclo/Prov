@@ -157,6 +157,8 @@ private val LocalSecondBarMode = compositionLocalOf { SecondBarMode.Deck }
 private val LocalDeckState = compositionLocalOf { DeckState(null) { _ -> } }
 private val LocalDeckController = compositionLocalOf { DeckController { _ -> } }
 private val LocalIsPageContext = compositionLocalOf { false }
+private val LocalExitClassic = compositionLocalOf<(() -> Unit)?>( { null } )
+
 
 // ===== Token colore (variabili facili da cambiare) =====
 private val DECK_HIGHLIGHT = Color(0xFF58A6FF) // bordo icona madre quando cluster aperto
@@ -204,6 +206,14 @@ fun EditorMenusOnly(
         } else {
             menuPath = menuPath.dropLast(1)
             lastChanged = null
+        }
+    }
+
+    BackHandler(enabled = menuPath.isEmpty()) {
+        when {
+            classicEditing -> classicEditing = false   // esci dalla Classic: torni alle icone madre
+            deckOpen != null -> deckOpen = null        // chiudi il cluster aperto
+            else -> Unit                                // ignora: evita che l’Activity si chiuda
         }
     }
 
@@ -427,7 +437,11 @@ fun EditorMenusOnly(
                 }
             } else {
                 // Modalità CLASSIC (vecchia root) + icona "?" interna alla MainMenuBar
-                CompositionLocalProvider(LocalSecondBarMode provides SecondBarMode.Classic) {
+
+                CompositionLocalProvider(
+                    LocalSecondBarMode provides SecondBarMode.Classic,
+                    LocalExitClassic provides { classicEditing = false }   // ← esce e torna alle madri
+                ) {
                     MainMenuBar(
                         onLayout = { menuPath = listOf("Layout") },
                         onContainer = { menuPath = listOf("Contenitore") },
@@ -992,20 +1006,24 @@ private fun BoxScope.MainMenuBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             when (LocalSecondBarMode.current) {
                 SecondBarMode.Classic -> {
-                    // VECCHIA ROOT — INVARIATA + icona "?"
+                    LocalExitClassic.current?.let { exitClassic ->
+                        ToolbarIconButton(
+                            icon = Icons.Outlined.ArrowBack,
+                            contentDescription = "Indietro",
+                            onClick = exitClassic
+                        )
+                    }
+
                     ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
                     ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer)
                     ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
                     ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
-
-                    // "?" — deve chiamarsi ic_question.xml (stub, nessuna azione)
                     ToolbarIconButton(
                         icon = ImageVector.vectorResource(id = R.drawable.ic_question),
                         contentDescription = "Info",
-                        onClick = { /* stub: nessuna azione */ }
+                        onClick = { /* stub */ }
                     )
                 }
 
