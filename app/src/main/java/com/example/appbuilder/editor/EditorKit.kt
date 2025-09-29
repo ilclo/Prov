@@ -92,8 +92,12 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.compositionLocalOf
 
-
+private val LocalDeckItems =
+    compositionLocalOf<Map<DeckRoot, List<String>>> { emptyMap() }
 
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
@@ -210,6 +214,14 @@ fun EditorMenusOnly(
     var wizardKind by remember { mutableStateOf<DeckRoot?>(null) }
     var homePageId by remember { mutableStateOf<String?>(null) }
     var wizardTarget  by remember { mutableStateOf<DeckRoot?>(null) }
+    val deckItems = remember {
+        mutableStateMapOf(
+            DeckRoot.PAGINA        to mutableStateListOf("pg001"),
+            DeckRoot.MENU_LATERALE to mutableStateListOf("ml001"),
+            DeckRoot.MENU_CENTRALE to mutableStateListOf("mc001"),
+            DeckRoot.AVVISO        to mutableStateListOf("al001")
+        )
+    }
 
     fun openWizardFor(root: DeckRoot) {
         wizardTarget = root
@@ -430,21 +442,26 @@ fun EditorMenusOnly(
         if (menuPath.isEmpty()) {
             // PRIMA BARRA
             MainBottomBar(
-                onUndo = { /* stub */ },
-                onRedo = { /* stub */ },
-                onSaveFile = { /* stub */ },
-                onDelete = { /* stub */ },
-                onDuplicate = { /* stub */ },
-                onProperties = { /* stub */ },
+                onUndo = { /* ... */ },
+                onRedo = { /* ... */ },
+                onSaveFile = { /* ... */ },
+                onDelete = { /* ... */ },
+                onDuplicate = { /* ... */ },
+                onProperties = { /* ... */ },
                 onLayout = { menuPath = listOf("Layout") },
-                onCreate = { openWizardFor(DeckRoot.PAGINA) },  // ⟵ QUI
-                onOpenList = { /* stub */ },
-                onSaveProject = { /* stub */ },
-                onOpenProject = { /* stub */ },
-                onNewProject = { /* stub */ },
+                onCreate = { /* se vuoi tenerlo per retrocompatibilità */ },
+                onCreatePage = { openWizardFor(DeckRoot.PAGINA) },          // ← NEW
+                onCreateAlert = { openWizardFor(DeckRoot.AVVISO) },         // ← NEW
+                onCreateMenuLaterale = { openWizardFor(DeckRoot.MENU_LATERALE) }, // ← NEW
+                onCreateMenuCentrale = { openWizardFor(DeckRoot.MENU_CENTRALE) }, // ← NEW
+                onOpenList = { /* ... */ },
+                onSaveProject = { /* ... */ },
+                onOpenProject = { /* ... */ },
+                onNewProject = { /* ... */ },
                 onMeasured = { actionsBarHeightPx = it },
                 discontinuousBottom = menuPath.isEmpty()
             )
+
 
             // SECONDA BARRA
             if (!classicEditing) {
@@ -456,16 +473,11 @@ fun EditorMenusOnly(
                         toggle = { key -> deckOpen = if (deckOpen == key) null else key }
                     ),
                     LocalDeckController provides DeckController(
-                        openChild = { root ->
-                            classicEditing = true
-                            editingClass = root
-                            deckOpen = null
-                        },
-                        openWizard = { root ->
-                            wizardTarget = root
-                            wizardVisible = true
-                        }
-                    )
+                        openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
+                        openWizard = { root -> wizardTarget = root; wizardVisible = true }
+                    ),
+                    // ⬇️ IMPORTANTE: converti esplicitamente a List<String> per evitare inferenze strane
+                    LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
                 ) {
                     MainMenuBar(
                         onLayout = { menuPath = listOf("Layout") },
@@ -491,11 +503,22 @@ fun EditorMenusOnly(
             }
             CreationWizardOverlay(
                 visible = wizardVisible,
-                target = wizardTarget,
+                target  = wizardTarget,
+                existingIds = deckItems.values.flatten().toSet(),   // ← tutti gli ID esistenti
                 onDismiss = { wizardVisible = false },
-                onCreate = {
-                    // TODO: aggiornerai gli elenchi reali (pagine, menù, avvisi)
+                onCreate  = { wr ->
+                    // append del nuovo ID nella lista corretta
+                    deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
                     wizardVisible = false
+
+                    // faccio vedere subito il cluster della madre corrispondente
+                    deckOpen = when (wr.root) {
+                        DeckRoot.PAGINA        -> "pagina"
+                        DeckRoot.MENU_LATERALE -> "menuL"
+                        DeckRoot.MENU_CENTRALE -> "menuC"
+                        DeckRoot.AVVISO        -> "avviso"
+                    }
+                    classicEditing = false
                 }
             )
         }
@@ -612,6 +635,17 @@ fun EditorMenusOnly(
                                 onValueChange = { newPresetName = it },
                                 singleLine = true,
                                 label = { Text("Nome stile") }
+                                isError = idError,
+                                colors = TextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = WIZ_AZURE,
+                                    focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
+                                    unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
+                                    focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
+                                    unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
+                                )
+                                
                             )
                         }
                     },
@@ -811,12 +845,13 @@ private fun BoxScope.MainBottomBar(
                         Box {
                             ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
                             DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
-                                DropdownMenuItem(text = { Text("Nuova pagina") }, onClick = { showCreateMenu = false; onCreate() })
-                                DropdownMenuItem(text = { Text("Nuovo avviso") }, onClick = { showCreateMenu = false })
-                                DropdownMenuItem(text = { Text("Menù laterale") }, onClick = { showCreateMenu = false })
-                                DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { showCreateMenu = false })
+                                DropdownMenuItem(text = { Text("Nuova pagina")  }, onClick = { showCreateMenu = false; onCreatePage() })
+                                DropdownMenuItem(text = { Text("Nuovo avviso")  }, onClick = { showCreateMenu = false; onCreateAlert() })
+                                DropdownMenuItem(text = { Text("Menù laterale") }, onClick = { showCreateMenu = false; onCreateMenuLaterale() })
+                                DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { showCreateMenu = false; onCreateMenuCentrale() })
                             }
                         }
+
                         // LISTA
                         Box {
                             ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true; onOpenList() })
@@ -1121,17 +1156,21 @@ private fun BoxScope.MainMenuBar(
                             )
                             val controller = LocalDeckController.current
                             if (deck.openKey == m.key) {
-                                // c+ apre il wizard per la madre corrente
                                 CPlusIcon(onClick = { controller.openWizard(m.root) })
 
-                                // figlia demo (tap → editor classico)
-                                ChildIconWithBadge(
-                                    icon = ImageVector.vectorResource(id = m.iconRes),
-                                    id = m.sampleId,
-                                    onClick = { controller.openChild(m.root) },
-                                    badgeBg = DECK_BADGE_BG,
-                                    badgeTxt = DECK_BADGE_TXT
-                                )
+                                // Prima prendi i figli come LISTA
+                                val children: List<String> = LocalDeckItems.current[m.root].orEmpty()
+
+                                // Poi itera come String (non Char)
+                                children.forEach { childId: String ->
+                                    ChildIconWithBadge(
+                                        icon = ImageVector.vectorResource(id = m.iconRes),
+                                        id = childId,                 // ← ora è String, niente più errore
+                                        onClick = { controller.openChild(m.root) },
+                                        badgeBg = DECK_BADGE_BG,
+                                        badgeTxt = DECK_BADGE_TXT
+                                    )
+                                }
                             }
                         }
                     }
@@ -1928,12 +1967,14 @@ private data class CreationResult(
 private fun BoxScope.CreationWizardOverlay(
     visible: Boolean,
     target: DeckRoot?,
+    existingIds: Set<String>,      // ← NEW
     onDismiss: () -> Unit,
     onCreate: (WizardResult) -> Unit
 ) {
     if (!visible) return
     val darkBg  = Color(0xFF0D1117) // stile GitHub scuro
     val panelBg = Color(0xFF131A24)
+    var idError by remember { mutableStateOf(false) }
 
     var showIdHelp by remember { mutableStateOf(false) }
 
@@ -2067,13 +2108,24 @@ private fun BoxScope.CreationWizardOverlay(
                                 singleLine = true,
                                 label = { Text("ID elemento associato") },
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = TextFieldDefaults.outlinedTextFieldColors(
-                                    textColor = Color.White,
+                                colors = TextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
                                     cursorColor = WIZ_AZURE,
-                                    focusedBorderColor = WIZ_AZURE,
+                                    focusedIndicatorColor = WIZ_AZURE,
+                                    unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                     focusedLabelColor = WIZ_AZURE,
-                                    unfocusedLabelColor = Color(0xFF9BA3AF),
-                                    unfocusedBorderColor = Color(0xFF2A3B5B)
+                                    unfocusedLabelColor = Color(0xFF9BA3AF)
+                                )
+                                isError = idError,
+                                colors = TextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = WIZ_AZURE,
+                                    focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
+                                    unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
+                                    focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
+                                    unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
                                 )
                             )
                         } else {
@@ -2104,14 +2156,27 @@ private fun BoxScope.CreationWizardOverlay(
                             label = { Text("Nome") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                textColor = Color.White,
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
                                 cursorColor = WIZ_AZURE,
-                                focusedBorderColor = WIZ_AZURE,
+                                focusedIndicatorColor = WIZ_AZURE,
+                                unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                 focusedLabelColor = WIZ_AZURE,
-                                unfocusedLabelColor = Color(0xFF9BA3AF),
-                                unfocusedBorderColor = Color(0xFF2A3B5B)
+                                unfocusedLabelColor = Color(0xFF9BA3AF)
                             )
+                            isError = idError,
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
+                                unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
+                                focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
+                                unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
+                            )
+
+
                         )
                         OutlinedTextField(
                             value = id,
@@ -2122,28 +2187,54 @@ private fun BoxScope.CreationWizardOverlay(
                             label = { Text("ID (5–8 caratteri, auto se vuoto o troppo corto)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                textColor = Color.White,
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
                                 cursorColor = WIZ_AZURE,
-                                focusedBorderColor = WIZ_AZURE,
+                                focusedIndicatorColor = WIZ_AZURE,
+                                unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                 focusedLabelColor = WIZ_AZURE,
-                                unfocusedLabelColor = Color(0xFF9BA3AF),
-                                unfocusedBorderColor = Color(0xFF2A3B5B)
+                                unfocusedLabelColor = Color(0xFF9BA3AF)
                             )
+                            isError = idError,
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
+                                unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
+                                focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
+                                unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
+                            )
+
+
                         )
                         OutlinedTextField(
                             value = description,
                             onValueChange = { description = it },
                             label = { Text("Descrizione (opzionale)") },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                textColor = Color.White,
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
                                 cursorColor = WIZ_AZURE,
-                                focusedBorderColor = WIZ_AZURE,
+                                focusedIndicatorColor = WIZ_AZURE,
+                                unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                 focusedLabelColor = WIZ_AZURE,
-                                unfocusedLabelColor = Color(0xFF9BA3AF),
-                                unfocusedBorderColor = Color(0xFF2A3B5B)
+                                unfocusedLabelColor = Color(0xFF9BA3AF)
                             )
+                            isError = idError,
+                                colors = TextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = WIZ_AZURE,
+                                    focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
+                                    unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
+                                    focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
+                                    unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
+                                )
+
+
                         )
 
                         // Campi specifici per tipo
@@ -2222,6 +2313,13 @@ private fun BoxScope.CreationWizardOverlay(
                             onClick = {
                                 val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
                                 val finalName = if (name.isBlank()) finalId else name
+                                val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
+                                if (existingIds.contains(finalId)) {
+                                    idError = true
+                                    return@Button   // non creare, bordo rosso già gestito dall’OutlinedTextField
+                                }
+
+
                                 onCreate(
                                     WizardResult(
                                         root = target ?: DeckRoot.PAGINA,
