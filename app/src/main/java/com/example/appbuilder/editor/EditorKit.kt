@@ -58,7 +58,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -81,15 +80,20 @@ import com.example.appbuilder.R
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.material.icons.outlined.HelpOutline
-
-
+import androidx.compose.material3.Switch
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.text.input.KeyboardCapitalization
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
 private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (stessa in Home e Submenu)
 private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / submenu)
 private val BARS_GAP = 14.dp                 // distacco tra le due barre (+2dp di “aria”)
 private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto al bordo schermo
-
+private val LocalExitClassic = staticCompositionLocalOf<() -> Unit> { {} }
 
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
@@ -150,14 +154,21 @@ private enum class DeckRoot { PAGINA, MENU_LATERALE, MENU_CENTRALE, AVVISO }
 private enum class SecondBarMode { Deck, Classic }
 
 private data class DeckState(val openKey: String?, val toggle: (String) -> Unit)
-private data class DeckController(val openChild: (DeckRoot) -> Unit)
+// ↑ Aggiungiamo la possibilità di aprire il wizard direttamente dalla CPlus
+private data class DeckController(
+    val openChild: (DeckRoot) -> Unit,
+    val openWizard: (DeckRoot) -> Unit
+)
 
 // Locals per pilotare MainMenuBar senza cambiare la sua firma
 private val LocalSecondBarMode = compositionLocalOf { SecondBarMode.Deck }
 private val LocalDeckState = compositionLocalOf { DeckState(null) { _ -> } }
-private val LocalDeckController = compositionLocalOf { DeckController { _ -> } }
+// ↑ ora espone anche openWizard
+private val LocalDeckController = compositionLocalOf {
+    DeckController(openChild = { _ -> }, openWizard = { _ -> })
+}
 private val LocalIsPageContext = compositionLocalOf { false }
-private val LocalExitClassic = compositionLocalOf<(() -> Unit)?>( { null } )
+
 
 
 // ===== Token colore (variabili facili da cambiare) =====
@@ -184,6 +195,22 @@ fun EditorMenusOnly(
     var classicEditing by remember { mutableStateOf(false) } // false = Deck, true = Classic (vecchia root)
     // MODE della seconda barra: "deck" (icone madre + cluster) oppure "classic" (vecchia root)
     // Preset salvati (nomi da mostrare nelle tendine)
+    // Wizard di creazione
+    var wizardVisible by remember { mutableStateOf(false) }
+    var wizardKind by remember { mutableStateOf<DeckRoot?>(null) }
+    var homePageId by remember { mutableStateOf<String?>(null) }
+    var wizardTarget  by remember { mutableStateOf<DeckRoot?>(null) }
+
+    fun openWizardFor(root: DeckRoot) {
+        wizardTarget = root
+        wizardVisible = true
+    }
+    BackHandler(enabled = wizardVisible) {
+        wizardVisible = false
+    }
+
+    // Back: se il wizard è aperto, il tasto indietro chiude il wizard (non l'app)
+    BackHandler(enabled = wizardVisible) { wizardVisible = false }
     val savedPresets = remember {
         mutableStateMapOf(
             "Layout" to mutableListOf("Nessuno", "Default chiaro", "Default scuro"),
@@ -391,7 +418,7 @@ fun EditorMenusOnly(
             )
     ) {
         if (menuPath.isEmpty()) {
-            // HOME: due barre sempre visibili
+            // PRIMA BARRA
             MainBottomBar(
                 onUndo = { /* stub */ },
                 onRedo = { /* stub */ },
@@ -400,47 +427,48 @@ fun EditorMenusOnly(
                 onDuplicate = { /* stub */ },
                 onProperties = { /* stub */ },
                 onLayout = { menuPath = listOf("Layout") },
-                onCreate = { /* stub: + della bottom bar */ },
+                onCreate = { openWizardFor(DeckRoot.PAGINA) },  // ⟵ QUI
                 onOpenList = { /* stub */ },
                 onSaveProject = { /* stub */ },
                 onOpenProject = { /* stub */ },
                 onNewProject = { /* stub */ },
                 onMeasured = { actionsBarHeightPx = it },
-                // In HOME il bordo inferiore è “discontinuo” (etichette/gap).
-                // Quando entri nei sottomenu, diventa continuo.
-                discontinuousBottom = true
+                discontinuousBottom = menuPath.isEmpty()
             )
 
             // SECONDA BARRA
             if (!classicEditing) {
-                // Modalità DECK (icone madre + cluster). Il c+ è uno stub,
-                // il tap su una figlia apre l’editor classico.
+
                 CompositionLocalProvider(
                     LocalSecondBarMode provides SecondBarMode.Deck,
                     LocalDeckState provides DeckState(
                         openKey = deckOpen,
                         toggle = { key -> deckOpen = if (deckOpen == key) null else key }
                     ),
-                    LocalDeckController provides DeckController { root ->
-                        classicEditing = true          // entra nella vecchia root
-                        editingClass = root            // ci servirà per abilitare Top/Bottom bar solo per Pagine
-                        deckOpen = null
-                    }
+                    LocalDeckController provides DeckController(
+                        openChild = { root ->
+                            classicEditing = true
+                            editingClass = root
+                            deckOpen = null
+                        },
+                        openWizard = { root ->
+                            wizardTarget = root
+                            wizardVisible = true
+                        }
+                    )
                 ) {
                     MainMenuBar(
                         onLayout = { menuPath = listOf("Layout") },
                         onContainer = { menuPath = listOf("Contenitore") },
-                        onText = { menuPath = listOf("Testo") },
-                        onAdd = { menuPath = listOf("Aggiungi") },
+                        onText     = { menuPath = listOf("Testo") },
+                        onAdd      = { menuPath = listOf("Aggiungi") },
                         bottomBarHeightPx = actionsBarHeightPx
                     )
                 }
             } else {
-                // Modalità CLASSIC (vecchia root) + icona "?" interna alla MainMenuBar
-
                 CompositionLocalProvider(
                     LocalSecondBarMode provides SecondBarMode.Classic,
-                    LocalExitClassic provides { classicEditing = false }   // ← esce e torna alle madri
+                    LocalExitClassic provides { classicEditing = false }    // torna alle icone madre
                 ) {
                     MainMenuBar(
                         onLayout = { menuPath = listOf("Layout") },
@@ -451,7 +479,17 @@ fun EditorMenusOnly(
                     )
                 }
             }
-        } else {
+            CreationWizardOverlay(
+                visible = wizardVisible,
+                target = wizardTarget,
+                onDismiss = { wizardVisible = false },
+                onCreate = {
+                    // TODO: aggiornerai gli elenchi reali (pagine, menù, avvisi)
+                    wizardVisible = false
+                }
+            )
+        }
+        else {
             // IN SOTTOMENU: seconda barra = SubMenuBar; sotto c’è sempre il Breadcrumb.
             // Imposta il “contesto pagina” per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
             val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
@@ -597,7 +635,6 @@ fun EditorMenusOnly(
 /* =========================================================================================
  *  BARRA PRINCIPALE (icone stile GitHub, scura, sempre visibile in HOME)
  * ========================================================================================= */
-
 @Composable
 private fun BoxScope.MainBottomBar(
     onUndo: () -> Unit,
@@ -607,13 +644,17 @@ private fun BoxScope.MainBottomBar(
     onDuplicate: () -> Unit,
     onProperties: () -> Unit,
     onLayout: () -> Unit,
-    onCreate: () -> Unit,
+    onCreate: () -> Unit,            // rimane, se lo usi altrove
+    onCreatePage: () -> Unit = {},   // NEW
+    onCreateAlert: () -> Unit = {},  // NEW
+    onCreateMenuLaterale: () -> Unit = {}, // NEW
+    onCreateMenuCentrale: () -> Unit = {}, // NEW
     onOpenList: () -> Unit,
     onSaveProject: () -> Unit,
     onOpenProject: () -> Unit,
     onNewProject: () -> Unit,
     onMeasured: (Int) -> Unit,
-    discontinuousBottom: Boolean = true // ⟵ NEW
+    discontinuousBottom: Boolean = true
 ) {
     // --- stato locale ---
     var showCreateMenu by remember { mutableStateOf(false) }
@@ -746,6 +787,17 @@ private fun BoxScope.MainBottomBar(
                         }
                     ) {
                         // CREA
+                        DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
+                            DropdownMenuItem(text = { Text("Nuova pagina") },
+                                onClick = { showCreateMenu = false; onCreatePage() })
+                            DropdownMenuItem(text = { Text("Nuovo avviso") },
+                                onClick = { showCreateMenu = false; onCreateAlert() })
+                            DropdownMenuItem(text = { Text("Menù laterale") },
+                                onClick = { showCreateMenu = false; onCreateMenuLaterale() })
+                            DropdownMenuItem(text = { Text("Menù centrale") },
+                                onClick = { showCreateMenu = false; onCreateMenuCentrale() })
+                        }
+
                         Box {
                             ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
                             DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
@@ -1012,7 +1064,7 @@ private fun BoxScope.MainMenuBar(
                         ToolbarIconButton(
                             icon = Icons.Outlined.ArrowBack,
                             contentDescription = "Indietro",
-                            onClick = exitClassic
+                            onClick = LocalExitClassic.current
                         )
                     }
 
@@ -1057,18 +1109,16 @@ private fun BoxScope.MainMenuBar(
                                 onClick = { deck.toggle(m.key) },
                                 ringColor = DECK_HIGHLIGHT
                             )
-
+                            val controller = LocalDeckController.current
                             if (deck.openKey == m.key) {
-                                // c+ (stub) + UNA figlia d'esempio (facile da rimuovere quando implementeremo la creazione)
-                                CPlusIcon(onClick = { /* stub: wizard non ancora implementato */ })
+                                // c+ apre il wizard per la madre corrente
+                                CPlusIcon(onClick = { controller.openWizard(m.root) })
 
+                                // figlia demo (tap → editor classico)
                                 ChildIconWithBadge(
                                     icon = ImageVector.vectorResource(id = m.iconRes),
                                     id = m.sampleId,
-                                    onClick = {
-                                        // TAP FIGLIA → entra nella vecchia root (Classic)
-                                        controller.openChild(m.root)
-                                    },
+                                    onClick = { controller.openChild(m.root) },
                                     badgeBg = DECK_BADGE_BG,
                                     badgeTxt = DECK_BADGE_TXT
                                 )
@@ -1848,3 +1898,314 @@ private fun dividerDot() {
             .background(Color(0xFF233049))
     )
 }
+
+// ======================================================================
+// WIZARD OVERLAY — crea Pagina / Menù Laterale / Menù Centrale / Avviso
+// Aspetto scuro, barre coperte da scrim, nessuna logica esterna.
+// ======================================================================
+private data class CreationResult(
+    val kind: DeckRoot,
+    val id: String,
+    val title: String,
+    val description: String?,
+    val scroll: String,           // "Assente" | "Verticale" | "Orizzontale"
+    val assocId: String?,         // eventuale associazione
+    val side: String?,            // solo per menù laterale: "Sinistra"|"Destra"|"Alto"|"Basso"
+    val setAsHome: Boolean        // solo per pagine
+)
+
+@Composable
+private fun BoxScope.CreationWizardOverlay(
+    visible: Boolean,
+    target: DeckRoot?,
+    onDismiss: () -> Unit,
+    onCreate: (WizardResult) -> Unit
+) {
+    if (!visible) return
+    val darkBg = Color(0xFF0D1117) // stile GitHub scuro
+    val panelBg = Color(0xFF131A24)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .align(Alignment.Center),
+        color = darkBg.copy(alpha = 0.98f),
+        contentColor = Color.White
+    ) {
+        // stato campi
+        var name by remember { mutableStateOf("") }
+        var description by remember { mutableStateOf("") }
+        var id by remember { mutableStateOf("") }
+        var idEdited by remember { mutableStateOf(false) }
+
+        // associazione
+        var assocMode by remember { mutableStateOf("manual") } // "manual" | "tap3s"
+        var assocId by remember { mutableStateOf("") }
+
+        // specifici per Pagine
+        var scroll by remember { mutableStateOf("Nessuna") } // Nessuna | Verticale | Orizzontale
+        var setAsHome by remember { mutableStateOf(false) }
+
+        // specifici per Menù laterale
+        var side by remember { mutableStateOf("Sinistra") } // Sinistra | Destra | Alto | Basso
+
+        // regole ID auto
+        fun prefixFor(root: DeckRoot?) = when (root) {
+            DeckRoot.PAGINA -> "pg"
+            DeckRoot.MENU_LATERALE -> "ml"
+            DeckRoot.MENU_CENTRALE -> "mc"
+            DeckRoot.AVVISO -> "al"
+            else -> "pg"
+        }
+
+        fun sanitize(s: String) = s.filter { it.isLetterOrDigit() }
+        fun autoIdFrom(name: String, root: DeckRoot?): String {
+            val p = prefixFor(root)
+            val base = sanitize(name).lowercase()
+            val candidate = if (base.length >= 5) base.take(8) else (base + "001").take(8)
+            val withPrefix = (p + candidate).take(8)
+            // garantiamo min 5
+            return if (withPrefix.length < 5) (withPrefix + "0".repeat(5 - withPrefix.length)) else withPrefix
+        }
+
+        LaunchedEffect(name, target) {
+            // aggiorno ID auto se l’utente non ha “bloccato” l’ID
+            if (!idEdited) {
+                id = autoIdFrom(name, target)
+            }
+        }
+
+        // header
+        Column(Modifier.fillMaxSize()) {
+            // Barra superiore del wizard
+            Surface(
+                color = panelBg,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Outlined.ArrowBack, contentDescription = "Chiudi")
+                    }
+                    val title = when (target) {
+                        DeckRoot.PAGINA -> "Nuova pagina"
+                        DeckRoot.MENU_LATERALE -> "Nuovo menù laterale"
+                        DeckRoot.MENU_CENTRALE -> "Nuovo menù centrale"
+                        DeckRoot.AVVISO -> "Nuovo avviso"
+                        else -> "Nuovo elemento"
+                    }
+                    Text(title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { /* help globale, se vuoi */ }) {
+                        Icon(Icons.Outlined.HelpOutline, contentDescription = "Aiuto")
+                    }
+                }
+            }
+
+            // Corpo pannello
+            Column(
+                Modifier
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(panelBg)
+                    .padding(16.dp)
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nome") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = id,
+                    onValueChange = {
+                        id = sanitize(it).take(8)
+                        idEdited = true
+                    },
+                    label = { Text("ID (5–8 caratteri, auto se vuoto o troppo corto)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Descrizione (opzionale)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Associazione
+                Text("Associazione (mostrare elemento collegato)", fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = assocMode == "manual", onClick = { assocMode = "manual" })
+                        Text("ID manuale")
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = assocMode == "tap3s", onClick = { assocMode = "tap3s" })
+                        Text("Seleziona a schermo (3s)")
+                        IconButton(onClick = { /* tooltip/modal di aiuto */ }) {
+                            Icon(Icons.Outlined.HelpOutline, contentDescription = "Come funziona")
+                        }
+                    }
+                }
+                if (assocMode == "manual") {
+                    OutlinedTextField(
+                        value = assocId,
+                        onValueChange = { assocId = sanitize(it).take(16) },
+                        label = { Text("ID elemento associato") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        "Entra in modalità selezione tenendo premuto 3s sul componente desiderato. (stub)",
+                        fontSize = 12.sp,
+                        color = Color(0xFF9BA3AF)
+                    )
+                    OutlinedButton(onClick = { /* TODO: abilita modalità selezione */ }) {
+                        Text("Avvia selezione (stub)")
+                    }
+                }
+
+                // Campi specifici per tipo
+                when (target) {
+                    DeckRoot.PAGINA -> {
+                        Text("Opzioni pagina", fontWeight = FontWeight.SemiBold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Scrollabilità:")
+                            OptionPill(selected = scroll == "Nessuna", onClick = { scroll = "Nessuna" }, label = "Nessuna")
+                            OptionPill(selected = scroll == "Verticale", onClick = { scroll = "Verticale" }, label = "Verticale")
+                            OptionPill(selected = scroll == "Orizzontale", onClick = { scroll = "Orizzontale" }, label = "Orizzontale")
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Switch(checked = setAsHome, onCheckedChange = { setAsHome = it })
+                            Text("Imposta come Home")
+                        }
+                    }
+                    DeckRoot.MENU_LATERALE -> {
+                        Text("Opzioni menù laterale", fontWeight = FontWeight.SemiBold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Lato:")
+                            OptionPill(selected = side == "Sinistra", onClick = { side = "Sinistra" }, label = "Sinistra")
+                            OptionPill(selected = side == "Destra",   onClick = { side = "Destra"   }, label = "Destra")
+                            OptionPill(selected = side == "Alto",     onClick = { side = "Alto"     }, label = "Alto")
+                            OptionPill(selected = side == "Basso",    onClick = { side = "Basso"    }, label = "Basso")
+                        }
+                    }
+                    DeckRoot.MENU_CENTRALE -> {
+                        Text("Opzioni menù centrale", fontWeight = FontWeight.SemiBold)
+                        Text("Nessuna opzione speciale per ora.", color = Color(0xFF9BA3AF), fontSize = 12.sp)
+                    }
+                    DeckRoot.AVVISO -> {
+                        Text("Opzioni avviso", fontWeight = FontWeight.SemiBold)
+                        OutlinedButton(onClick = { /* apri ECA mode (stub) */ }) {
+                            Text("Apri Event–Condition–Action mode (stub)")
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+
+            // footer
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                    Text("Annulla")
+                }
+                Button(
+                    onClick = {
+                        val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
+                        val finalName = if (name.isBlank()) finalId else name
+                        onCreate(
+                            WizardResult(
+                                root = target ?: DeckRoot.PAGINA,
+                                id = finalId,
+                                name = finalName,
+                                description = description.ifBlank { "n/a" },
+                                assocId = assocId.takeIf { assocMode == "manual" && it.isNotBlank() },
+                                scroll = scroll,
+                                setAsHome = (target == DeckRoot.PAGINA && setAsHome),
+                                side = (target == DeckRoot.MENU_LATERALE).let { if (it) side else null }
+                            )
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Crea")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptionPill(selected: Boolean, onClick: () -> Unit, label: String) {
+    OutlinedButton(
+        onClick = onClick,
+        border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null
+    ) { Text(label) }
+}
+
+private data class WizardResult(
+    val root: DeckRoot,
+    val id: String,
+    val name: String,
+    val description: String,
+    val assocId: String?,
+    val scroll: String,
+    val setAsHome: Boolean = false,
+    val side: String? = null
+)
+
+
+// Piccolo dropdown “scuro” in linea con lo stile
+@Composable
+private fun DropdownSmall(
+    current: String,
+    options: List<String>,
+    onSelected: (String) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) { Text(current) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { opt ->
+                DropdownMenuItem(text = { Text(opt) }, onClick = { onSelected(opt); open = false })
+            }
+        }
+    }
+}
+
+// Chip minimale, aspetto scuro, niente API sperimentali
+@Composable
+private fun FilterChipLike(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String
+) {
+    val bg = if (selected) Color(0xFF22304B) else Color(0xFF1B2334)
+    Surface(
+        color = bg,
+        contentColor = Color.White,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        TextButton(onClick = onClick) {
+            Text(label)
+        }
+    }
+}
+
+
