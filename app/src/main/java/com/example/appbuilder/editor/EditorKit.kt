@@ -381,24 +381,30 @@ fun EditorMenusOnly(
             )
     ) {
         if (menuPath.isEmpty()) {
+            // HOME: due barre sempre visibili
             MainBottomBar(
-                onUndo = { /* … */ },
-                onRedo = { /* … */ },
-                onSaveFile = { /* … */ },
-                onDelete = { /* … */ },
-                onDuplicate = { /* … */ },
-                onProperties = { /* … */ },
+                onUndo = { /* stub */ },
+                onRedo = { /* stub */ },
+                onSaveFile = { /* stub */ },
+                onDelete = { /* stub */ },
+                onDuplicate = { /* stub */ },
+                onProperties = { /* stub */ },
                 onLayout = { menuPath = listOf("Layout") },
-                onCreate = { /* … */ },
-                onOpenList = { /* … */ },
-                onSaveProject = { /* … */ },
-                onOpenProject = { /* … */ },
-                onNewProject = { /* … */ },
+                onCreate = { /* stub: + della bottom bar */ },
+                onOpenList = { /* stub */ },
+                onSaveProject = { /* stub */ },
+                onOpenProject = { /* stub */ },
+                onNewProject = { /* stub */ },
                 onMeasured = { actionsBarHeightPx = it },
-                discontinuousBottom = menuPath.isEmpty()
+                // In HOME il bordo inferiore è “discontinuo” (etichette/gap).
+                // Quando entri nei sottomenu, diventa continuo.
+                discontinuousBottom = true
             )
 
+            // SECONDA BARRA
             if (!classicEditing) {
+                // Modalità DECK (icone madre + cluster). Il c+ è uno stub,
+                // il tap su una figlia apre l’editor classico.
                 CompositionLocalProvider(
                     LocalSecondBarMode provides SecondBarMode.Deck,
                     LocalDeckState provides DeckState(
@@ -406,8 +412,8 @@ fun EditorMenusOnly(
                         toggle = { key -> deckOpen = if (deckOpen == key) null else key }
                     ),
                     LocalDeckController provides DeckController { root ->
-                        classicEditing = true
-                        editingClass = root
+                        classicEditing = true          // entra nella vecchia root
+                        editingClass = root            // ci servirà per abilitare Top/Bottom bar solo per Pagine
                         deckOpen = null
                     }
                 ) {
@@ -420,6 +426,7 @@ fun EditorMenusOnly(
                     )
                 }
             } else {
+                // Modalità CLASSIC (vecchia root) + icona "?" interna alla MainMenuBar
                 CompositionLocalProvider(LocalSecondBarMode provides SecondBarMode.Classic) {
                     MainMenuBar(
                         onLayout = { menuPath = listOf("Layout") },
@@ -430,33 +437,30 @@ fun EditorMenusOnly(
                     )
                 }
             }
-        }
-
         } else {
+            // IN SOTTOMENU: seconda barra = SubMenuBar; sotto c’è sempre il Breadcrumb.
+            // Imposta il “contesto pagina” per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
             val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
             CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
                 SubMenuBar(
                     path = menuPath,
                     selections = menuSelections,
-
-
                     onBack = {
                         if (menuPath.size == 1 && dirty) showConfirm = true
                         else {
                             menuPath = menuPath.dropLast(1)
-                            lastChanged = null   // ← niente “scia” nel breadcrumb
+                            lastChanged = null
                         }
                     },
                     onEnter = { label ->
-                        // Sibling foglia nello stesso ramo (immagini)
+                        // evita accumulo “foglie sorelle” (Aggiungi foto/album/video)
                         val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
                         menuPath = when {
                             menuPath.lastOrNull() == label -> menuPath
                             menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
-                                menuPath.dropLast(1) + label   // ← sostituisci, non accumulare
+                                menuPath.dropLast(1) + label
                             else -> menuPath + label
                         }
-                        // Navigazione ≠ scelta: non mostrare nel breadcrumb
                         lastChanged = null
                     },
                     onToggle = { label, value ->
@@ -464,7 +468,7 @@ fun EditorMenusOnly(
                         menuSelections[key(menuPath, label)] = value
                         lastChanged = "$label: ${if (value) "ON" else "OFF"}"
                         dirty = true
-                        // Se c'era uno STILE attivo, qualsiasi modifica manuale lo annulla (Default resta)
+                        // qualsiasi modifica manuale annulla lo STILE (Default resta)
                         val styleKey = key(listOf(root), "style")
                         val styleVal = (menuSelections[styleKey] as? String).orEmpty()
                         if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
@@ -482,30 +486,25 @@ fun EditorMenusOnly(
                             "default" -> {
                                 val name = value
                                 if (name.equals("Nessuno", true)) {
-                                    // Applica eventuale stile, altrimenti reset a default base
                                     resolveAndApply(root)
                                 } else {
-                                    // Applica prima il Default...
                                     applyPresetByName(root, name)
-                                    // ...poi se c'è uno Stile diverso da Nessuno → lo Stile vince
                                     val styleVal = (menuSelections[key(listOf(root), "style")] as? String).orEmpty()
                                     if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true) && !styleVal.equals(name, true)) {
-                                        applyPresetByName(root, styleVal)
+                                        applyPresetByName(root, styleVal) // stile ha priorità
                                     }
                                 }
                             }
                             "style" -> {
                                 val name = value
                                 if (name.equals("Nessuno", true)) {
-                                    // Se tolgo lo stile: applica default se presente, altrimenti default base
                                     resolveAndApply(root)
                                 } else {
-                                    // Stile applicato istantaneamente e con precedenza
-                                    applyPresetByName(root, name)
+                                    applyPresetByName(root, name) // applica subito e con precedenza
                                 }
                             }
                             else -> {
-                                // Modifica puntuale: Stile → Nessuno (Default resta selezionato)
+                                // modifica puntuale → stile attivo passa a “Nessuno”
                                 val styleKey = key(listOf(root), "style")
                                 val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
                                 if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
@@ -519,18 +518,16 @@ fun EditorMenusOnly(
                 BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
             }
 
-            // Barra di conferma quando risalgo con modifiche
+            // Barra di conferma (quando risali con modifiche)
             if (showConfirm) {
                 ConfirmBar(
                     onCancel = {
-                        // scarto le modifiche effimere
                         dirty = false
                         lastChanged = null
                         showConfirm = false
                         menuPath = emptyList()
                     },
                     onOk = {
-                        // accetto (in questa demo non applichiamo a un documento reale)
                         dirty = false
                         showConfirm = false
                         menuPath = emptyList()
@@ -539,7 +536,7 @@ fun EditorMenusOnly(
                 )
             }
 
-            // Dialog: Salva impostazioni come preset
+            // Dialog “Salva come stile”
             if (showSaveDialog) {
                 AlertDialog(
                     onDismissRequest = { showSaveDialog = false },
@@ -561,25 +558,20 @@ fun EditorMenusOnly(
                             val root = menuPath.firstOrNull() ?: "Contenitore"
                             val name = newPresetName.trim()
                             if (name.isNotBlank()) {
-                                savePreset(root, name) // crea/aggiorna con i valori correnti
+                                savePreset(root, name)
                             }
                             newPresetName = ""
                             dirty = false
                             showSaveDialog = false
                             showConfirm = false
                             menuPath = emptyList()
-                        }) {
-                            Text("Salva")
-                        }
+                        }) { Text("Salva") }
                     },
                     dismissButton = {
                         TextButton(onClick = {
                             newPresetName = ""
                             showSaveDialog = false
-                        }) {
-                            Text("Annulla")
-
-                        }
+                        }) { Text("Annulla") }
                     }
                 )
             }
