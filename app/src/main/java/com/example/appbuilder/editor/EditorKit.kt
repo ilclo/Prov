@@ -102,6 +102,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateDpAsState
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ExperimentalFoundationApi
 
 
 // Mappa "madre → lista ID figli" visibile alla seconda barra (Deck)
@@ -1252,6 +1254,7 @@ private fun BoxScope.MainMenuBar(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MotherIcon(
     icon: ImageVector,
@@ -1290,6 +1293,8 @@ private fun MotherIcon(
         }
     }
 }
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CPlusIcon(
     onClick: () -> Unit,
@@ -1324,6 +1329,7 @@ private fun CPlusIcon(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChildIconWithBadge(
     icon: ImageVector,
@@ -1925,6 +1931,7 @@ private fun TextLevel(
  *  WIDGET MENU — pulsanti a icona, toggle con bordo spesso, dropdown con badge
  * ========================================================================================= */
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ToolbarIconButton(
     icon: ImageVector,
@@ -1932,11 +1939,12 @@ private fun ToolbarIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean = false,
-    onClick: () -> Unit,
     onLongPress: (() -> Unit)? = null,
     infoTitle: String? = null,
     infoBody: String? = null,
-    allowLongPressInInfo: Boolean = true
+    allowLongPressInInfo: Boolean = true,
+    // ⬇️ metti onClick come ULTIMO parametro (senza default)
+    onClick: () -> Unit
 ) {
     val container = if (selected) MaterialTheme.colorScheme.primary else Color(0xFF1B2334)
     val content = Color.White
@@ -1957,10 +1965,7 @@ private fun ToolbarIconButton(
                     enabled = enabled,
                     onClick = {
                         if (info.enabled) {
-                            info.show(
-                                infoTitle ?: contentDescription,
-                                infoBody ?: "—"
-                            )
+                            info.show(infoTitle ?: contentDescription, infoBody ?: "—")
                         } else {
                             onClick()
                         }
@@ -1970,10 +1975,7 @@ private fun ToolbarIconButton(
                             if (allowLongPressInInfo) {
                                 (onLongPress ?: onClick).invoke()
                             } else {
-                                info.show(
-                                    infoTitle ?: contentDescription,
-                                    infoBody ?: "—"
-                                )
+                                info.show(infoTitle ?: contentDescription, infoBody ?: "—")
                             }
                         } else {
                             (onLongPress ?: onClick).invoke()
@@ -2584,7 +2586,7 @@ private fun FilterChipLike(
     }
 }
 
-
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BoxScope.InfoEdgeDeck(
     open: Boolean,
