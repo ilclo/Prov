@@ -2103,13 +2103,15 @@ private fun BoxScope.CreationWizardOverlay(
                         if (assocMode == "manual") {
                             OutlinedTextField(
                                 value = assocId,
-                                onValueChange = { assocId = sanitize(it).take(16) },
+                                onValueChange = { assocId = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }.take(32) },
                                 singleLine = true,
                                 label = { Text("ID elemento associato") },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
+                                    focusedTextColor = Color.Black,
+                                    unfocusedTextColor = Color.Black,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White,
                                     cursorColor = WIZ_AZURE,
                                     focusedIndicatorColor = WIZ_AZURE,
                                     unfocusedIndicatorColor = Color(0xFF2A3B5B),
@@ -2146,8 +2148,10 @@ private fun BoxScope.CreationWizardOverlay(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             colors = TextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
                                 cursorColor = WIZ_AZURE,
                                 focusedIndicatorColor = WIZ_AZURE,
                                 unfocusedIndicatorColor = Color(0xFF2A3B5B),
@@ -2155,20 +2159,25 @@ private fun BoxScope.CreationWizardOverlay(
                                 unfocusedLabelColor = Color(0xFF9BA3AF)
                             )
                         )
-
                         OutlinedTextField(
                             value = id,
                             onValueChange = {
-                                id = sanitize(it).take(8)
+                                id = it.lowercase()
+                                    .replace(' ', '_')
+                                    .filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }
+                                    .take(15)          // fino a 15 come da tue regole
                                 idEdited = true
+                                idError = false       // reset visuale all'editing
                             },
-                            label = { Text("ID (5–8 caratteri, auto se vuoto o troppo corto)") },
+                            label = { Text("ID") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             isError = idError,
                             colors = TextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
                                 cursorColor = WIZ_AZURE,
                                 focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
                                 unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
@@ -2176,15 +2185,16 @@ private fun BoxScope.CreationWizardOverlay(
                                 unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
                             )
                         )
-
                         OutlinedTextField(
                             value = description,
                             onValueChange = { description = it },
                             label = { Text("Descrizione (opzionale)") },
                             modifier = Modifier.fillMaxWidth(),
                             colors = TextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
                                 cursorColor = WIZ_AZURE,
                                 focusedIndicatorColor = WIZ_AZURE,
                                 unfocusedIndicatorColor = Color(0xFF2A3B5B),
@@ -2192,7 +2202,6 @@ private fun BoxScope.CreationWizardOverlay(
                                 unfocusedLabelColor = Color(0xFF9BA3AF)
                             )
                         )
-
                         // Campi specifici per tipo
                         when (target) {
                             DeckRoot.PAGINA -> {
@@ -2267,12 +2276,36 @@ private fun BoxScope.CreationWizardOverlay(
                         }
                         Button(
                             onClick = {
-                                val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
+                                // Costruzione ID finale secondo le tue regole attuali del file (con take(15) se vuoi estenderle qui)
+                                val computedId = if (id.isNotBlank()) id else /* autoIdFrom(name, target) o tua logica */
+                                    (when (target) {
+                                        DeckRoot.PAGINA        -> "pg"
+                                        DeckRoot.MENU_LATERALE -> "ml"
+                                        DeckRoot.MENU_CENTRALE -> "mc"
+                                        DeckRoot.AVVISO        -> "al"
+                                        else -> "pg"
+                                    } + "-" + name.lowercase()
+                                        .replace(' ', '_')
+                                        .filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }
+                                        .take(15)
+                                    ).ifBlank {
+                                        // fallback se nome corto/vuoto: prefisso-00001 (basic, non incrementale qui)
+                                        val pref = when (target) {
+                                            DeckRoot.PAGINA        -> "pg"
+                                            DeckRoot.MENU_LATERALE -> "ml"
+                                            DeckRoot.MENU_CENTRALE -> "mc"
+                                            DeckRoot.AVVISO        -> "al"
+                                            else -> "pg"
+                                        }
+                                        "${pref}-00001"
+                                    }
+
+                                val finalId = computedId
                                 val finalName = if (name.isBlank()) finalId else name
 
                                 if (existingIds.contains(finalId)) {
                                     idError = true
-                                    return@Button   // non creare: bordo rosso già gestito dal TextField “ID”
+                                    return@Button
                                 }
 
                                 onCreate(
