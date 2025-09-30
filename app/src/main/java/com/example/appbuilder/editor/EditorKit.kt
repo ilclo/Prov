@@ -94,6 +94,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.BorderStroke
 
 
 // Mappa "madre → lista ID figli" visibile alla seconda barra (Deck)
@@ -109,7 +117,8 @@ private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto
 private val LocalExitClassic = staticCompositionLocalOf<() -> Unit> { {} }
 // Accento per i wizard "Crea …"
 private val WIZ_AZURE = Color(0xFF58A6FF)   // azzurro (come DECK_HIGHLIGHT)
-
+private data class InfoModeEnv(val enabled: Boolean, val show: (String, String) -> Unit)
+private val LocalInfoMode = staticCompositionLocalOf { InfoModeEnv(false) { _, _ -> } }
 /* =========================================================================================
  *  MODELLO MINIMO DI STATO (solo per navigazione menù)
  * ========================================================================================= */
@@ -215,6 +224,30 @@ fun EditorMenusOnly(
     var wizardKind by remember { mutableStateOf<DeckRoot?>(null) }
     var homePageId by remember { mutableStateOf<String?>(null) }
     var wizardTarget  by remember { mutableStateOf<DeckRoot?>(null) }
+    // ---- Stato per modalità info + pannelli descrittivi ----
+    var infoDeckOpen by remember { mutableStateOf(false) }      // deck laterale destro aperto/chiuso
+    var infoMode by remember { mutableStateOf(false) }          // flag modalità info
+    var infoCard by remember { mutableStateOf<Pair<String, String>?>(null) } // (titolo, testo)
+    var infoCardVisible by remember { mutableStateOf(false) }
+
+    // Auto‑hide del pannello descrittivo (5s)
+    LaunchedEffect(infoCard) {
+        if (infoCard != null) {
+            infoCardVisible = true
+            delay(5000)
+            infoCardVisible = false
+            infoCard = null
+        }
+    }
+
+    // Mostra il “benvenuto” alla modalità info quando si attiva
+    LaunchedEffect(infoMode) {
+        if (infoMode) {
+            infoCard = "Modalità info" to
+                    "Tocca un’icona per una descrizione. Tieni premuto per entrare dove consentito. " +
+                    "Per uscire, riapri il deck a destra e tocca di nuovo '?'."
+        }
+    }
     val deckItems = remember {
         mutableStateMapOf(
             DeckRoot.PAGINA        to mutableStateListOf("pg001"),
@@ -429,250 +462,268 @@ fun EditorMenusOnly(
     // Dialog salvataggio stile
     var showSaveDialog by remember { mutableStateOf(false) }
     var newPresetName by remember { mutableStateOf("") }
-
-
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF1A1A1A), Color(0xFF242424)) // grigi scuri
-                )
-            )
+    CompositionLocalProvider(
+        LocalInfoMode provides InfoModeEnv(
+            enabled = infoMode,
+            show = { title, body -> infoCard = title to body }
+        )
     ) {
-        var idError by remember { mutableStateOf(false) }
-        if (menuPath.isEmpty()) {
-            // PRIMA BARRA
-            MainBottomBar(
-                onUndo = { /* ... */ },
-                onRedo = { /* ... */ },
-                onSaveFile = { /* ... */ },
-                onDelete = { /* ... */ },
-                onDuplicate = { /* ... */ },
-                onProperties = { /* ... */ },
-                onLayout = { menuPath = listOf("Layout") },
-                onCreate = { /* se vuoi tenerlo per retrocompatibilità */ },
-                onCreatePage = { openWizardFor(DeckRoot.PAGINA) },          // ← NEW
-                onCreateAlert = { openWizardFor(DeckRoot.AVVISO) },         // ← NEW
-                onCreateMenuLaterale = { openWizardFor(DeckRoot.MENU_LATERALE) }, // ← NEW
-                onCreateMenuCentrale = { openWizardFor(DeckRoot.MENU_CENTRALE) }, // ← NEW
-                onOpenList = { /* ... */ },
-                onSaveProject = { /* ... */ },
-                onOpenProject = { /* ... */ },
-                onNewProject = { /* ... */ },
-                onMeasured = { actionsBarHeightPx = it },
-                discontinuousBottom = menuPath.isEmpty()
-            )
-
-
-            // SECONDA BARRA
-            if (!classicEditing) {
-
-                CompositionLocalProvider(
-                    LocalSecondBarMode provides SecondBarMode.Deck,
-                    LocalDeckState provides DeckState(
-                        openKey = deckOpen,
-                        toggle = { key -> deckOpen = if (deckOpen == key) null else key }
-                    ),
-                    LocalDeckController provides DeckController(
-                        openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
-                        openWizard = { root -> wizardTarget = root; wizardVisible = true }
-                    ),
-                    // ⬇️ Rende disponibile la mappa madre→figli come List<String>
-                    LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
-                ) {
-                    MainMenuBar(
-                        onLayout = { menuPath = listOf("Layout") },
-                        onContainer = { menuPath = listOf("Contenitore") },
-                        onText     = { menuPath = listOf("Testo") },
-                        onAdd      = { menuPath = listOf("Aggiungi") },
-                        bottomBarHeightPx = actionsBarHeightPx
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF1A1A1A), Color(0xFF242424)) // grigi scuri
                     )
-                }
-            } else {
-                CompositionLocalProvider(
-                    LocalSecondBarMode provides SecondBarMode.Classic,
-                    LocalExitClassic provides { classicEditing = false }    // torna alle icone madre
-                ) {
-                    MainMenuBar(
-                        onLayout = { menuPath = listOf("Layout") },
-                        onContainer = { menuPath = listOf("Contenitore") },
-                        onText = { menuPath = listOf("Testo") },
-                        onAdd = { menuPath = listOf("Aggiungi") },
-                        bottomBarHeightPx = actionsBarHeightPx
-                    )
-                }
-            }
-            CreationWizardOverlay(
-                visible = wizardVisible,
-                target  = wizardTarget,
-                existingIds = deckItems.values.flatten().toSet(),   // ← tutti gli ID esistenti
-                onDismiss = { wizardVisible = false },
-                onCreate  = { wr ->
-                    deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
-                    wizardVisible = false
-                    deckOpen = when (wr.root) {
-                        DeckRoot.PAGINA        -> "pagina"
-                        DeckRoot.MENU_LATERALE -> "menuL"
-                        DeckRoot.MENU_CENTRALE -> "menuC"
-                        DeckRoot.AVVISO        -> "avviso"
+                )
+        ) {
+            var idError by remember { mutableStateOf(false) }
+            if (menuPath.isEmpty()) {
+                // PRIMA BARRA
+                MainBottomBar(
+                    onUndo = { /* ... */ },
+                    onRedo = { /* ... */ },
+                    onSaveFile = { /* ... */ },
+                    onDelete = { /* ... */ },
+                    onDuplicate = { /* ... */ },
+                    onProperties = { /* ... */ },
+                    onLayout = { menuPath = listOf("Layout") },
+                    onCreate = { /* se vuoi tenerlo per retrocompatibilità */ },
+                    onCreatePage = { openWizardFor(DeckRoot.PAGINA) },          // ← NEW
+                    onCreateAlert = { openWizardFor(DeckRoot.AVVISO) },         // ← NEW
+                    onCreateMenuLaterale = { openWizardFor(DeckRoot.MENU_LATERALE) }, // ← NEW
+                    onCreateMenuCentrale = { openWizardFor(DeckRoot.MENU_CENTRALE) }, // ← NEW
+                    onOpenList = { /* ... */ },
+                    onSaveProject = { /* ... */ },
+                    onOpenProject = { /* ... */ },
+                    onNewProject = { /* ... */ },
+                    onMeasured = { actionsBarHeightPx = it },
+                    discontinuousBottom = menuPath.isEmpty()
+                )
+
+
+                // SECONDA BARRA
+                if (!classicEditing) {
+
+                    CompositionLocalProvider(
+                        LocalSecondBarMode provides SecondBarMode.Deck,
+                        LocalDeckState provides DeckState(
+                            openKey = deckOpen,
+                            toggle = { key -> deckOpen = if (deckOpen == key) null else key }
+                        ),
+                        LocalDeckController provides DeckController(
+                            openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
+                            openWizard = { root -> wizardTarget = root; wizardVisible = true }
+                        ),
+                        // ⬇️ Rende disponibile la mappa madre→figli come List<String>
+                        LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
+                    ) {
+                        MainMenuBar(
+                            onLayout = { menuPath = listOf("Layout") },
+                            onContainer = { menuPath = listOf("Contenitore") },
+                            onText     = { menuPath = listOf("Testo") },
+                            onAdd      = { menuPath = listOf("Aggiungi") },
+                            bottomBarHeightPx = actionsBarHeightPx
+                        )
                     }
-                    classicEditing = false
+                } else {
+                    CompositionLocalProvider(
+                        LocalSecondBarMode provides SecondBarMode.Classic,
+                        LocalExitClassic provides { classicEditing = false }    // torna alle icone madre
+                    ) {
+                        MainMenuBar(
+                            onLayout = { menuPath = listOf("Layout") },
+                            onContainer = { menuPath = listOf("Contenitore") },
+                            onText = { menuPath = listOf("Testo") },
+                            onAdd = { menuPath = listOf("Aggiungi") },
+                            bottomBarHeightPx = actionsBarHeightPx
+                        )
+                    }
                 }
-            )
-        }
-        else {
-            // IN SOTTOMENU: seconda barra = SubMenuBar; sotto c’è sempre il Breadcrumb.
-            // Imposta il “contesto pagina” per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
-            val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
-            CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
-                SubMenuBar(
-                    path = menuPath,
-                    selections = menuSelections,
-                    onBack = {
-                        if (menuPath.size == 1 && dirty) showConfirm = true
-                        else {
-                            menuPath = menuPath.dropLast(1)
+                CreationWizardOverlay(
+                    visible = wizardVisible,
+                    target  = wizardTarget,
+                    existingIds = deckItems.values.flatten().toSet(),   // ← tutti gli ID esistenti
+                    onDismiss = { wizardVisible = false },
+                    onCreate  = { wr ->
+                        deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
+                        wizardVisible = false
+                        deckOpen = when (wr.root) {
+                            DeckRoot.PAGINA        -> "pagina"
+                            DeckRoot.MENU_LATERALE -> "menuL"
+                            DeckRoot.MENU_CENTRALE -> "menuC"
+                            DeckRoot.AVVISO        -> "avviso"
+                        }
+                        classicEditing = false
+                    }
+                )
+            }
+            else {
+                // IN SOTTOMENU: seconda barra = SubMenuBar; sotto c’è sempre il Breadcrumb.
+                // Imposta il “contesto pagina” per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
+                val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
+                CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
+                    SubMenuBar(
+                        path = menuPath,
+                        selections = menuSelections,
+                        onBack = {
+                            if (menuPath.size == 1 && dirty) showConfirm = true
+                            else {
+                                menuPath = menuPath.dropLast(1)
+                                lastChanged = null
+                            }
+                        },
+                        onEnter = { label ->
+                            // evita accumulo “foglie sorelle” (Aggiungi foto/album/video)
+                            val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
+                            menuPath = when {
+                                menuPath.lastOrNull() == label -> menuPath
+                                menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
+                                    menuPath.dropLast(1) + label
+                                else -> menuPath + label
+                            }
                             lastChanged = null
-                        }
-                    },
-                    onEnter = { label ->
-                        // evita accumulo “foglie sorelle” (Aggiungi foto/album/video)
-                        val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
-                        menuPath = when {
-                            menuPath.lastOrNull() == label -> menuPath
-                            menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
-                                menuPath.dropLast(1) + label
-                            else -> menuPath + label
-                        }
-                        lastChanged = null
-                    },
-                    onToggle = { label, value ->
-                        val root = menuPath.firstOrNull() ?: "Contenitore"
-                        menuSelections[key(menuPath, label)] = value
-                        lastChanged = "$label: ${if (value) "ON" else "OFF"}"
-                        dirty = true
-                        // qualsiasi modifica manuale annulla lo STILE (Default resta)
-                        val styleKey = key(listOf(root), "style")
-                        val styleVal = (menuSelections[styleKey] as? String).orEmpty()
-                        if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
-                            menuSelections[styleKey] = "Nessuno"
-                        }
-                    },
-                    onPick = { label, value ->
-                        val root = menuPath.firstOrNull() ?: "Contenitore"
-                        val fullKey = key(menuPath, label)
-                        menuSelections[fullKey] = value
-                        lastChanged = "$label: $value"
-                        dirty = true
+                        },
+                        onToggle = { label, value ->
+                            val root = menuPath.firstOrNull() ?: "Contenitore"
+                            menuSelections[key(menuPath, label)] = value
+                            lastChanged = "$label: ${if (value) "ON" else "OFF"}"
+                            dirty = true
+                            // qualsiasi modifica manuale annulla lo STILE (Default resta)
+                            val styleKey = key(listOf(root), "style")
+                            val styleVal = (menuSelections[styleKey] as? String).orEmpty()
+                            if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
+                                menuSelections[styleKey] = "Nessuno"
+                            }
+                        },
+                        onPick = { label, value ->
+                            val root = menuPath.firstOrNull() ?: "Contenitore"
+                            val fullKey = key(menuPath, label)
+                            menuSelections[fullKey] = value
+                            lastChanged = "$label: $value"
+                            dirty = true
 
-                        when (label) {
-                            "default" -> {
-                                val name = value
-                                if (name.equals("Nessuno", true)) {
-                                    resolveAndApply(root)
-                                } else {
-                                    applyPresetByName(root, name)
-                                    val styleVal = (menuSelections[key(listOf(root), "style")] as? String).orEmpty()
-                                    if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true) && !styleVal.equals(name, true)) {
-                                        applyPresetByName(root, styleVal) // stile ha priorità
+                            when (label) {
+                                "default" -> {
+                                    val name = value
+                                    if (name.equals("Nessuno", true)) {
+                                        resolveAndApply(root)
+                                    } else {
+                                        applyPresetByName(root, name)
+                                        val styleVal = (menuSelections[key(listOf(root), "style")] as? String).orEmpty()
+                                        if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true) && !styleVal.equals(name, true)) {
+                                            applyPresetByName(root, styleVal) // stile ha priorità
+                                        }
+                                    }
+                                }
+                                "style" -> {
+                                    val name = value
+                                    if (name.equals("Nessuno", true)) {
+                                        resolveAndApply(root)
+                                    } else {
+                                        applyPresetByName(root, name) // applica subito e con precedenza
+                                    }
+                                }
+                                else -> {
+                                    // modifica puntuale → stile attivo passa a “Nessuno”
+                                    val styleKey = key(listOf(root), "style")
+                                    val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
+                                    if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
+                                        menuSelections[styleKey] = "Nessuno"
                                     }
                                 }
                             }
-                            "style" -> {
-                                val name = value
-                                if (name.equals("Nessuno", true)) {
-                                    resolveAndApply(root)
-                                } else {
-                                    applyPresetByName(root, name) // applica subito e con precedenza
-                                }
-                            }
-                            else -> {
-                                // modifica puntuale → stile attivo passa a “Nessuno”
-                                val styleKey = key(listOf(root), "style")
-                                val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
-                                if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
-                                    menuSelections[styleKey] = "Nessuno"
-                                }
-                            }
-                        }
-                    },
-                    savedPresets = savedPresets
-                )
-                BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
-            }
+                        },
+                        savedPresets = savedPresets
+                    )
+                    BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
+                }
 
-            // Barra di conferma (quando risali con modifiche)
-            if (showConfirm) {
-                ConfirmBar(
-                    onCancel = {
-                        dirty = false
-                        lastChanged = null
-                        showConfirm = false
-                        menuPath = emptyList()
-                    },
-                    onOk = {
-                        dirty = false
-                        showConfirm = false
-                        menuPath = emptyList()
-                    },
-                    onSavePreset = { showSaveDialog = true }
-                )
-            }
-
-            // Dialog “Salva come stile”
-            if (showSaveDialog) {
-                AlertDialog(
-                    onDismissRequest = { showSaveDialog = false },
-                    title = { Text("Salva come stile") },
-                    text = {
-                        Column {
-                            Text("Dai un nome allo stile corrente. Se esiste già, verrà aggiornato.")
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = newPresetName,
-                                onValueChange = { newPresetName = it },
-                                singleLine = true,
-                                label = { Text("Nome stile") },
-                                colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = WIZ_AZURE,
-                                    focusedIndicatorColor = WIZ_AZURE,
-                                    unfocusedIndicatorColor = Color(0xFF2A3B5B),
-                                    focusedLabelColor = WIZ_AZURE,
-                                    unfocusedLabelColor = Color(0xFF9BA3AF)
-                                )
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            val root = menuPath.firstOrNull() ?: "Contenitore"
-                            val name = newPresetName.trim()
-                            if (name.isNotBlank()) {
-                                savePreset(root, name)
-                            }
-                            newPresetName = ""
+                // Barra di conferma (quando risali con modifiche)
+                if (showConfirm) {
+                    ConfirmBar(
+                        onCancel = {
                             dirty = false
-                            showSaveDialog = false
+                            lastChanged = null
                             showConfirm = false
                             menuPath = emptyList()
-                        }) { Text("Salva") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = {
-                            newPresetName = ""
-                            showSaveDialog = false
-                        }) { Text("Annulla") }
-                    }
+                        },
+                        onOk = {
+                            dirty = false
+                            showConfirm = false
+                            menuPath = emptyList()
+                        },
+                        onSavePreset = { showSaveDialog = true }
+                    )
+                }
+
+                // Dialog “Salva come stile”
+                if (showSaveDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSaveDialog = false },
+                        title = { Text("Salva come stile") },
+                        text = {
+                            Column {
+                                Text("Dai un nome allo stile corrente. Se esiste già, verrà aggiornato.")
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = newPresetName,
+                                    onValueChange = { newPresetName = it },
+                                    singleLine = true,
+                                    label = { Text("Nome stile") },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        cursorColor = WIZ_AZURE,
+                                        focusedIndicatorColor = WIZ_AZURE,
+                                        unfocusedIndicatorColor = Color(0xFF2A3B5B),
+                                        focusedLabelColor = WIZ_AZURE,
+                                        unfocusedLabelColor = Color(0xFF9BA3AF)
+                                    )
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val root = menuPath.firstOrNull() ?: "Contenitore"
+                                val name = newPresetName.trim()
+                                if (name.isNotBlank()) {
+                                    savePreset(root, name)
+                                }
+                                newPresetName = ""
+                                dirty = false
+                                showSaveDialog = false
+                                showConfirm = false
+                                menuPath = emptyList()
+                            }) { Text("Salva") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                newPresetName = ""
+                                showSaveDialog = false
+                            }) { Text("Annulla") }
+                        }
+                    )
+                }
+                // 1) Deck laterale destro (apertura a scorrimento/tap)
+                InfoEdgeDeck(
+                    open = infoDeckOpen,
+                    onToggleOpen = { infoDeckOpen = !infoDeckOpen },
+                    infoEnabled = infoMode,
+                    onToggleInfo = { infoMode = !infoMode }
+                )
+
+// 2) Toast informativo (in alto, scompare con fade)
+                InfoToastCard(
+                    visible = infoCardVisible && infoCard != null,
+                    title = infoCard?.first ?: "",
+                    body = infoCard?.second ?: "",
+                    onDismiss = { infoCardVisible = false; infoCard = null }
                 )
             }
         }
     }
 }
-
 
 /* =========================================================================================
  *  BARRA PRINCIPALE (icone stile GitHub, scura, sempre visibile in HOME)
@@ -785,10 +836,15 @@ private fun BoxScope.MainBottomBar(
                             firstBlockRightEdge = left + width
                         }
                     ) {
-                        ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo)
-                        ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo)
-                        ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete)
-                        ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate)
+                        // BLOCCO 1
+                        ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo,
+                            infoTitle = "Annulla", infoBody = "Annulla l’ultima modifica")
+                        ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo,
+                            infoTitle = "Ripeti", infoBody = "Ripristina l’ultima azione annullata")
+                        ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete,
+                            infoTitle = "Cestino", infoBody = "Elimina l’elemento corrente")
+                        ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate,
+                            infoTitle = "Duplica", infoBody = "Crea una copia dell’elemento corrente")
                     }
 
                     // PUNTINO 1
@@ -809,9 +865,12 @@ private fun BoxScope.MainBottomBar(
                             middleBlockLeftEdge = left
                         }
                     ) {
-                        ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties)
-                        ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout)
-                        ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile)
+                        ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties,
+                            infoTitle = "Proprietà", infoBody = "Impostazioni dell’elemento corrente")
+                        ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout,
+                            infoTitle = "Layout pagina", infoBody = "Apri le impostazioni di layout")
+                        ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile,
+                            infoTitle = "Salva", infoBody = "Salva l’elemento corrente")
                     }
                 }
 
@@ -882,9 +941,12 @@ private fun BoxScope.MainBottomBar(
                             lastBlockLeftEdge = left
                         }
                     ) {
-                        ToolbarIconButton(Icons.Outlined.Save, "Salva progetto", onClick = onSaveProject)
-                        ToolbarIconButton(Icons.Outlined.FolderOpen, "Apri", onClick = onOpenProject)
-                        ToolbarIconButton(Icons.Outlined.CreateNewFolder, "Nuovo progetto", onClick = onNewProject)
+                        ToolbarIconButton(Icons.Outlined.Save, "Salva progetto", onClick = onSaveProject,
+                            infoTitle = "Salva progetto", infoBody = "Salva lo stato del progetto")
+                        ToolbarIconButton(Icons.Outlined.FolderOpen, "Apri", onClick = onOpenProject,
+                            infoTitle = "Apri progetto", infoBody = "Apri un progetto esistente")
+                        ToolbarIconButton(Icons.Outlined.CreateNewFolder, "Nuovo progetto", onClick = onNewProject,
+                            infoTitle = "Nuovo progetto", infoBody = "Crea un nuovo progetto")
                     }
                 }
             }
@@ -1111,14 +1173,19 @@ private fun BoxScope.MainMenuBar(
                         )
                     }
 
-                    ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText)
-                    ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer)
-                    ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout)
-                    ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd)
+                    ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText,
+                        infoTitle = "Testo", infoBody = "Stili e proprietà del testo", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer,
+                        infoTitle = "Contenitore", infoBody = "Aspetto e comportamenti del contenitore", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout,
+                        infoTitle = "Layout", infoBody = "Colori/immagini ed effetti dell’area", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd,
+                        infoTitle = "Aggiungi", infoBody = "Inserisci nuovi elementi", allowLongPressInInfo = false)
                     ToolbarIconButton(
                         icon = ImageVector.vectorResource(id = R.drawable.ic_question),
                         contentDescription = "Info",
-                        onClick = { /* stub */ }
+                        onClick = { /* stub */ },
+                        infoTitle = "Info elemento", infoBody = "Dati descrittivi (stub)", allowLongPressInInfo = false
                     )
                 }
 
@@ -1150,21 +1217,28 @@ private fun BoxScope.MainMenuBar(
                                 },
                                 selected = deck.openKey == m.key,
                                 onClick = { deck.toggle(m.key) },
-                                ringColor = DECK_HIGHLIGHT
+                                infoTitle = when (m.root) {
+                                    DeckRoot.PAGINA -> "Pagine"
+                                    DeckRoot.MENU_LATERALE -> "Menù laterale"
+                                    DeckRoot.MENU_CENTRALE -> "Menù centrale"
+                                    DeckRoot.AVVISO -> "Avvisi"
+                                },
+                                infoBody = "Tieni premuto per mostrare/nascondere le icone figlie"
                             )
-                            val controller = LocalDeckController.current
+
                             if (deck.openKey == m.key) {
-                                CPlusIcon(onClick = { controller.openWizard(m.root) })
+                                CPlusIcon(
+                                    onClick = { controller.openWizard(m.root) },
+                                    infoTitle = "Crea",
+                                    infoBody = "Crea un nuovo elemento in questo cluster"
+                                )
 
-                                // 1) Preleva i figli in modo esplicito come List<String>
                                 val children: List<String> = LocalDeckItems.current[m.root].orEmpty()
-
-                                // 2) Itera tipizzando childId come String → evita l'inferenza Char
-                                children.forEach { childId: String ->
+                                children.forEach { childId ->
                                     ChildIconWithBadge(
                                         icon = ImageVector.vectorResource(id = m.iconRes),
-                                        id = childId,                        // <- String, non Char
-                                        onClick = { controller.openChild(m.root) },
+                                        id = childId,
+                                        onClick = { controller.openChild(m.root) }, // long-press lo richiama comunque
                                         badgeBg = DECK_BADGE_BG,
                                         badgeTxt = DECK_BADGE_TXT
                                     )
@@ -1183,31 +1257,69 @@ private fun MotherIcon(
     icon: ImageVector,
     contentDescription: String,
     selected: Boolean,
-    onClick: () -> Unit,
-    ringColor: Color = DECK_HIGHLIGHT
+    onClick: () -> Unit,                 // azione “apri/chiudi cluster”
+    infoTitle: String? = null,
+    infoBody: String? = null
 ) {
+    val info = LocalInfoMode.current
     Surface(
         shape = CircleShape,
-        color = Color(0xFF1B2334), // stesso “nero” delle tue icone
+        color = Color(0xFF1B2334),
         contentColor = Color.White,
         tonalElevation = if (selected) 6.dp else 0.dp,
         shadowElevation = if (selected) 6.dp else 0.dp,
-        border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, ringColor) else null
+        border = if (selected) BorderStroke(2.dp, DECK_HIGHLIGHT) else null,
+        modifier = Modifier.size(42.dp)
     ) {
-        IconButton(onClick = onClick, modifier = Modifier.size(42.dp)) {
-            Icon(icon, contentDescription = contentDescription)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .combinedClickable(
+                    onClick = {
+                        if (info.enabled) {
+                            info.show(infoTitle ?: contentDescription, infoBody ?: "—")
+                        } else {
+                            onClick()
+                        }
+                    },
+                    // IN INFO MODE: il cluster si apre solo con long‑press
+                    onLongClick = { onClick() }
+                )
+        ) {
+            Icon(icon, contentDescription = contentDescription, modifier = Modifier.align(Alignment.Center))
         }
     }
 }
-
 @Composable
 private fun CPlusIcon(
     onClick: () -> Unit,
-    icon: ImageVector = ImageVector.vectorResource(id = R.drawable.ic_add_circle)
+    icon: ImageVector = ImageVector.vectorResource(id = R.drawable.ic_add_circle),
+    infoTitle: String = "Crea",
+    infoBody: String = "Crea un nuovo elemento in questo cluster"
 ) {
+    val info = LocalInfoMode.current
     Surface(shape = CircleShape, color = Color(0xFF1B2334), contentColor = Color.White) {
-        IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
-            Icon(icon, contentDescription = "Nuovo")
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .combinedClickable(
+                    onClick = {
+                        if (info.enabled) {
+                            info.show(infoTitle, infoBody)   // in info mode non apre wizard
+                        } else {
+                            onClick()
+                        }
+                    },
+                    onLongClick = {
+                        if (info.enabled) {
+                            info.show(infoTitle, infoBody)   // nessuna azione anche su long
+                        } else {
+                            onClick()
+                        }
+                    }
+                )
+        ) {
+            Icon(icon, contentDescription = "Nuovo", modifier = Modifier.align(Alignment.Center))
         }
     }
 }
@@ -1220,11 +1332,25 @@ private fun ChildIconWithBadge(
     badgeBg: Color = DECK_BADGE_BG,
     badgeTxt: Color = DECK_BADGE_TXT
 ) {
+    val info = LocalInfoMode.current
     val shown = id.take(8)
     Box(contentAlignment = Alignment.Center) {
         Surface(shape = CircleShape, color = Color(0xFF1B2334), contentColor = Color.White) {
-            IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
-                Icon(icon, contentDescription = shown)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .combinedClickable(
+                        onClick = {
+                            if (info.enabled) {
+                                info.show("Elemento $shown", "Tieni premuto per aprire l’editor classico")
+                            } else {
+                                onClick()
+                            }
+                        },
+                        onLongClick = { onClick() }    // long‑press = apri editor classico
+                    )
+            ) {
+                Icon(icon, contentDescription = shown, modifier = Modifier.align(Alignment.Center))
             }
         }
         Surface(
@@ -1233,7 +1359,7 @@ private fun ChildIconWithBadge(
             shape = RoundedCornerShape(6.dp),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .offset { IntOffset(0, 14) } // stendardetto sotto, senza “alzare” l’icona
+                .offset { IntOffset(0, 14) }
         ) {
             Text(
                 text = shown,
@@ -1801,29 +1927,65 @@ private fun TextLevel(
 
 @Composable
 private fun ToolbarIconButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     contentDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean = false,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
+    infoTitle: String? = null,
+    infoBody: String? = null,
+    allowLongPressInInfo: Boolean = true
 ) {
     val container = if (selected) MaterialTheme.colorScheme.primary else Color(0xFF1B2334)
     val content = Color.White
-    FilledIconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.size(42.dp),
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = container,
-            contentColor = content,
-            disabledContainerColor = container.copy(alpha = 0.5f),
-            disabledContentColor = content.copy(alpha = 0.5f)
-        )
+    val info = LocalInfoMode.current
+
+    Surface(
+        color = container,
+        contentColor = content,
+        shape = CircleShape,
+        tonalElevation = if (selected) 6.dp else 0.dp,
+        shadowElevation = if (selected) 6.dp else 0.dp,
+        modifier = modifier.size(42.dp)
     ) {
-        Icon(icon, contentDescription = contentDescription)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .combinedClickable(
+                    enabled = enabled,
+                    onClick = {
+                        if (info.enabled) {
+                            info.show(
+                                infoTitle ?: contentDescription,
+                                infoBody ?: "—"
+                            )
+                        } else {
+                            onClick()
+                        }
+                    },
+                    onLongClick = {
+                        if (info.enabled) {
+                            if (allowLongPressInInfo) {
+                                (onLongPress ?: onClick).invoke()
+                            } else {
+                                info.show(
+                                    infoTitle ?: contentDescription,
+                                    infoBody ?: "—"
+                                )
+                            }
+                        } else {
+                            (onLongPress ?: onClick).invoke()
+                        }
+                    }
+                )
+        ) {
+            Icon(icon, contentDescription = contentDescription, modifier = Modifier.align(Alignment.Center))
+        }
     }
 }
+
 
 @Composable
 private fun ToggleIcon(
@@ -2287,17 +2449,17 @@ private fun BoxScope.CreationWizardOverlay(
                                         .replace(' ', '_')
                                         .filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }
                                         .take(15)
-                                    ).ifBlank {
-                                        // fallback se nome corto/vuoto: prefisso-00001 (basic, non incrementale qui)
-                                        val pref = when (target) {
-                                            DeckRoot.PAGINA        -> "pg"
-                                            DeckRoot.MENU_LATERALE -> "ml"
-                                            DeckRoot.MENU_CENTRALE -> "mc"
-                                            DeckRoot.AVVISO        -> "al"
-                                            else -> "pg"
+                                            ).ifBlank {
+                                            // fallback se nome corto/vuoto: prefisso-00001 (basic, non incrementale qui)
+                                            val pref = when (target) {
+                                                DeckRoot.PAGINA        -> "pg"
+                                                DeckRoot.MENU_LATERALE -> "ml"
+                                                DeckRoot.MENU_CENTRALE -> "mc"
+                                                DeckRoot.AVVISO        -> "al"
+                                                else -> "pg"
+                                            }
+                                            "${pref}-00001"
                                         }
-                                        "${pref}-00001"
-                                    }
 
                                 val finalId = computedId
                                 val finalName = if (name.isBlank()) finalId else name
@@ -2423,3 +2585,107 @@ private fun FilterChipLike(
 }
 
 
+@Composable
+private fun BoxScope.InfoEdgeDeck(
+    open: Boolean,
+    onToggleOpen: () -> Unit,
+    infoEnabled: Boolean,
+    onToggleInfo: () -> Unit
+) {
+    val panelWidth = 64.dp
+    val handleWidth = 14.dp
+    val offsetX by animateDpAsState(
+        targetValue = if (open) 0.dp else (panelWidth - handleWidth),
+        animationSpec = tween(200), label = "deckOffset"
+    )
+    Row(
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .offset { IntOffset(offsetX.roundToPx(), 0) }
+            .height(180.dp)
+    ) {
+        // Pannello
+        Surface(
+            color = Color(0xFF111621),
+            contentColor = Color.White,
+            shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
+            tonalElevation = 8.dp,
+            shadowElevation = 10.dp,
+            modifier = Modifier.width(panelWidth)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Bottone "?"
+                Surface(shape = CircleShape, color = Color(0xFF1B2334)) {
+                    IconButton(onClick = onToggleInfo, modifier = Modifier.size(42.dp)) {
+                        Icon(
+                            imageVector = Icons.Outlined.HelpOutline,
+                            contentDescription = "Modalità info",
+                            tint = if (infoEnabled) WIZ_AZURE else Color.White
+                        )
+                    }
+                }
+                // Bottone ingranaggio (stub)
+                Surface(shape = CircleShape, color = Color(0xFF1B2334)) {
+                    IconButton(onClick = { /* stub impostazioni */ }, modifier = Modifier.size(42.dp)) {
+                        Icon(
+                            imageVector = EditorIcons.Settings, // già usato nella barra
+                            contentDescription = "Impostazioni"
+                        )
+                    }
+                }
+            }
+        }
+        // Maniglia (semplice tap per aprire/chiudere)
+        Box(
+            modifier = Modifier
+                .width(handleWidth)
+                .fillMaxHeight()
+                .background(Color(0x3322304B))
+                .combinedClickable(onClick = onToggleOpen, onLongClick = onToggleOpen)
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.InfoToastCard(
+    visible: Boolean,
+    title: String,
+    body: String,
+    onDismiss: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(150)),
+        exit  = fadeOut(tween(250)),
+        modifier = Modifier.align(Alignment.TopCenter)
+    ) {
+        Surface(
+            color = Color(0xFF0F141E),
+            contentColor = Color.White,
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, WIZ_AZURE),
+            tonalElevation = 8.dp,
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .padding(top = 24.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Column(Modifier.padding(14.dp)) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                Text(body, color = Color(0xFF9BA3AF))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.textButtonColors(contentColor = WIZ_AZURE)
+                    ) { Text("OK") }
+                }
+            }
+        }
+    }
+}
