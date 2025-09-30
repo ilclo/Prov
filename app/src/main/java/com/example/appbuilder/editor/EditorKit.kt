@@ -53,7 +53,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -348,6 +347,7 @@ fun EditorMenusOnly(
         val styleKey = key(listOf(root), "style")
         val defSel = (menuSelections[defaultKey] as? String)?.trim().orEmpty()
         val styleSel = (menuSelections[styleKey] as? String)?.trim().orEmpty()
+
         when {
             styleSel.isNotEmpty() && !styleSel.equals("Nessuno", true) && presetValues[root]?.containsKey(styleSel) == true ->
                 applyPresetByName(root, styleSel)
@@ -439,6 +439,7 @@ fun EditorMenusOnly(
                 )
             )
     ) {
+        var idError by remember { mutableStateOf(false) }
         if (menuPath.isEmpty()) {
             // PRIMA BARRA
             MainBottomBar(
@@ -634,7 +635,7 @@ fun EditorMenusOnly(
                                 value = newPresetName,
                                 onValueChange = { newPresetName = it },
                                 singleLine = true,
-                                label = { Text("Nome stile") }
+                                label = { Text("Nome stile") },
                                 isError = idError,
                                 colors = TextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
@@ -645,7 +646,6 @@ fun EditorMenusOnly(
                                     focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
                                     unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
                                 )
-                                
                             )
                         }
                     },
@@ -2116,7 +2116,7 @@ private fun BoxScope.CreationWizardOverlay(
                                     unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                     focusedLabelColor = WIZ_AZURE,
                                     unfocusedLabelColor = Color(0xFF9BA3AF)
-                                )
+                                ),
                                 isError = idError,
                                 colors = TextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
@@ -2164,9 +2164,9 @@ private fun BoxScope.CreationWizardOverlay(
                                 unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                 focusedLabelColor = WIZ_AZURE,
                                 unfocusedLabelColor = Color(0xFF9BA3AF)
-                            )
-                            isError = idError,
-                            colors = TextFieldDefaults.colors(
+                            ),
+                                isError = idError,
+                                colors = TextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 cursorColor = WIZ_AZURE,
@@ -2195,9 +2195,9 @@ private fun BoxScope.CreationWizardOverlay(
                                 unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                 focusedLabelColor = WIZ_AZURE,
                                 unfocusedLabelColor = Color(0xFF9BA3AF)
-                            )
-                            isError = idError,
-                            colors = TextFieldDefaults.colors(
+                            ),
+                                isError = idError,
+                                colors = TextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 cursorColor = WIZ_AZURE,
@@ -2222,17 +2222,17 @@ private fun BoxScope.CreationWizardOverlay(
                                 unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                 focusedLabelColor = WIZ_AZURE,
                                 unfocusedLabelColor = Color(0xFF9BA3AF)
-                            )
-                            isError = idError,
+                            ),
+                                isError = idError,
                                 colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = WIZ_AZURE,
-                                    focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
-                                    unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
-                                    focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
-                                    unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
-                                )
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
+                                unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
+                                focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
+                                unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
+                            )
 
 
                         )
@@ -2313,7 +2313,6 @@ private fun BoxScope.CreationWizardOverlay(
                             onClick = {
                                 val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
                                 val finalName = if (name.isBlank()) finalId else name
-                                val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
                                 if (existingIds.contains(finalId)) {
                                     idError = true
                                     return@Button   // non creare, bordo rosso già gestito dall’OutlinedTextField
@@ -2350,9 +2349,9 @@ private fun BoxScope.CreationWizardOverlay(
                     text = {
                         Text(
                             "• Se compili l'ID, viene usato quello.\n" +
-                            "• Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
-                            "• Se Nome è corto o vuoto: il sistema completa fino a 5–8 caratteri.\n" +
-                            "• L'ID deve essere univoco."
+                                    "• Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
+                                    "• Se Nome è corto o vuoto: il sistema completa fino a 5–8 caratteri.\n" +
+                                    "• L'ID deve essere univoco."
                         )
                     },
                     confirmButton = {
