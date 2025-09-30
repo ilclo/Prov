@@ -95,8 +95,10 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.compositionLocalOf
 
+
+// Mappa "madre → lista ID figli" visibile alla seconda barra (Deck)
 private val LocalDeckItems =
-    compositionLocalOf<Map<DeckRoot, List<String>>> { emptyMap() }
+    staticCompositionLocalOf<Map<DeckRoot, List<String>>> { emptyMap() }
 
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
@@ -477,7 +479,7 @@ fun EditorMenusOnly(
                         openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
                         openWizard = { root -> wizardTarget = root; wizardVisible = true }
                     ),
-                    // ⬇️ IMPORTANTE: converti esplicitamente a List<String> per evitare inferenze strane
+                    // ⬇️ Rende disponibile la mappa madre→figli come List<String>
                     LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
                 ) {
                     MainMenuBar(
@@ -508,11 +510,8 @@ fun EditorMenusOnly(
                 existingIds = deckItems.values.flatten().toSet(),   // ← tutti gli ID esistenti
                 onDismiss = { wizardVisible = false },
                 onCreate  = { wr ->
-                    // append del nuovo ID nella lista corretta
                     deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
                     wizardVisible = false
-
-                    // faccio vedere subito il cluster della madre corrispondente
                     deckOpen = when (wr.root) {
                         DeckRoot.PAGINA        -> "pagina"
                         DeckRoot.MENU_LATERALE -> "menuL"
@@ -1157,14 +1156,14 @@ private fun BoxScope.MainMenuBar(
                             if (deck.openKey == m.key) {
                                 CPlusIcon(onClick = { controller.openWizard(m.root) })
 
-                                // Prima prendi i figli come LISTA
+                                // 1) Preleva i figli in modo esplicito come List<String>
                                 val children: List<String> = LocalDeckItems.current[m.root].orEmpty()
 
-                                // Poi itera come String (non Char)
+                                // 2) Itera tipizzando childId come String → evita l'inferenza Char
                                 children.forEach { childId: String ->
                                     ChildIconWithBadge(
                                         icon = ImageVector.vectorResource(id = m.iconRes),
-                                        id = childId,                 // ← ora è String, niente più errore
+                                        id = childId,                        // <- String, non Char
                                         onClick = { controller.openChild(m.root) },
                                         badgeBg = DECK_BADGE_BG,
                                         badgeTxt = DECK_BADGE_TXT
