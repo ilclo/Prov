@@ -636,15 +636,14 @@ fun EditorMenusOnly(
                                 onValueChange = { newPresetName = it },
                                 singleLine = true,
                                 label = { Text("Nome stile") },
-                                isError = idError,
                                 colors = TextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
                                     unfocusedTextColor = Color.White,
                                     cursorColor = WIZ_AZURE,
-                                    focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
-                                    unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
-                                    focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
-                                    unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
+                                    focusedIndicatorColor = WIZ_AZURE,
+                                    unfocusedIndicatorColor = Color(0xFF2A3B5B),
+                                    focusedLabelColor = WIZ_AZURE,
+                                    unfocusedLabelColor = Color(0xFF9BA3AF)
                                 )
                             )
                         }
@@ -2116,16 +2115,6 @@ private fun BoxScope.CreationWizardOverlay(
                                     unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                     focusedLabelColor = WIZ_AZURE,
                                     unfocusedLabelColor = Color(0xFF9BA3AF)
-                                ),
-                                isError = idError,
-                                colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = WIZ_AZURE,
-                                    focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
-                                    unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
-                                    focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
-                                    unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
                                 )
                             )
                         } else {
@@ -2164,20 +2153,9 @@ private fun BoxScope.CreationWizardOverlay(
                                 unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                 focusedLabelColor = WIZ_AZURE,
                                 unfocusedLabelColor = Color(0xFF9BA3AF)
-                            ),
-                                isError = idError,
-                                colors = TextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                cursorColor = WIZ_AZURE,
-                                focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
-                                unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
-                                focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
-                                unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
                             )
-
-
                         )
+
                         OutlinedTextField(
                             value = id,
                             onValueChange = {
@@ -2187,17 +2165,8 @@ private fun BoxScope.CreationWizardOverlay(
                             label = { Text("ID (5–8 caratteri, auto se vuoto o troppo corto)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
+                            isError = idError,
                             colors = TextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                cursorColor = WIZ_AZURE,
-                                focusedIndicatorColor = WIZ_AZURE,
-                                unfocusedIndicatorColor = Color(0xFF2A3B5B),
-                                focusedLabelColor = WIZ_AZURE,
-                                unfocusedLabelColor = Color(0xFF9BA3AF)
-                            ),
-                                isError = idError,
-                                colors = TextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 cursorColor = WIZ_AZURE,
@@ -2206,9 +2175,8 @@ private fun BoxScope.CreationWizardOverlay(
                                 focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
                                 unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
                             )
-
-
                         )
+
                         OutlinedTextField(
                             value = description,
                             onValueChange = { description = it },
@@ -2222,19 +2190,7 @@ private fun BoxScope.CreationWizardOverlay(
                                 unfocusedIndicatorColor = Color(0xFF2A3B5B),
                                 focusedLabelColor = WIZ_AZURE,
                                 unfocusedLabelColor = Color(0xFF9BA3AF)
-                            ),
-                                isError = idError,
-                                colors = TextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                cursorColor = WIZ_AZURE,
-                                focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
-                                unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
-                                focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
-                                unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
                             )
-
-
                         )
 
                         // Campi specifici per tipo
@@ -2313,11 +2269,11 @@ private fun BoxScope.CreationWizardOverlay(
                             onClick = {
                                 val finalId = (if (id.isNotBlank()) sanitize(id) else autoIdFrom(name, target)).take(8)
                                 val finalName = if (name.isBlank()) finalId else name
+
                                 if (existingIds.contains(finalId)) {
                                     idError = true
-                                    return@Button   // non creare, bordo rosso già gestito dall’OutlinedTextField
+                                    return@Button   // non creare: bordo rosso già gestito dal TextField “ID”
                                 }
-
 
                                 onCreate(
                                     WizardResult(
@@ -2337,6 +2293,7 @@ private fun BoxScope.CreationWizardOverlay(
                         ) {
                             Text("Crea")
                         }
+
                     }
                 }
             }
