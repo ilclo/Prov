@@ -866,7 +866,7 @@ private fun BoxScope.MainBottomBar(
                         }
                     ) { dividerDot() }
 
-                    // BLOCCO INTERMEDIO (PAGINE E MENÃ™)
+                    // BLOCCO INTERMEDIO (PAGINE E MENU'™)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
