@@ -104,7 +104,11 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.ExperimentalFoundationApi
-
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 
 // Mappa "madre → lista ID figli" visibile alla seconda barra (Deck)
 private val LocalDeckItems =
@@ -2596,73 +2600,159 @@ private fun BoxScope.InfoEdgeDeck(
     onToggleOpen: () -> Unit,
     infoEnabled: Boolean,
     onToggleInfo: () -> Unit,
-    enabled: Boolean = true       // ← NEW: default per retro-compatibilità
+    enabled: Boolean = true
 ) {
-    val panelWidth = 64.dp
-    val handleWidth = 14.dp
-    val offsetX by animateDpAsState(
-        targetValue = if (open) 0.dp else (panelWidth - handleWidth),
-        animationSpec = tween(200), label = "deckOffset"
+    // --- parametri estetici (puoi regolarli a piacere) ---
+    val tileSize   = 56.dp           // quadrato icona
+    val spacing    = 10.dp           // spazio tra tile
+    val corner     = 12.dp           // arrotondamento tile (quadrato "morbido")
+    val peekWidth  = 12.dp           // “pochi mm” sempre visibili sul lato destro
+
+    // Larghezza animata del contenitore (solo a destra)
+    val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
+    val width by animateDpAsState(
+        targetValue = targetWidth,
+        animationSpec = tween(220),
+        label = "sideWidth"
     )
-    Row(
+
+    // Visibilità a cascata (dall’alto verso il basso)
+    var showHelp by remember(open) { mutableStateOf(false) }
+    var showGear by remember(open) { mutableStateOf(false) }
+    LaunchedEffect(open) {
+        if (open) {
+            showHelp = true; delay(60)
+            showGear = true
+        } else {
+            showGear = false; delay(40)
+            showHelp = false
+        }
+    }
+
+    Box(
         modifier = Modifier
             .align(Alignment.CenterEnd)
-            .offset { IntOffset(offsetX.roundToPx(), 0) }
-            .height(180.dp)
+            .width(width)
+            .fillMaxHeight()
     ) {
-        // Pannello
-        Surface(
-            color = Color(0xFF111621),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
-            tonalElevation = 8.dp,
-            shadowElevation = 10.dp,
-            modifier = Modifier.width(panelWidth)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Surface(shape = CircleShape, color = Color(0xFF1B2334)) {
-                    IconButton(
-                        onClick = onToggleInfo,
-                        enabled = enabled,                          // ← disabilita click se false
-                        modifier = Modifier.size(42.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.HelpOutline,
-                            contentDescription = "Modalità info",
-                            tint = when {
-                                !enabled     -> Color(0xFF6B7280)   // grigio disattivo
-                                infoEnabled  -> WIZ_AZURE
-                                else         -> Color.White
-                            }
+        // --- Peek: sottile fascia verticale con ombra/gradiente sempre visibile ---
+        val shadeAlpha = if (open) 0.08f else 0.25f
+        Box(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .width(peekWidth)
+                .fillMaxHeight()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0x66000000).copy(alpha = shadeAlpha),
+                            Color(0x00000000),
+                            Color(0x66000000).copy(alpha = shadeAlpha)
                         )
+                    )
+                )
+                // Swipe dalla destra verso sinistra per aprire/chiudere
+                .pointerInput(open) {
+                    detectHorizontalDragGestures { _, dx ->
+                        // dx < 0 = trascina verso sinistra
+                        if (!open && dx < -18f) onToggleOpen()
+                        // dx > 0 = trascina verso destra
+                        if ( open && dx >  18f) onToggleOpen()
                     }
                 }
+                // Tap vicino al bordo per aprire/chiudere
+                .combinedClickable(
+                    onClick = onToggleOpen,
+                    onLongClick = onToggleOpen
+                )
+        )
 
-                // Bottone ingranaggio (stub)
-                Surface(shape = CircleShape, color = Color(0xFF1B2334)) {
-                    IconButton(onClick = { /* stub impostazioni */ }, modifier = Modifier.size(42.dp)) {
-                        Icon(
-                            imageVector = EditorIcons.Settings, // già usato nella barra
-                            contentDescription = "Impostazioni"
-                        )
-                    }
+        // --- Colonna dei tile quadrati (icona “?” + ingranaggio) ---
+        if (open) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // “?” — colore/abilitazione invariati (rispetta infoEnabled & enabled)
+                AnimatedVisibility(
+                    visible = showHelp,
+                    enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
+                    exit  = fadeOut(tween(120)) + scaleOut(tween(120))
+                ) {
+                    SquareTile(
+                        size = tileSize,
+                        corner = corner,
+                        icon = Icons.Outlined.HelpOutline,
+                        tint = when {
+                            !enabled     -> Color(0xFF6B7280) // grigio disattivo nei sottomenu
+                            infoEnabled  -> WIZ_AZURE        // azzurro quando attiva la info-mode
+                            else         -> Color.White
+                        },
+                        enabled = enabled,
+                        onClick = {
+                            if (enabled) {
+                                onToggleInfo()
+                                onToggleOpen() // chiudi dopo il tap
+                            }
+                        }
+                    )
+                }
+
+                // Ingranaggio — stub (chiude il menù dopo il tap)
+                AnimatedVisibility(
+                    visible = showGear,
+                    enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.85f),
+                    exit  = fadeOut(tween(120)) + scaleOut(tween(120))
+                ) {
+                    SquareTile(
+                        size = tileSize,
+                        corner = corner,
+                        icon = EditorIcons.Settings,
+                        tint = Color.White,
+                        enabled = true,
+                        onClick = {
+                            // TODO: apri impostazioni (stub)
+                            onToggleOpen()
+                        }
+                    )
                 }
             }
         }
-        // Maniglia (semplice tap per aprire/chiudere)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SquareTile(
+    size: Dp,
+    corner: Dp,
+    icon: ImageVector,
+    tint: Color,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        color = Color(0xFF111621),
+        contentColor = tint,
+        shape = RoundedCornerShape(corner),
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp
+    ) {
         Box(
             modifier = Modifier
-                .width(handleWidth)
-                .fillMaxHeight()
-                .background(Color(0x3322304B))
-                .combinedClickable(onClick = onToggleOpen, onLongClick = onToggleOpen)
-        )
+                .size(size)
+                .combinedClickable(
+                    enabled = enabled,
+                    onClick = onClick,
+                    onLongClick = onClick // stessa gesture per immediatezza
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+        }
     }
 }
 
