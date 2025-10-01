@@ -707,22 +707,26 @@ fun EditorMenusOnly(
                         }
                     )
                 }
-                // 1) Deck laterale destro (apertura a scorrimento/tap)
-                InfoEdgeDeck(
-                    open = infoDeckOpen,
-                    onToggleOpen = { infoDeckOpen = !infoDeckOpen },
-                    infoEnabled = infoMode,
-                    onToggleInfo = { infoMode = !infoMode }
-                )
 
-// 2) Toast informativo (in alto, scompare con fade)
-                InfoToastCard(
-                    visible = infoCardVisible && infoCard != null,
-                    title = infoCard?.first ?: "",
-                    body = infoCard?.second ?: "",
-                    onDismiss = { infoCardVisible = false; infoCard = null }
-                )
             }
+
+            // 1) Deck laterale destro (apertura a scorrimento/tap)
+            InfoEdgeDeck(
+                open = infoDeckOpen,
+                onToggleOpen = { infoDeckOpen = !infoDeckOpen },
+                infoEnabled = infoMode,
+                onToggleInfo = { infoMode = !infoMode },
+                enabled = menuPath.isEmpty()
+            )
+
+            // 2) Toast informativo (in alto, scompare con fade)
+            InfoToastCard(
+                visible = infoCardVisible && infoCard != null,
+                title = infoCard?.first ?: "",
+                body = infoCard?.second ?: "",
+                onDismiss = { infoCardVisible = false; infoCard = null }
+            )
+
         }
     }
 }
@@ -840,13 +844,13 @@ private fun BoxScope.MainBottomBar(
                     ) {
                         // BLOCCO 1
                         ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo,
-                            infoTitle = "Annulla", infoBody = "Annulla l’ultima modifica")
+                            infoTitle = "Annulla", infoBody = "Annulla l’ultima modifica", allowLongPressInInfo = false )
                         ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo,
-                            infoTitle = "Ripeti", infoBody = "Ripristina l’ultima azione annullata")
+                            infoTitle = "Ripeti", infoBody = "Ripristina l’ultima azione annullata", allowLongPressInInfo = false )
                         ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete,
-                            infoTitle = "Cestino", infoBody = "Elimina l’elemento corrente")
+                            infoTitle = "Cestino", infoBody = "Elimina l’elemento corrente", allowLongPressInInfo = false )
                         ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate,
-                            infoTitle = "Duplica", infoBody = "Crea una copia dell’elemento corrente")
+                            infoTitle = "Duplica", infoBody = "Crea una copia dell’elemento corrente", allowLongPressInInfo = false )
                     }
 
                     // PUNTINO 1
@@ -1310,24 +1314,19 @@ private fun CPlusIcon(
                 .combinedClickable(
                     onClick = {
                         if (info.enabled) {
-                            info.show(infoTitle, infoBody)   // in info mode non apre wizard
+                            info.show(infoTitle, infoBody)  // in info mode: SOLO descrizione
                         } else {
                             onClick()
                         }
                     },
-                    onLongClick = {
-                        if (info.enabled) {
-                            info.show(infoTitle, infoBody)   // nessuna azione anche su long
-                        } else {
-                            onClick()
-                        }
-                    }
+                    onLongClick = { /* nessuna azione */ } // ← disabilitato
                 )
         ) {
             Icon(icon, contentDescription = "Nuovo", modifier = Modifier.align(Alignment.Center))
         }
     }
 }
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1406,23 +1405,27 @@ private fun BoxScope.SubMenuBar(
             .height(TOP_BAR_HEIGHT)
     ) {
         val scroll = rememberScrollState()
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .horizontalScroll(scroll)
-                .padding(horizontal = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+        CompositionLocalProvider(
+            LocalInfoMode provides InfoModeEnv(enabled = false) { _, _ -> }
         ) {
-            // back icon
-            ToolbarIconButton(Icons.Outlined.ArrowBack, "Indietro", onClick = onBack)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .horizontalScroll(scroll)
+                    .padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // back icon
+                ToolbarIconButton(Icons.Outlined.ArrowBack, "Indietro", onClick = onBack)
 
-            when (path.firstOrNull()) {
-                "Layout" -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
-                "Contenitore" -> ContainerLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
-                "Testo" -> TextLevel(path, selections, onToggle, onPick, savedPresets)
-                "Aggiungi" -> AddLevel(path, selections, onEnter)
+                when (path.firstOrNull()) {
+                    "Layout" -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
+                    "Contenitore" -> ContainerLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
+                    "Testo" -> TextLevel(path, selections, onToggle, onPick, savedPresets)
+                    "Aggiungi" -> AddLevel(path, selections, onEnter)
+                }
             }
         }
     }
@@ -2592,7 +2595,8 @@ private fun BoxScope.InfoEdgeDeck(
     open: Boolean,
     onToggleOpen: () -> Unit,
     infoEnabled: Boolean,
-    onToggleInfo: () -> Unit
+    onToggleInfo: () -> Unit,
+    enabled: Boolean = true       // ← NEW: default per retro-compatibilità
 ) {
     val panelWidth = 64.dp
     val handleWidth = 14.dp
@@ -2622,16 +2626,24 @@ private fun BoxScope.InfoEdgeDeck(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Bottone "?"
                 Surface(shape = CircleShape, color = Color(0xFF1B2334)) {
-                    IconButton(onClick = onToggleInfo, modifier = Modifier.size(42.dp)) {
+                    IconButton(
+                        onClick = onToggleInfo,
+                        enabled = enabled,                          // ← disabilita click se false
+                        modifier = Modifier.size(42.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.HelpOutline,
                             contentDescription = "Modalità info",
-                            tint = if (infoEnabled) WIZ_AZURE else Color.White
+                            tint = when {
+                                !enabled     -> Color(0xFF6B7280)   // grigio disattivo
+                                infoEnabled  -> WIZ_AZURE
+                                else         -> Color.White
+                            }
                         )
                     }
                 }
+
                 // Bottone ingranaggio (stub)
                 Surface(shape = CircleShape, color = Color(0xFF1B2334)) {
                     IconButton(onClick = { /* stub impostazioni */ }, modifier = Modifier.size(42.dp)) {
