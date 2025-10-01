@@ -123,7 +123,7 @@ private val LocalDeckItems =
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
 private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (stessa in Home e Submenu)
 private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / submenu)
-private val BARS_GAP = 14.dp                 // distacco tra le due barre (+2dp di "ariaâ€)
+private val BARS_GAP = 14.dp                 
 private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto al bordo schermo
 private val LocalExitClassic = staticCompositionLocalOf<() -> Unit> { {} }
 // Accento per i wizard "Crea ..."
@@ -235,12 +235,12 @@ private fun BoxScope.ProUpsellSheet(onClose: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Starter", fontWeight = FontWeight.SemiBold)
                     Text("• Tutto ciò che serve\n• Supporto base\n", color = Color(0xFF9BA3AF))
-                    Text("€ X/mese", fontWeight = FontWeight.Medium)
+                    Text("E' X/mese", fontWeight = FontWeight.Medium)
                 }
                 Column(Modifier.weight(1f)) {
                     Text("Pro", fontWeight = FontWeight.SemiBold)
                     Text("• Tutto di Starter\n• Funzioni extra (stub)\n", color = Color(0xFF9BA3AF))
-                    Text("€ Y/mese", fontWeight = FontWeight.Medium)
+                    Text("E' Y/mese", fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -252,7 +252,7 @@ private enum class DeckRoot { PAGINA, MENU_LATERALE, MENU_CENTRALE, AVVISO }
 private enum class SecondBarMode { Deck, Classic }
 
 private data class DeckState(val openKey: String?, val toggle: (String) -> Unit)
-// â†‘ Aggiungiamo la possibilità  di aprire il wizard direttamente dalla CPlus
+
 private data class DeckController(
     val openChild: (DeckRoot) -> Unit,
     val openWizard: (DeckRoot) -> Unit
@@ -261,7 +261,7 @@ private data class DeckController(
 // Locals per pilotare MainMenuBar senza cambiare la sua firma
 private val LocalSecondBarMode = compositionLocalOf { SecondBarMode.Deck }
 private val LocalDeckState = compositionLocalOf { DeckState(null) { _ -> } }
-// â†‘ ora espone anche openWizard
+
 private val LocalDeckController = compositionLocalOf {
     DeckController(openChild = { _ -> }, openWizard = { _ -> })
 }
@@ -304,7 +304,7 @@ fun EditorMenusOnly(
     var infoCard by remember { mutableStateOf<Pair<String, String>?>(null) } // (titolo, testo)
     var infoCardVisible by remember { mutableStateOf(false) }
 
-// Autoâ€‘hide del pannello descrittivo (5s)
+// Auto-hide del pannello descrittivo (5s)
     LaunchedEffect(infoCard) {
         if (infoCard != null) {
             infoCardVisible = true
@@ -314,7 +314,7 @@ fun EditorMenusOnly(
         }
     }
 
-// Mostra il "benvenutoâ€ alla modalità  info quando si attiva
+// Mostra il "benvenuto" alla modalità  info quando si attiva
     LaunchedEffect(infoMode) {
         if (infoMode) {
             infoCard = "Modalità  info" to
@@ -339,7 +339,7 @@ fun EditorMenusOnly(
         wizardVisible = false
     }
 
-// Back: se il wizard à¨ aperto, il tasto indietro chiude il wizard (non l'app)
+// Back: se il wizard è aperto, il tasto indietro chiude il wizard (non l'app)
     BackHandler(enabled = wizardVisible) { wizardVisible = false }
     val savedPresets = remember {
         mutableStateMapOf(
@@ -467,7 +467,7 @@ fun EditorMenusOnly(
         }
     }
 
-// Seeding di alcuni preset iniziali (cosà¬ "Default/Titolo/..." agiscono subito)
+// Seeding di alcuni preset iniziali (cosà "Default/Titolo/..." agiscono subito)
     LaunchedEffect(Unit) {
         fun ensure(root: String, name: String, values: Map<String, Any?>) {
             val store = presetValues.getOrPut(root) { mutableMapOf() }
@@ -566,10 +566,10 @@ fun EditorMenusOnly(
                     onProperties = { /* ... */ },
                     onLayout = { menuPath = listOf("Layout") },
                     onCreate = { /* se vuoi tenerlo per retrocompatibilità  */ },
-                    onCreatePage = { openWizardFor(DeckRoot.PAGINA) },          // â† NEW
-                    onCreateAlert = { openWizardFor(DeckRoot.AVVISO) },         // â† NEW
-                    onCreateMenuLaterale = { openWizardFor(DeckRoot.MENU_LATERALE) }, // â† NEW
-                    onCreateMenuCentrale = { openWizardFor(DeckRoot.MENU_CENTRALE) }, // â† NEW
+                    onCreatePage = { openWizardFor(DeckRoot.PAGINA) },          // • NEW
+                    onCreateAlert = { openWizardFor(DeckRoot.AVVISO) },         // • NEW
+                    onCreateMenuLaterale = { openWizardFor(DeckRoot.MENU_LATERALE) }, // • NEW
+                    onCreateMenuCentrale = { openWizardFor(DeckRoot.MENU_CENTRALE) }, // • NEW
                     onOpenList = { /* ... */ },
                     onSaveProject = { /* ... */ },
                     onOpenProject = { /* ... */ },
@@ -592,7 +592,7 @@ fun EditorMenusOnly(
                             openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
                             openWizard = { root -> wizardTarget = root; wizardVisible = true }
                         ),
-// â¬‡ï¸ Rende disponibile la mappa madre→figli come List<String>
+
                         LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
                     ) {
                         MainMenuBar(
@@ -620,7 +620,7 @@ fun EditorMenusOnly(
                 CreationWizardOverlay(
                     visible = wizardVisible,
                     target  = wizardTarget,
-                    existingIds = deckItems.values.flatten().toSet(),   // â† tutti gli ID esistenti
+                    existingIds = deckItems.values.flatten().toSet(),   // • tutti gli ID esistenti
                     onDismiss = { wizardVisible = false },
                     onCreate  = { wr ->
                         deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
@@ -636,8 +636,8 @@ fun EditorMenusOnly(
                 )
             }
             else {
-// IN SOTTOMENU: seconda barra = SubMenuBar; sotto c'à¨ sempre il Breadcrumb.
-// Imposta il "contesto paginaâ€ per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
+// IN SOTTOMENU: seconda barra = SubMenuBar; sotto c'è sempre il Breadcrumb.
+// Imposta il "contesto pagina" per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
                 val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
                 CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
                     SubMenuBar(
@@ -651,7 +651,7 @@ fun EditorMenusOnly(
                             }
                         },
                         onEnter = { label ->
-// evita accumulo "foglie sorelleâ€ (Aggiungi foto/album/video)
+// evita accumulo "foglie sorelle" (Aggiungi foto/album/video)
                             val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
                             menuPath = when {
                                 menuPath.lastOrNull() == label -> menuPath
@@ -702,7 +702,7 @@ fun EditorMenusOnly(
                                     }
                                 }
                                 else -> {
-// modifica puntuale → stile attivo passa a "Nessunoâ€
+// modifica puntuale → stile attivo passa a "Nessuno"
                                     val styleKey = key(listOf(root), "style")
                                     val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
                                     if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
@@ -739,7 +739,7 @@ fun EditorMenusOnly(
                     )
                 }
 
-// Dialog "Salva come stileâ€
+// Dialog "Salva come stile"
                 if (showSaveDialog) {
                     AlertDialog(
                         onDismissRequest = { showSaveDialog = false },
@@ -1057,7 +1057,7 @@ private fun BoxScope.MainBottomBar(
                     strokeWidth = stroke,
                     cap = androidx.compose.ui.graphics.StrokeCap.Butt
                 )
-// arco top-left (180Â° → 270Â°)
+
                 drawArc(
                     color = lineAccent,
                     startAngle = 180f,
@@ -1067,7 +1067,7 @@ private fun BoxScope.MainBottomBar(
                     size = androidx.compose.ui.geometry.Size(2 * corner - stroke, 2 * corner - stroke),
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
                 )
-// arco top-right (270Â° → 360Â°)
+
                 drawArc(
                     color = lineAccent,
                     startAngle = 270f,
@@ -1346,7 +1346,7 @@ private fun MotherIcon(
     icon: ImageVector,
     contentDescription: String,
     selected: Boolean,
-    onClick: () -> Unit,                 // azione "apri/chiudi clusterâ€
+    onClick: () -> Unit,                 // azione "apri/chiudi cluster"
     infoTitle: String? = null,
     infoBody: String? = null
 ) {
@@ -1371,7 +1371,7 @@ private fun MotherIcon(
                             onClick()
                         }
                     },
-// IN INFO MODE: il cluster si apre solo con longâ€‘press
+// IN INFO MODE: il cluster si apre solo con long-press
                     onLongClick = { onClick() }
                 )
         ) {
@@ -1401,7 +1401,7 @@ private fun CPlusIcon(
                             onClick()
                         }
                     },
-                    onLongClick = { /* nessuna azione */ } // â† disabilitato
+                    onLongClick = { /* nessuna azione */ } // • disabilitato
                 )
         ) {
             Icon(icon, contentDescription = "Nuovo", modifier = Modifier.align(Alignment.Center))
@@ -1434,7 +1434,7 @@ private fun ChildIconWithBadge(
                                 onClick()
                             }
                         },
-                        onLongClick = { onClick() }    // longâ€‘press = apri editor classico
+                        onLongClick = { onClick() }    // long-press = apri editor classico
                     )
             ) {
                 Icon(icon, contentDescription = shown, modifier = Modifier.align(Alignment.Center))
@@ -1458,7 +1458,7 @@ private fun ChildIconWithBadge(
 }
 
 /* =========================================================================================
-*  SUBMENU — barra icone livello corrente (menù "ad alberoâ€)
+*  SUBMENU — barra icone livello corrente (menù "ad albero")
 *  SOLO UI: nessuna modifica applicata al documento.
 * ========================================================================================= */
 
@@ -1538,7 +1538,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
-            lastChanged?.let { append("   â€•   "); append(it) } // â† mostra sempre scelte utente
+            lastChanged?.let { append("   •   "); append(it) } 
         }
         Row(
             Modifier
@@ -1722,7 +1722,7 @@ private fun LayoutLevel(
             }
         }
 
-// ----- Layout "pianoâ€ (già  esistente) -----
+// ----- Layout "piano" (già  esistente) -----
         "Colore" -> {
             val isFree = LocalIsFree.current
 
@@ -2256,7 +2256,7 @@ private data class CreationResult(
 private fun BoxScope.CreationWizardOverlay(
     visible: Boolean,
     target: DeckRoot?,
-    existingIds: Set<String>,      // â† NEW
+    existingIds: Set<String>,      // • NEW
     onDismiss: () -> Unit,
     onCreate: (WizardResult) -> Unit
 ) {
@@ -2628,10 +2628,10 @@ private fun BoxScope.CreationWizardOverlay(
                     title = { Text("Regole per l'ID") },
                     text = {
                         Text(
-                            "â€• Se compili l'ID, viene usato quello.\n" +
-                                    "â€• Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
-                                    "â€• Se Nome à¨ corto o vuoto: il sistema completa fino a 5-8 caratteri.\n" +
-                                    "â€• L'ID deve essere univoco."
+                            "• Se compili l'ID, viene usato quello.\n" +
+                                    "• Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
+                                    "• Se Nome è corto o vuoto: il sistema completa fino a 5-8 caratteri.\n" +
+                                    "• L'ID deve essere univoco."
                         )
                     },
                     confirmButton = {
@@ -2676,7 +2676,7 @@ private data class WizardResult(
 )
 
 
-// Piccolo dropdown "scuroâ€ in linea con lo stile
+// Piccolo dropdown "scuro" in linea con lo stile
 @Composable
 private fun DropdownSmall(
     current: String,
@@ -2726,7 +2726,7 @@ private fun BoxScope.InfoEdgeDeck(
     val tileSize   = 56.dp           // quadrato icona
     val spacing    = 10.dp           // spazio tra tile
     val corner     = 12.dp           // arrotondamento tile (quadrato "morbido")
-    val peekWidth  = 12.dp           // "pochi mmâ€ sempre visibili sul lato destro
+    val peekWidth  = 12.dp           // "pochi mm" sempre visibili sul lato destro
 
 // Larghezza animata del contenitore (solo a destra)
     val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
@@ -2787,7 +2787,7 @@ private fun BoxScope.InfoEdgeDeck(
                 )
         )
 
-// --- Colonna dei tile quadrati (icona "?â€ + ingranaggio) ---
+// --- Colonna dei tile quadrati (icona "?" + ingranaggio) ---
         if (open) {
             Column(
                 modifier = Modifier
@@ -2796,7 +2796,7 @@ private fun BoxScope.InfoEdgeDeck(
                 verticalArrangement = Arrangement.spacedBy(spacing),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-// "?â€ — colore/abilitazione invariati (rispetta infoEnabled & enabled)
+// "?" — colore/abilitazione invariati (rispetta infoEnabled & enabled)
                 AnimatedVisibility(
                     visible = showHelp,
                     enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
