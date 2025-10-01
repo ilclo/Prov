@@ -123,15 +123,15 @@ private val LocalDeckItems =
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
 private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (stessa in Home e Submenu)
 private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / submenu)
-private val BARS_GAP = 14.dp                 // distacco tra le due barre (+2dp di â€œariaâ€)
-private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore piÃ¹ alta rispetto al bordo schermo
+private val BARS_GAP = 14.dp                 // distacco tra le due barre (+2dp di "ariaâ€)
+private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto al bordo schermo
 private val LocalExitClassic = staticCompositionLocalOf<() -> Unit> { {} }
-// Accento per i wizard "Crea â€¦"
+// Accento per i wizard "Crea ..."
 private val WIZ_AZURE = Color(0xFF58A6FF)   // azzurro (come DECK_HIGHLIGHT)
 private data class InfoModeEnv(val enabled: Boolean, val show: (String, String) -> Unit)
 private val LocalInfoMode = staticCompositionLocalOf { InfoModeEnv(false) { _, _ -> } }
 /* =========================================================================================
-*  MODELLO MINIMO DI STATO (solo per navigazione menÃ¹)
+*  MODELLO MINIMO DI STATO (solo per navigazione menù)
 * ========================================================================================= */
 
 data class EditorShellState(
@@ -139,7 +139,7 @@ data class EditorShellState(
 )
 
 /* =========================================================================================
-*  ENTRY â€” schermata demo (sfondo neutro + menÃ¹)
+*  ENTRY — schermata demo (sfondo neutro + menù)
 * ========================================================================================= */
 
 @Composable
@@ -149,7 +149,7 @@ fun EditorDemoScreen() {
 }
 
 /* =========================================================================================
-*  ROOT â€” solo menÃ¹ (nessuna azione applicata)
+*  ROOT — solo menù (nessuna azione applicata)
 * ========================================================================================= */
 
 /* ---------- AGGIUNGI ---------- */
@@ -252,7 +252,7 @@ private enum class DeckRoot { PAGINA, MENU_LATERALE, MENU_CENTRALE, AVVISO }
 private enum class SecondBarMode { Deck, Classic }
 
 private data class DeckState(val openKey: String?, val toggle: (String) -> Unit)
-// â†‘ Aggiungiamo la possibilitÃ  di aprire il wizard direttamente dalla CPlus
+// â†‘ Aggiungiamo la possibilità  di aprire il wizard direttamente dalla CPlus
 private data class DeckController(
     val openChild: (DeckRoot) -> Unit,
     val openWizard: (DeckRoot) -> Unit
@@ -280,7 +280,7 @@ fun EditorMenusOnly(
 ) {
     var deckOpen by remember { mutableStateOf<String?>(null) }        // "pagina"|"menuL"|"menuC"|"avviso"|null
     var editingClass by remember { mutableStateOf<DeckRoot?>(null) }   // classe della figlia aperta (per flag Layout)
-// Path del menÃ¹ (es. ["Contenitore", "Bordi", "Spessore"])
+// Path del menù (es. ["Contenitore", "Bordi", "Spessore"])
     var menuPath by remember { mutableStateOf<List<String>>(emptyList()) }
 // Selezioni effimere dei dropdown/toggle (key = pathTestuale)
     val menuSelections = remember { mutableStateMapOf<String, Any?>() }
@@ -288,7 +288,7 @@ fun EditorMenusOnly(
     var dirty by remember { mutableStateOf(false) }
 // Ultima opzione interessata (per mostrare info extra nel path)
     var lastChanged by remember { mutableStateOf<String?>(null) }
-// Conferma allâ€™uscita dai sottomenu verso la home
+// Conferma all'uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
     var classicEditing by remember { mutableStateOf(false) } // false = Deck, true = Classic (vecchia root)
 // MODE della seconda barra: "deck" (icone madre + cluster) oppure "classic" (vecchia root)
@@ -298,9 +298,9 @@ fun EditorMenusOnly(
     var wizardKind by remember { mutableStateOf<DeckRoot?>(null) }
     var homePageId by remember { mutableStateOf<String?>(null) }
     var wizardTarget  by remember { mutableStateOf<DeckRoot?>(null) }
-// ---- Stato per modalitÃ  info + pannelli descrittivi ----
+// ---- Stato per modalità  info + pannelli descrittivi ----
     var infoDeckOpen by remember { mutableStateOf(false) }      // deck laterale destro aperto/chiuso
-    var infoMode by remember { mutableStateOf(false) }          // flag modalitÃ  info
+    var infoMode by remember { mutableStateOf(false) }          // flag modalità  info
     var infoCard by remember { mutableStateOf<Pair<String, String>?>(null) } // (titolo, testo)
     var infoCardVisible by remember { mutableStateOf(false) }
 
@@ -314,11 +314,11 @@ fun EditorMenusOnly(
         }
     }
 
-// Mostra il â€œbenvenutoâ€ alla modalitÃ  info quando si attiva
+// Mostra il "benvenutoâ€ alla modalità  info quando si attiva
     LaunchedEffect(infoMode) {
         if (infoMode) {
-            infoCard = "ModalitÃ  info" to
-                    "Tocca unâ€™icona per una descrizione. Tieni premuto per entrare dove consentito. " +
+            infoCard = "Modalità  info" to
+                    "Tocca un'icona per una descrizione. Tieni premuto per entrare dove consentito. " +
                     "Per uscire, riapri il deck a destra e tocca di nuovo '?'."
         }
     }
@@ -339,7 +339,7 @@ fun EditorMenusOnly(
         wizardVisible = false
     }
 
-// Back: se il wizard Ã¨ aperto, il tasto indietro chiude il wizard (non l'app)
+// Back: se il wizard à¨ aperto, il tasto indietro chiude il wizard (non l'app)
     BackHandler(enabled = wizardVisible) { wizardVisible = false }
     val savedPresets = remember {
         mutableStateMapOf(
@@ -370,7 +370,7 @@ fun EditorMenusOnly(
         when {
             classicEditing -> classicEditing = false   // esci dalla Classic: torni alle icone madre
             deckOpen != null -> deckOpen = null        // chiudi il cluster aperto
-            else -> Unit                                // ignora: evita che lâ€™Activity si chiuda
+            else -> Unit                                // ignora: evita che l'Activity si chiuda
         }
     }
 
@@ -467,7 +467,7 @@ fun EditorMenusOnly(
         }
     }
 
-// Seeding di alcuni preset iniziali (cosÃ¬ "Default/Titolo/..." agiscono subito)
+// Seeding di alcuni preset iniziali (cosà¬ "Default/Titolo/..." agiscono subito)
     LaunchedEffect(Unit) {
         fun ensure(root: String, name: String, values: Map<String, Any?>) {
             val store = presetValues.getOrPut(root) { mutableMapOf() }
@@ -531,7 +531,7 @@ fun EditorMenusOnly(
     }
 
 
-// Misuro lâ€™altezza della barra azioni per distanziare la barra categorie
+// Misuro l'altezza della barra azioni per distanziare la barra categorie
     var actionsBarHeightPx by remember { mutableStateOf(0) }
 // Dialog salvataggio stile
     var showSaveDialog by remember { mutableStateOf(false) }
@@ -565,7 +565,7 @@ fun EditorMenusOnly(
                     onDuplicate = { /* ... */ },
                     onProperties = { /* ... */ },
                     onLayout = { menuPath = listOf("Layout") },
-                    onCreate = { /* se vuoi tenerlo per retrocompatibilitÃ  */ },
+                    onCreate = { /* se vuoi tenerlo per retrocompatibilità  */ },
                     onCreatePage = { openWizardFor(DeckRoot.PAGINA) },          // â† NEW
                     onCreateAlert = { openWizardFor(DeckRoot.AVVISO) },         // â† NEW
                     onCreateMenuLaterale = { openWizardFor(DeckRoot.MENU_LATERALE) }, // â† NEW
@@ -592,7 +592,7 @@ fun EditorMenusOnly(
                             openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
                             openWizard = { root -> wizardTarget = root; wizardVisible = true }
                         ),
-// â¬‡ï¸ Rende disponibile la mappa madreâ†’figli come List<String>
+// â¬‡ï¸ Rende disponibile la mappa madre→figli come List<String>
                         LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
                     ) {
                         MainMenuBar(
@@ -636,8 +636,8 @@ fun EditorMenusOnly(
                 )
             }
             else {
-// IN SOTTOMENU: seconda barra = SubMenuBar; sotto câ€™Ã¨ sempre il Breadcrumb.
-// Imposta il â€œcontesto paginaâ€ per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
+// IN SOTTOMENU: seconda barra = SubMenuBar; sotto c'à¨ sempre il Breadcrumb.
+// Imposta il "contesto paginaâ€ per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
                 val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
                 CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
                     SubMenuBar(
@@ -651,7 +651,7 @@ fun EditorMenusOnly(
                             }
                         },
                         onEnter = { label ->
-// evita accumulo â€œfoglie sorelleâ€ (Aggiungi foto/album/video)
+// evita accumulo "foglie sorelleâ€ (Aggiungi foto/album/video)
                             val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
                             menuPath = when {
                                 menuPath.lastOrNull() == label -> menuPath
@@ -689,7 +689,7 @@ fun EditorMenusOnly(
                                         applyPresetByName(root, name)
                                         val styleVal = (menuSelections[key(listOf(root), "style")] as? String).orEmpty()
                                         if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true) && !styleVal.equals(name, true)) {
-                                            applyPresetByName(root, styleVal) // stile ha prioritÃ
+                                            applyPresetByName(root, styleVal) // stile ha priorità
                                         }
                                     }
                                 }
@@ -702,7 +702,7 @@ fun EditorMenusOnly(
                                     }
                                 }
                                 else -> {
-// modifica puntuale â†’ stile attivo passa a â€œNessunoâ€
+// modifica puntuale → stile attivo passa a "Nessunoâ€
                                     val styleKey = key(listOf(root), "style")
                                     val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
                                     if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
@@ -739,14 +739,14 @@ fun EditorMenusOnly(
                     )
                 }
 
-// Dialog â€œSalva come stileâ€
+// Dialog "Salva come stileâ€
                 if (showSaveDialog) {
                     AlertDialog(
                         onDismissRequest = { showSaveDialog = false },
                         title = { Text("Salva come stile") },
                         text = {
                             Column {
-                                Text("Dai un nome allo stile corrente. Se esiste giÃ , verrÃ  aggiornato.")
+                                Text("Dai un nome allo stile corrente. Se esiste già , verrà  aggiornato.")
                                 Spacer(Modifier.height(8.dp))
                                 OutlinedTextField(
                                     value = newPresetName,
@@ -841,7 +841,7 @@ private fun BoxScope.MainBottomBar(
     var showCreateMenu by remember { mutableStateOf(false) }
     var showListMenu by remember { mutableStateOf(false) }
 
-// densitÃ  e misure contenitore
+// densità  e misure contenitore
     val localDensity = LocalDensity.current
     var containerHeightPx by remember { mutableStateOf(0f) }
     var containerLeftInRoot by remember { mutableStateOf(0f) }
@@ -853,9 +853,9 @@ private fun BoxScope.MainBottomBar(
     var wPagine by remember { mutableStateOf(0f) }
     var wProgressi by remember { mutableStateOf(0f) }
 
-// misure per "gap tra gruppi" (piÃ¹ affidabile dei puntini)
+// misure per "gap tra gruppi" (più affidabile dei puntini)
     var firstBlockRightEdge by remember { mutableStateOf<Float?>(null) }      // destra blocco 1
-    var middleBlockLeftEdge by remember { mutableStateOf<Float?>(null) }      // sinistra blocco Pagine&MenÃ¹
+    var middleBlockLeftEdge by remember { mutableStateOf<Float?>(null) }      // sinistra blocco Pagine&Menù
     var preSecondBlockRightEdge by remember { mutableStateOf<Float?>(null) }  // destra blocco Crea+Lista
     var lastBlockLeftEdge by remember { mutableStateOf<Float?>(null) }        // sinistra blocco Progetti
 
@@ -926,13 +926,13 @@ private fun BoxScope.MainBottomBar(
                     ) {
 // BLOCCO 1
                         ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo,
-                            infoTitle = "Annulla", infoBody = "Annulla lâ€™ultima modifica", allowLongPressInInfo = false )
+                            infoTitle = "Annulla", infoBody = "Annulla l'ultima modifica", allowLongPressInInfo = false )
                         ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo,
-                            infoTitle = "Ripeti", infoBody = "Ripristina lâ€™ultima azione annullata", allowLongPressInInfo = false )
+                            infoTitle = "Ripeti", infoBody = "Ripristina l'ultima azione annullata", allowLongPressInInfo = false )
                         ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete,
-                            infoTitle = "Cestino", infoBody = "Elimina lâ€™elemento corrente", allowLongPressInInfo = false )
+                            infoTitle = "Cestino", infoBody = "Elimina l'elemento corrente", allowLongPressInInfo = false )
                         ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate,
-                            infoTitle = "Duplica", infoBody = "Crea una copia dellâ€™elemento corrente", allowLongPressInInfo = false )
+                            infoTitle = "Duplica", infoBody = "Crea una copia dell'elemento corrente", allowLongPressInInfo = false )
                     }
 
 // PUNTINO 1
@@ -953,12 +953,12 @@ private fun BoxScope.MainBottomBar(
                             middleBlockLeftEdge = left
                         }
                     ) {
-                        ToolbarIconButton(EditorIcons.Settings, "ProprietÃ ", onClick = onProperties,
-                            infoTitle = "ProprietÃ ", infoBody = "Impostazioni dellâ€™elemento corrente")
+                        ToolbarIconButton(EditorIcons.Settings, "Proprietà ", onClick = onProperties,
+                            infoTitle = "Proprietà ", infoBody = "Impostazioni dell'elemento corrente")
                         ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout,
                             infoTitle = "Layout pagina", infoBody = "Apri le impostazioni di layout")
                         ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile,
-                            infoTitle = "Salva", infoBody = "Salva lâ€™elemento corrente")
+                            infoTitle = "Salva", infoBody = "Salva l'elemento corrente")
                     }
                 }
 
@@ -981,9 +981,9 @@ private fun BoxScope.MainBottomBar(
                                 onClick = { showCreateMenu = false; onCreatePage() })
                             DropdownMenuItem(text = { Text("Nuovo avviso") },
                                 onClick = { showCreateMenu = false; onCreateAlert() })
-                            DropdownMenuItem(text = { Text("MenÃ¹ laterale") },
+                            DropdownMenuItem(text = { Text("Menù laterale") },
                                 onClick = { showCreateMenu = false; onCreateMenuLaterale() })
-                            DropdownMenuItem(text = { Text("MenÃ¹ centrale") },
+                            DropdownMenuItem(text = { Text("Menù centrale") },
                                 onClick = { showCreateMenu = false; onCreateMenuCentrale() })
                         }
 
@@ -992,8 +992,8 @@ private fun BoxScope.MainBottomBar(
                             DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
                                 DropdownMenuItem(text = { Text("Nuova pagina")  }, onClick = { showCreateMenu = false; onCreatePage() })
                                 DropdownMenuItem(text = { Text("Nuovo avviso")  }, onClick = { showCreateMenu = false; onCreateAlert() })
-                                DropdownMenuItem(text = { Text("MenÃ¹ laterale") }, onClick = { showCreateMenu = false; onCreateMenuLaterale() })
-                                DropdownMenuItem(text = { Text("MenÃ¹ centrale") }, onClick = { showCreateMenu = false; onCreateMenuCentrale() })
+                                DropdownMenuItem(text = { Text("Menù laterale") }, onClick = { showCreateMenu = false; onCreateMenuLaterale() })
+                                DropdownMenuItem(text = { Text("Menù centrale") }, onClick = { showCreateMenu = false; onCreateMenuCentrale() })
                             }
                         }
 
@@ -1001,10 +1001,10 @@ private fun BoxScope.MainBottomBar(
                         Box {
                             ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true; onOpenList() })
                             DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
-                                DropdownMenuItem(text = { Text("Pagineâ€¦") }, onClick = { showListMenu = false })
-                                DropdownMenuItem(text = { Text("Avvisiâ€¦") }, onClick = { showListMenu = false })
-                                DropdownMenuItem(text = { Text("Menu lateraliâ€¦") }, onClick = { showListMenu = false })
-                                DropdownMenuItem(text = { Text("Menu centraliâ€¦") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Pagine...") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Avvisi...") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Menu laterali...") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Menu centrali...") }, onClick = { showListMenu = false })
                             }
                         }
                     }
@@ -1046,7 +1046,7 @@ private fun BoxScope.MainBottomBar(
                 val pad = with(localDensity) { 6.dp.toPx() }
                 val extra = with(localDensity) { extraGapPad.toPx() }
 
-// TOP (curvo + segmento) â€” segue gli angoli arrotondati della Surface
+// TOP (curvo + segmento) — segue gli angoli arrotondati della Surface
                 val corner = with(localDensity) { 18.dp.toPx() } // deve combaciare con RoundedCornerShape(topStart/topEnd)
                 val topY = stroke / 2f
 // segmento centrale
@@ -1057,7 +1057,7 @@ private fun BoxScope.MainBottomBar(
                     strokeWidth = stroke,
                     cap = androidx.compose.ui.graphics.StrokeCap.Butt
                 )
-// arco top-left (180Â° â†’ 270Â°)
+// arco top-left (180Â° → 270Â°)
                 drawArc(
                     color = lineAccent,
                     startAngle = 180f,
@@ -1067,7 +1067,7 @@ private fun BoxScope.MainBottomBar(
                     size = androidx.compose.ui.geometry.Size(2 * corner - stroke, 2 * corner - stroke),
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
                 )
-// arco top-right (270Â° â†’ 360Â°)
+// arco top-right (270Â° → 360Â°)
                 drawArc(
                     color = lineAccent,
                     startAngle = 270f,
@@ -1093,7 +1093,7 @@ private fun BoxScope.MainBottomBar(
                 )
 
                 if (!discontinuousBottom) {
-// PATH ATTIVO â†’ bordo inferiore CONTINUO
+// PATH ATTIVO → bordo inferiore CONTINUO
                     drawLine(
                         color = lineAccent,
                         start = androidx.compose.ui.geometry.Offset(0f, y),
@@ -1104,7 +1104,7 @@ private fun BoxScope.MainBottomBar(
                     return@Canvas
                 }
 
-// STATO HOME â†’ bordo inferiore con GAP sotto le scritte e tra i gruppi (come ora)
+// STATO HOME → bordo inferiore con GAP sotto le scritte e tra i gruppi (come ora)
                 val gaps = mutableListOf<Pair<Float, Float>>()
 
                 firstBlockCenter?.let { cx ->
@@ -1172,11 +1172,11 @@ private fun BoxScope.MainBottomBar(
                         }
                 )
             }
-// "pagine e menÃ¹"
+// "pagine e menù"
             if (firstDotCenter != null && secondDotCenter != null) {
                 var baselinePagPx by remember { mutableStateOf(0f) }
                 Text(
-                    "pagine e menÃ¹",
+                    "pagine e menù",
                     style = labelStyle,
                     onTextLayout = { tlr -> baselinePagPx = tlr.getLineBaseline(0).toFloat() },
                     modifier = Modifier
@@ -1262,11 +1262,11 @@ private fun BoxScope.MainMenuBar(
                     }
 
                     ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText,
-                        infoTitle = "Testo", infoBody = "Stili e proprietÃ  del testo", allowLongPressInInfo = false)
+                        infoTitle = "Testo", infoBody = "Stili e proprietà  del testo", allowLongPressInInfo = false)
                     ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer,
                         infoTitle = "Contenitore", infoBody = "Aspetto e comportamenti del contenitore", allowLongPressInInfo = false)
                     ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout,
-                        infoTitle = "Layout", infoBody = "Colori/immagini ed effetti dellâ€™area", allowLongPressInInfo = false)
+                        infoTitle = "Layout", infoBody = "Colori/immagini ed effetti dell'area", allowLongPressInInfo = false)
                     ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd,
                         infoTitle = "Aggiungi", infoBody = "Inserisci nuovi elementi", allowLongPressInInfo = false)
                     ToolbarIconButton(
@@ -1278,7 +1278,7 @@ private fun BoxScope.MainMenuBar(
                 }
 
                 SecondBarMode.Deck -> {
-// NUOVA ROOT â€” MADRI + CLUSTER, con hiding delle madri a destra
+// NUOVA ROOT — MADRI + CLUSTER, con hiding delle madri a destra
                     val deck = LocalDeckState.current
                     val controller = LocalDeckController.current
 
@@ -1299,16 +1299,16 @@ private fun BoxScope.MainMenuBar(
                                 icon = ImageVector.vectorResource(id = m.iconRes),
                                 contentDescription = when (m.root) {
                                     DeckRoot.PAGINA -> "Pagina"
-                                    DeckRoot.MENU_LATERALE -> "MenÃ¹ laterale"
-                                    DeckRoot.MENU_CENTRALE -> "MenÃ¹ centrale"
+                                    DeckRoot.MENU_LATERALE -> "Menù laterale"
+                                    DeckRoot.MENU_CENTRALE -> "Menù centrale"
                                     DeckRoot.AVVISO -> "Avviso"
                                 },
                                 selected = deck.openKey == m.key,
                                 onClick = { deck.toggle(m.key) },
                                 infoTitle = when (m.root) {
                                     DeckRoot.PAGINA -> "Pagine"
-                                    DeckRoot.MENU_LATERALE -> "MenÃ¹ laterale"
-                                    DeckRoot.MENU_CENTRALE -> "MenÃ¹ centrale"
+                                    DeckRoot.MENU_LATERALE -> "Menù laterale"
+                                    DeckRoot.MENU_CENTRALE -> "Menù centrale"
                                     DeckRoot.AVVISO -> "Avvisi"
                                 },
                                 infoBody = "Tieni premuto per mostrare/nascondere le icone figlie"
@@ -1346,7 +1346,7 @@ private fun MotherIcon(
     icon: ImageVector,
     contentDescription: String,
     selected: Boolean,
-    onClick: () -> Unit,                 // azione â€œapri/chiudi clusterâ€
+    onClick: () -> Unit,                 // azione "apri/chiudi clusterâ€
     infoTitle: String? = null,
     infoBody: String? = null
 ) {
@@ -1366,7 +1366,7 @@ private fun MotherIcon(
                 .combinedClickable(
                     onClick = {
                         if (info.enabled) {
-                            info.show(infoTitle ?: contentDescription, infoBody ?: "â€”")
+                            info.show(infoTitle ?: contentDescription, infoBody ?: "—")
                         } else {
                             onClick()
                         }
@@ -1429,7 +1429,7 @@ private fun ChildIconWithBadge(
                     .combinedClickable(
                         onClick = {
                             if (info.enabled) {
-                                info.show("Elemento $shown", "Tieni premuto per aprire lâ€™editor classico")
+                                info.show("Elemento $shown", "Tieni premuto per aprire l'editor classico")
                             } else {
                                 onClick()
                             }
@@ -1458,7 +1458,7 @@ private fun ChildIconWithBadge(
 }
 
 /* =========================================================================================
-*  SUBMENU â€” barra icone livello corrente (menÃ¹ â€œad alberoâ€)
+*  SUBMENU — barra icone livello corrente (menù "ad alberoâ€)
 *  SOLO UI: nessuna modifica applicata al documento.
 * ========================================================================================= */
 
@@ -1520,7 +1520,7 @@ private fun BoxScope.SubMenuBar(
 }
 
 /* =========================================================================================
-*  BREADCRUMB â€” path corrente + ultima opzione
+*  BREADCRUMB — path corrente + ultima opzione
 * ========================================================================================= */
 @Composable
 private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
@@ -1537,8 +1537,8 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
             .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
     ) {
         val pretty = buildString {
-            append(if (path.isEmpty()) "â€”" else path.joinToString("  â†’  "))
-            lastChanged?.let { append("   â€¢   "); append(it) } // â† mostra sempre scelte utente
+            append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
+            lastChanged?.let { append("   â€•   "); append(it) } // â† mostra sempre scelte utente
         }
         Row(
             Modifier
@@ -1573,7 +1573,7 @@ private fun LayoutLevel(
     fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
 
 // Aree "wrappate" del Layout che devono riusare SOLO i sottomenu whitelist (Colore/Immagini)
-    val layoutAreas = setOf("Bottom bar", "Top bar", "MenÃ¹ centrale", "MenÃ¹ laterale")
+    val layoutAreas = setOf("Bottom bar", "Top bar", "Menù centrale", "Menù laterale")
 
     when (path.getOrNull(1)) {
         null -> {
@@ -1713,7 +1713,7 @@ private fun LayoutLevel(
                         options = listOf("Slide", "Fade", "Page flip"),
                         onSelected = { onPick("anim", it) }
                     )
-                    IconDropdown(EditorIcons.Layout, "VelocitÃ ",
+                    IconDropdown(EditorIcons.Layout, "Velocità ",
                         current = get("speed") ?: "Media",
                         options = listOf("Lenta", "Media", "Veloce"),
                         onSelected = { onPick("speed", it) }
@@ -1722,7 +1722,7 @@ private fun LayoutLevel(
             }
         }
 
-// ----- Layout â€œpianoâ€ (giÃ  esistente) -----
+// ----- Layout "pianoâ€ (già  esistente) -----
         "Colore" -> {
             val isFree = LocalIsFree.current
 
@@ -1805,7 +1805,7 @@ private fun LayoutLevel(
                 options = listOf("Slide", "Fade", "Page flip"),
                 onSelected = { onPick("anim", it) }
             )
-            IconDropdown(EditorIcons.Layout, "VelocitÃ ",
+            IconDropdown(EditorIcons.Layout, "Velocità ",
                 current = get("speed") ?: "Media",
                 options = listOf("Lenta", "Media", "Veloce"),
                 onSelected = { onPick("speed", it) }
@@ -1835,7 +1835,7 @@ private fun ContainerLevel(
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
 
-            IconDropdown(EditorIcons.SwipeVertical, "ScrollabilitÃ ",
+            IconDropdown(EditorIcons.SwipeVertical, "Scrollabilità ",
                 current = get("scroll") ?: "Assente",
                 options = listOf("Assente", "Verticale", "Orizzontale"),
                 onSelected = { onPick("scroll", it) }
@@ -1962,7 +1962,7 @@ private fun ContainerLevel(
                 options = listOf("Slide", "Fade", "Page flip"),
                 onSelected = { onPick("anim", it) }
             )
-            IconDropdown(EditorIcons.Layout, "VelocitÃ ",
+            IconDropdown(EditorIcons.Layout, "Velocità ",
                 current = get("speed") ?: "Media",
                 options = listOf("Lenta", "Media", "Veloce"),
                 onSelected = { onPick("speed", it) }
@@ -1982,7 +1982,7 @@ private fun TextLevel(
     onFreeGate: () -> Unit                 // ⬅️ NEW
 ) {
     val isFree = LocalIsFree.current
-// toggles (bordo piÃ¹ spesso se selezionati)
+// toggles (bordo più spesso se selezionati)
     val uKey = key(path, "Sottolinea")
     val iKey = key(path, "Corsivo")
 // Sottolinea
@@ -1998,7 +1998,7 @@ private fun TextLevel(
         icon = EditorIcons.Italic
     )
 
-// dropdown (font / weight / size / evidenzia / colore) â€” chiavi allineate a keysForRoot("Testo")
+// dropdown (font / weight / size / evidenzia / colore) — chiavi allineate a keysForRoot("Testo")
     IconDropdown(EditorIcons.Highlight, "Evidenzia",
         current = (selections[key(path, "Evidenzia")] as? String) ?: "Nessuna",
         options = listOf("Nessuna", "Marker", "Oblique", "Scribble"),
@@ -2056,7 +2056,7 @@ private fun TextLevel(
 
 
 /* =========================================================================================
-*  WIDGET MENU â€” pulsanti a icona, toggle con bordo spesso, dropdown con badge
+*  WIDGET MENU — pulsanti a icona, toggle con bordo spesso, dropdown con badge
 * ========================================================================================= */
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -2238,7 +2238,7 @@ private fun dividerDot() {
 }
 
 // ======================================================================
-// WIZARD OVERLAY â€” crea Pagina / MenÃ¹ Laterale / MenÃ¹ Centrale / Avviso
+// WIZARD OVERLAY — crea Pagina / Menù Laterale / Menù Centrale / Avviso
 // Aspetto scuro, barre coperte da scrim, nessuna logica esterna.
 // ======================================================================
 private data class CreationResult(
@@ -2248,7 +2248,7 @@ private data class CreationResult(
     val description: String?,
     val scroll: String,           // "Assente" | "Verticale" | "Orizzontale"
     val assocId: String?,         // eventuale associazione
-    val side: String?,            // solo per menÃ¹ laterale: "Sinistra"|"Destra"|"Alto"|"Basso"
+    val side: String?,            // solo per menù laterale: "Sinistra"|"Destra"|"Alto"|"Basso"
     val setAsHome: Boolean        // solo per pagine
 )
 
@@ -2289,7 +2289,7 @@ private fun BoxScope.CreationWizardOverlay(
         var scroll by remember { mutableStateOf("Nessuna") } // Nessuna | Verticale | Orizzontale
         var setAsHome by remember { mutableStateOf(false) }
 
-// specifici per MenÃ¹ laterale
+// specifici per Menù laterale
         var side by remember { mutableStateOf("Sinistra") } // Sinistra | Destra | Alto | Basso
 
         // regole ID auto
@@ -2326,8 +2326,8 @@ private fun BoxScope.CreationWizardOverlay(
                     }
                     val title = when (target) {
                         DeckRoot.PAGINA -> "Nuova pagina"
-                        DeckRoot.MENU_LATERALE -> "Nuovo menÃ¹ laterale"
-                        DeckRoot.MENU_CENTRALE -> "Nuovo menÃ¹ centrale"
+                        DeckRoot.MENU_LATERALE -> "Nuovo menù laterale"
+                        DeckRoot.MENU_CENTRALE -> "Nuovo menù centrale"
                         DeckRoot.AVVISO -> "Nuovo avviso"
                         else -> "Nuovo elemento"
                     }
@@ -2411,7 +2411,7 @@ private fun BoxScope.CreationWizardOverlay(
                             )
                         } else {
                             Text(
-                                "Tieni premuto 3s sul componente desiderato (modalitÃ  stub).",
+                                "Tieni premuto 3s sul componente desiderato (modalità  stub).",
                                 fontSize = 12.sp,
                                 color = Color(0xFF9BA3AF)
                             )
@@ -2501,7 +2501,7 @@ private fun BoxScope.CreationWizardOverlay(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.horizontalScroll(rememberScrollState())
                                 ) {
-                                    Text("ScrollabilitÃ :")
+                                    Text("Scrollabilità :")
                                     OptionPill(selected = scroll == "Nessuna", onClick = { scroll = "Nessuna" }, label = "Nessuna")
                                     OptionPill(selected = scroll == "Verticale", onClick = { scroll = "Verticale" }, label = "Verticale")
                                     OptionPill(selected = scroll == "Orizzontale", onClick = { scroll = "Orizzontale" }, label = "Orizzontale")
@@ -2519,7 +2519,7 @@ private fun BoxScope.CreationWizardOverlay(
                                 }
                             }
                             DeckRoot.MENU_LATERALE -> {
-                                Text("Opzioni menÃ¹ laterale", fontWeight = FontWeight.SemiBold)
+                                Text("Opzioni menù laterale", fontWeight = FontWeight.SemiBold)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -2533,7 +2533,7 @@ private fun BoxScope.CreationWizardOverlay(
                                 }
                             }
                             DeckRoot.MENU_CENTRALE -> {
-                                Text("Opzioni menÃ¹ centrale", fontWeight = FontWeight.SemiBold)
+                                Text("Opzioni menù centrale", fontWeight = FontWeight.SemiBold)
                                 Text("Nessuna opzione speciale per ora.", color = Color(0xFF9BA3AF), fontSize = 12.sp)
                             }
                             DeckRoot.AVVISO -> {
@@ -2543,7 +2543,7 @@ private fun BoxScope.CreationWizardOverlay(
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, WIZ_AZURE)
                                 ) {
-                                    Text("Apri Eventâ€“Conditionâ€“Action mode (stub)")
+                                    Text("Apri Event-Condition-Action mode (stub)")
                                 }
                             }
                             else -> Unit
@@ -2628,10 +2628,10 @@ private fun BoxScope.CreationWizardOverlay(
                     title = { Text("Regole per l'ID") },
                     text = {
                         Text(
-                            "â€¢ Se compili l'ID, viene usato quello.\n" +
-                                    "â€¢ Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
-                                    "â€¢ Se Nome Ã¨ corto o vuoto: il sistema completa fino a 5â€“8 caratteri.\n" +
-                                    "â€¢ L'ID deve essere univoco."
+                            "â€• Se compili l'ID, viene usato quello.\n" +
+                                    "â€• Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
+                                    "â€• Se Nome à¨ corto o vuoto: il sistema completa fino a 5-8 caratteri.\n" +
+                                    "â€• L'ID deve essere univoco."
                         )
                     },
                     confirmButton = {
@@ -2676,7 +2676,7 @@ private data class WizardResult(
 )
 
 
-// Piccolo dropdown â€œscuroâ€ in linea con lo stile
+// Piccolo dropdown "scuroâ€ in linea con lo stile
 @Composable
 private fun DropdownSmall(
     current: String,
@@ -2726,7 +2726,7 @@ private fun BoxScope.InfoEdgeDeck(
     val tileSize   = 56.dp           // quadrato icona
     val spacing    = 10.dp           // spazio tra tile
     val corner     = 12.dp           // arrotondamento tile (quadrato "morbido")
-    val peekWidth  = 12.dp           // â€œpochi mmâ€ sempre visibili sul lato destro
+    val peekWidth  = 12.dp           // "pochi mmâ€ sempre visibili sul lato destro
 
 // Larghezza animata del contenitore (solo a destra)
     val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
@@ -2736,7 +2736,7 @@ private fun BoxScope.InfoEdgeDeck(
         label = "sideWidth"
     )
 
-// VisibilitÃ  a cascata (dallâ€™alto verso il basso)
+// Visibilità  a cascata (dall'alto verso il basso)
     var showHelp by remember(open) { mutableStateOf(false) }
     var showGear by remember(open) { mutableStateOf(false) }
     LaunchedEffect(open) {
@@ -2787,7 +2787,7 @@ private fun BoxScope.InfoEdgeDeck(
                 )
         )
 
-// --- Colonna dei tile quadrati (icona â€œ?â€ + ingranaggio) ---
+// --- Colonna dei tile quadrati (icona "?â€ + ingranaggio) ---
         if (open) {
             Column(
                 modifier = Modifier
@@ -2796,7 +2796,7 @@ private fun BoxScope.InfoEdgeDeck(
                 verticalArrangement = Arrangement.spacedBy(spacing),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-// â€œ?â€ â€” colore/abilitazione invariati (rispetta infoEnabled & enabled)
+// "?â€ — colore/abilitazione invariati (rispetta infoEnabled & enabled)
                 AnimatedVisibility(
                     visible = showHelp,
                     enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
@@ -2821,7 +2821,7 @@ private fun BoxScope.InfoEdgeDeck(
                     )
                 }
 
-// Ingranaggio â€” stub (chiude il menÃ¹ dopo il tap)
+// Ingranaggio — stub (chiude il menù dopo il tap)
                 AnimatedVisibility(
                     visible = showGear,
                     enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.85f),
