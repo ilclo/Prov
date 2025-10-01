@@ -115,7 +115,7 @@ import androidx.compose.ui.unit.Dp
 // Local per sapere ovunque se l’utente è free (true) o no
 private val LocalIsFree = staticCompositionLocalOf { true }
 
-private const val codiceprofree = 23456
+private const val codiceprofree = 12345
 private val LocalDeckItems =
     staticCompositionLocalOf<Map<DeckRoot, List<String>>> { emptyMap() }
 
