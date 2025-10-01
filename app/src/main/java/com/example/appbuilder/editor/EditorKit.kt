@@ -168,11 +168,12 @@ private fun AddLevel(
         ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
         ToolbarIconButton(Icons.Outlined.ToggleOn, "Toggle") { onEnter("Toggle") }
 
-// Slider → gated
         ToolbarIconButton(
             Icons.Outlined.LinearScale, "Slider",
-            locked = isFree, onLockedAttempt = { showUpsell = true }
+            locked = isFree,
+            onLockedAttempt = onFreeGate
         ) { onEnter("Slider") }
+
 
         ToolbarIconButton(
             icon = ImageVector.vectorResource(id = R.drawable.ic_align_flex_end),
@@ -710,13 +711,15 @@ fun EditorMenusOnly(
                                 }
                             }
                         },
-                        savedPresets = savedPresets
+                        savedPresets = savedPresets,
+                        onFreeGate = { showUpsell = true }
                     )
                     BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
                 }
 
 // Barra di conferma (quando risali con modifiche)
                 if (showConfirm) {
+                    val isFreeUser = LocalIsFree.current
                     ConfirmBar(
                         onCancel = {
                             dirty = false
@@ -730,7 +733,7 @@ fun EditorMenusOnly(
                             menuPath = emptyList()
                         },
                         onSavePreset = {
-                            if (LocalIsFree.current) showUpsell = true
+                            if (isFreeUser) showUpsell = true
                             else showSaveDialog = true
                         }
                     )
@@ -1467,7 +1470,8 @@ private fun BoxScope.SubMenuBar(
     onEnter: (String) -> Unit,
     onToggle: (label: String, value: Boolean) -> Unit,
     onPick: (label: String, value: String) -> Unit,
-    savedPresets: Map<String, MutableList<String>>
+    savedPresets: Map<String, MutableList<String>>,
+    onFreeGate: () -> Unit
 ) {
     val offsetY = with(LocalDensity.current) { (BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA + BARS_GAP + SAFE_BOTTOM_MARGIN).roundToPx() }
     Surface(
@@ -1500,14 +1504,14 @@ private fun BoxScope.SubMenuBar(
                 ToolbarIconButton(Icons.Outlined.ArrowBack, "Indietro", onClick = onBack)
 
                 when (path.firstOrNull()) {
-                    "Layout" -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
-                    "Contenitore" -> ContainerLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
-                    "Testo" -> TextLevel(path, selections, onToggle, onPick, savedPresets)
+                    "Layout"       -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets, onFreeGate)
+                    "Contenitore"  -> ContainerLevel(path, selections, onEnter, onToggle, onPick, savedPresets, onFreeGate)
+                    "Testo"        -> TextLevel(path, selections, onToggle, onPick, savedPresets, onFreeGate)
                     "Aggiungi" -> AddLevel(
-                        path = menuPath,
-                        selections = menuSelections,
+                        path = path,
+                        selections = selections,
                         onEnter = onEnter,
-                        onFreeGate = { showUpsell = true } // ⬅️ fa comparire il banner piani
+                        onFreeGate = onFreeGate
                     )
                 }
             }
@@ -1562,8 +1566,10 @@ private fun LayoutLevel(
     onEnter: (String) -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onPick: (String, String) -> Unit,
-    saved: Map<String, MutableList<String>>
+    saved: Map<String, MutableList<String>>,
+    onFreeGate: () -> Unit
 ) {
+    val isFree = LocalIsFree.current
     fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
 
 // Aree "wrappate" del Layout che devono riusare SOLO i sottomenu whitelist (Colore/Immagini)
@@ -1596,7 +1602,7 @@ private fun LayoutLevel(
                 options = saved["Layout"].orEmpty(),
                 onSelected = { onPick("default", it) },
                 locked = isFree,
-                onLockedAttempt = { showUpsell = true }
+                onLockedAttempt = onFreeGate
             )
 
 // STILE (Outlined custom o Material)
@@ -1632,7 +1638,7 @@ private fun LayoutLevel(
                         options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
                         onSelected = { onPick("col2", it) },
                         locked = isFree,
-                        onLockedAttempt = { showUpsell = true }
+                        onLockedAttempt = onFreeGate
                     )
 
                     IconDropdown(EditorIcons.Gradient, "Gradiente",
@@ -1640,7 +1646,7 @@ private fun LayoutLevel(
                         options = listOf("Orizzontale", "Verticale"),
                         onSelected = { onPick("grad", it) },
                         locked = isFree,
-                        onLockedAttempt = { showUpsell = true }
+                        onLockedAttempt = onFreeGate
                     )
                     IconDropdown(EditorIcons.Functions, "Effetti",
                         current = get("fx") ?: "Vignettatura",
@@ -1651,12 +1657,12 @@ private fun LayoutLevel(
                 "Immagini" -> {
                     ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine",
                         locked = isFree,
-                        onLockedAttempt = { showUpsell = true }
+                        onLockedAttempt = onFreeGate
                     ) { onEnter("Aggiungi foto") }
 
                     ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album",
                         locked = isFree,
-                        onLockedAttempt = { showUpsell = true }
+                        onLockedAttempt = onFreeGate
                     ) { onEnter("Aggiungi album") }
                 }
                 "Aggiungi foto" -> {
@@ -1731,7 +1737,7 @@ private fun LayoutLevel(
                 options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
                 onSelected = { onPick("col2", it) },
                 locked = isFree,
-                onLockedAttempt = { showUpsell = true }
+                onLockedAttempt = onFreeGate
             )
 
             IconDropdown(EditorIcons.Gradient, "Gradiente",
@@ -1739,7 +1745,7 @@ private fun LayoutLevel(
                 options = listOf("Orizzontale", "Verticale"),
                 onSelected = { onPick("grad", it) },
                 locked = isFree,
-                onLockedAttempt = { showUpsell = true }
+                onLockedAttempt = onFreeGate
             )
             IconDropdown(EditorIcons.Functions, "Effetti",
                 current = get("fx") ?: "Vignettatura",
@@ -1817,8 +1823,10 @@ private fun ContainerLevel(
     onEnter: (String) -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onPick: (String, String) -> Unit,
-    saved: Map<String, MutableList<String>>
+    saved: Map<String, MutableList<String>>,
+    onFreeGate: () -> Unit
 ) {
+    val isFree = LocalIsFree.current
     fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
     when (path.getOrNull(1)) {
         null -> {
@@ -1860,7 +1868,7 @@ private fun ContainerLevel(
                 options = saved["Testo"].orEmpty(),
                 onSelected = { onPick("default", it) },
                 locked = isFree,
-                onLockedAttempt = { showUpsell = true }
+                onLockedAttempt = onFreeGate
             )
 
             IconDropdown(
@@ -1886,7 +1894,7 @@ private fun ContainerLevel(
                 options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
                 onSelected = { onPick("col2", it) },
                 locked = isFree,
-                onLockedAttempt = { showUpsell = true }
+                onLockedAttempt = onFreeGate
             )
 
             IconDropdown(EditorIcons.Gradient, "Gradiente",
@@ -1894,7 +1902,7 @@ private fun ContainerLevel(
                 options = listOf("Orizzontale", "Verticale"),
                 onSelected = { onPick("grad", it) },
                 locked = isFree,
-                onLockedAttempt = { showUpsell = true }
+                onLockedAttempt = onFreeGate
             )
             IconDropdown(EditorIcons.Functions, "FX",
                 current = get("fx") ?: "Vignettatura",
@@ -1970,8 +1978,10 @@ private fun TextLevel(
     selections: MutableMap<String, Any?>,
     onToggle: (String, Boolean) -> Unit,
     onPick: (String, String) -> Unit,
-    saved: Map<String, MutableList<String>>
+    saved: Map<String, MutableList<String>>,
+    onFreeGate: () -> Unit                 // ⬅️ NEW
 ) {
+    val isFree = LocalIsFree.current
 // toggles (bordo piÃ¹ spesso se selezionati)
     val uKey = key(path, "Sottolinea")
     val iKey = key(path, "Corsivo")
@@ -2022,7 +2032,7 @@ private fun TextLevel(
         options = saved["Testo"].orEmpty(),
         onSelected = { onPick("default", it) },
         locked = isFree,
-        onLockedAttempt = { showUpsell = true }
+        onLockedAttempt = onFreeGate
     )
 
     IconDropdown(
@@ -2073,6 +2083,8 @@ private fun ToolbarIconButton(
         shadowElevation = if (selected) 6.dp else 0.dp,
         modifier = modifier.size(42.dp)
     ) {
+        val info = LocalInfoMode.current
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -2086,10 +2098,10 @@ private fun ToolbarIconButton(
                     onLongClick = {
                         if (locked && !info.enabled) { onLockedAttempt?.invoke(); return@combinedClickable }
                         if (info.enabled) {
-                            if (allowLongPressInInfo) (onLongPress ?: onClick).invoke() else info.show(infoTitle ?: contentDescription, infoBody ?: "—")
+                            if (allowLongPressInInfo) (onLongPress ?: onClick).invoke()
+                            else info.show(infoTitle ?: contentDescription, infoBody ?: "—")
                         } else (onLongPress ?: onClick).invoke()
-                    },
-                    onLongClick = onLongPress
+                    }
                 ),
             contentAlignment = Alignment.Center
         ) {
