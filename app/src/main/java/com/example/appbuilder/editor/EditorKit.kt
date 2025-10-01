@@ -110,13 +110,12 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 
-// 12345 = FREE ; 23456 = STARTER/PRO
-private const val codiceprofree = 12345
+
 
 // Local per sapere ovunque se l’utente è free (true) o no
 private val LocalIsFree = staticCompositionLocalOf { true }
 
-// Mappa "madre â†’ lista ID figli" visibile alla seconda barra (Deck)
+private const val codiceprofree = 23456
 private val LocalDeckItems =
     staticCompositionLocalOf<Map<DeckRoot, List<String>>> { emptyMap() }
 
@@ -132,16 +131,16 @@ private val WIZ_AZURE = Color(0xFF58A6FF)   // azzurro (come DECK_HIGHLIGHT)
 private data class InfoModeEnv(val enabled: Boolean, val show: (String, String) -> Unit)
 private val LocalInfoMode = staticCompositionLocalOf { InfoModeEnv(false) { _, _ -> } }
 /* =========================================================================================
- *  MODELLO MINIMO DI STATO (solo per navigazione menÃ¹)
- * ========================================================================================= */
+*  MODELLO MINIMO DI STATO (solo per navigazione menÃ¹)
+* ========================================================================================= */
 
 data class EditorShellState(
     val isEditor: Boolean = true
 )
 
 /* =========================================================================================
- *  ENTRY â€” schermata demo (sfondo neutro + menÃ¹)
- * ========================================================================================= */
+*  ENTRY â€” schermata demo (sfondo neutro + menÃ¹)
+* ========================================================================================= */
 
 @Composable
 fun EditorDemoScreen() {
@@ -150,23 +149,26 @@ fun EditorDemoScreen() {
 }
 
 /* =========================================================================================
- *  ROOT â€” solo menÃ¹ (nessuna azione applicata)
- * ========================================================================================= */
+*  ROOT â€” solo menÃ¹ (nessuna azione applicata)
+* ========================================================================================= */
 
 /* ---------- AGGIUNGI ---------- */
 @Composable
 private fun AddLevel(
     path: List<String>,
     selections: MutableMap<String, Any?>,
-    onEnter: (String) -> Unit
+    onEnter: (String) -> Unit,
+    onFreeGate: () -> Unit // ⬅️ NEW: lo passa chi chiama (EditorMenusOnly)
 ) {
+    val isFree = LocalIsFree.current
+
     if (path.getOrNull(1) == null) {
         val isFree = LocalIsFree.current
 
         ToolbarIconButton(EditorIcons.Icon, "Icona") { onEnter("Icona") }
         ToolbarIconButton(Icons.Outlined.ToggleOn, "Toggle") { onEnter("Toggle") }
 
-        // Slider → gated
+// Slider → gated
         ToolbarIconButton(
             Icons.Outlined.LinearScale, "Slider",
             locked = isFree, onLockedAttempt = { showUpsell = true }
@@ -187,6 +189,60 @@ private fun AddLevel(
             modifier = Modifier.size(40.dp),
             shape = CircleShape
         ) {}
+    }
+}
+
+@Composable
+private fun BoxScope.ProUpsellSheet(onClose: () -> Unit) {
+    androidx.compose.material3.Surface(
+        color = Color(0xFF0F141E),
+        contentColor = Color.White,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        border = BorderStroke(1.dp, WIZ_AZURE),
+        tonalElevation = 12.dp,
+        shadowElevation = 12.dp,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Sblocca Starter o Pro", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Text(
+                "Starter e Pro sbloccano: preset/“default”, più font, Colore 2 e Gradiente, Immagini/Album per Layout e Contenitore, e altro.",
+                color = Color(0xFF9BA3AF)
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onClose,
+                    border = BorderStroke(1.5.dp, WIZ_AZURE),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Chiudi") }
+
+                androidx.compose.material3.Button(
+                    onClick = onClose,
+                    colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Vedi piani") }
+            }
+            // Mini tabella prezzi (stub)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Starter", fontWeight = FontWeight.SemiBold)
+                    Text("• Tutto ciò che serve\n• Supporto base\n", color = Color(0xFF9BA3AF))
+                    Text("€ X/mese", fontWeight = FontWeight.Medium)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("Pro", fontWeight = FontWeight.SemiBold)
+                    Text("• Tutto di Starter\n• Funzioni extra (stub)\n", color = Color(0xFF9BA3AF))
+                    Text("€ Y/mese", fontWeight = FontWeight.Medium)
+                }
+            }
+        }
     }
 }
 
@@ -223,31 +279,31 @@ fun EditorMenusOnly(
 ) {
     var deckOpen by remember { mutableStateOf<String?>(null) }        // "pagina"|"menuL"|"menuC"|"avviso"|null
     var editingClass by remember { mutableStateOf<DeckRoot?>(null) }   // classe della figlia aperta (per flag Layout)
-    // Path del menÃ¹ (es. ["Contenitore", "Bordi", "Spessore"])
+// Path del menÃ¹ (es. ["Contenitore", "Bordi", "Spessore"])
     var menuPath by remember { mutableStateOf<List<String>>(emptyList()) }
-    // Selezioni effimere dei dropdown/toggle (key = pathTestuale)
+// Selezioni effimere dei dropdown/toggle (key = pathTestuale)
     val menuSelections = remember { mutableStateMapOf<String, Any?>() }
-    // Modifiche in corso (serve per mostrare la barra di conferma alla risalita)
+// Modifiche in corso (serve per mostrare la barra di conferma alla risalita)
     var dirty by remember { mutableStateOf(false) }
-    // Ultima opzione interessata (per mostrare info extra nel path)
+// Ultima opzione interessata (per mostrare info extra nel path)
     var lastChanged by remember { mutableStateOf<String?>(null) }
-    // Conferma allâ€™uscita dai sottomenu verso la home
+// Conferma allâ€™uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
     var classicEditing by remember { mutableStateOf(false) } // false = Deck, true = Classic (vecchia root)
-    // MODE della seconda barra: "deck" (icone madre + cluster) oppure "classic" (vecchia root)
-    // Preset salvati (nomi da mostrare nelle tendine)
-    // Wizard di creazione
+// MODE della seconda barra: "deck" (icone madre + cluster) oppure "classic" (vecchia root)
+// Preset salvati (nomi da mostrare nelle tendine)
+// Wizard di creazione
     var wizardVisible by remember { mutableStateOf(false) }
     var wizardKind by remember { mutableStateOf<DeckRoot?>(null) }
     var homePageId by remember { mutableStateOf<String?>(null) }
     var wizardTarget  by remember { mutableStateOf<DeckRoot?>(null) }
-    // ---- Stato per modalitÃ  info + pannelli descrittivi ----
+// ---- Stato per modalitÃ  info + pannelli descrittivi ----
     var infoDeckOpen by remember { mutableStateOf(false) }      // deck laterale destro aperto/chiuso
     var infoMode by remember { mutableStateOf(false) }          // flag modalitÃ  info
     var infoCard by remember { mutableStateOf<Pair<String, String>?>(null) } // (titolo, testo)
     var infoCardVisible by remember { mutableStateOf(false) }
 
-    // Autoâ€‘hide del pannello descrittivo (5s)
+// Autoâ€‘hide del pannello descrittivo (5s)
     LaunchedEffect(infoCard) {
         if (infoCard != null) {
             infoCardVisible = true
@@ -257,7 +313,7 @@ fun EditorMenusOnly(
         }
     }
 
-    // Mostra il â€œbenvenutoâ€ alla modalitÃ  info quando si attiva
+// Mostra il â€œbenvenutoâ€ alla modalitÃ  info quando si attiva
     LaunchedEffect(infoMode) {
         if (infoMode) {
             infoCard = "ModalitÃ  info" to
@@ -282,7 +338,7 @@ fun EditorMenusOnly(
         wizardVisible = false
     }
 
-    // Back: se il wizard Ã¨ aperto, il tasto indietro chiude il wizard (non l'app)
+// Back: se il wizard Ã¨ aperto, il tasto indietro chiude il wizard (non l'app)
     BackHandler(enabled = wizardVisible) { wizardVisible = false }
     val savedPresets = remember {
         mutableStateMapOf(
@@ -292,7 +348,7 @@ fun EditorMenusOnly(
         )
     }
 
-    // Valori dei preset/stili: root -> (nome -> mappa configurazioni)
+// Valori dei preset/stili: root -> (nome -> mappa configurazioni)
     val presetValues = remember {
         mutableStateMapOf<String, MutableMap<String, Map<String, Any?>>>(
             "Layout" to mutableMapOf(),
@@ -382,7 +438,7 @@ fun EditorMenusOnly(
         val normalized = name.trim()
         if (normalized.isBlank()) return
         val list = savedPresets.getOrPut(root) { mutableListOf("Nessuno") }
-        // mantieni "Nessuno", rimuovi eventuali duplicati (case-insensitive), poi aggiungi
+// mantieni "Nessuno", rimuovi eventuali duplicati (case-insensitive), poi aggiungi
         list.removeAll { it.equals(normalized, ignoreCase = true) }
         list.add(normalized)
         val store = presetValues.getOrPut(root) { mutableMapOf() }
@@ -410,13 +466,13 @@ fun EditorMenusOnly(
         }
     }
 
-    // Seeding di alcuni preset iniziali (cosÃ¬ "Default/Titolo/..." agiscono subito)
+// Seeding di alcuni preset iniziali (cosÃ¬ "Default/Titolo/..." agiscono subito)
     LaunchedEffect(Unit) {
         fun ensure(root: String, name: String, values: Map<String, Any?>) {
             val store = presetValues.getOrPut(root) { mutableMapOf() }
             if (store[name] == null) store[name] = values
         }
-        // TESTO
+// TESTO
         ensure("Testo", "Titolo", mapOf(
             key(listOf("Testo"),"Sottolinea") to false,
             key(listOf("Testo"),"Corsivo") to false,
@@ -444,7 +500,7 @@ fun EditorMenusOnly(
             key(listOf("Testo"),"Size") to "16sp",
             key(listOf("Testo"),"Colore") to "Nero",
         ))
-        // CONTENITORE
+// CONTENITORE
         ensure("Contenitore", "Card base", mapOf(
             key(listOf("Contenitore"),"scroll") to "Assente",
             key(listOf("Contenitore"),"shape") to "Rettangolo",
@@ -458,7 +514,7 @@ fun EditorMenusOnly(
             key(listOf("Contenitore","Colore"),"col1") to "Ciano",
             key(listOf("Contenitore","Colore"),"grad") to "Orizzontale",
         ))
-        // LAYOUT
+// LAYOUT
         ensure("Layout", "Default chiaro", mapOf(
             key(listOf("Layout","Colore"),"col1") to "Bianco",
             key(listOf("Layout","Colore"),"col2") to "Grigio chiaro",
@@ -474,12 +530,13 @@ fun EditorMenusOnly(
     }
 
 
-    // Misuro lâ€™altezza della barra azioni per distanziare la barra categorie
+// Misuro lâ€™altezza della barra azioni per distanziare la barra categorie
     var actionsBarHeightPx by remember { mutableStateOf(0) }
-    // Dialog salvataggio stile
+// Dialog salvataggio stile
     var showSaveDialog by remember { mutableStateOf(false) }
     var newPresetName by remember { mutableStateOf("") }
     var showUpsell by remember { mutableStateOf(false) }
+
     CompositionLocalProvider(
         LocalInfoMode provides InfoModeEnv(
             enabled = infoMode,
@@ -498,7 +555,7 @@ fun EditorMenusOnly(
         ) {
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
-                // PRIMA BARRA
+// PRIMA BARRA
                 MainBottomBar(
                     onUndo = { /* ... */ },
                     onRedo = { /* ... */ },
@@ -521,7 +578,7 @@ fun EditorMenusOnly(
                 )
 
 
-                // SECONDA BARRA
+// SECONDA BARRA
                 if (!classicEditing) {
 
                     CompositionLocalProvider(
@@ -534,7 +591,7 @@ fun EditorMenusOnly(
                             openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
                             openWizard = { root -> wizardTarget = root; wizardVisible = true }
                         ),
-                        // â¬‡ï¸ Rende disponibile la mappa madreâ†’figli come List<String>
+// â¬‡ï¸ Rende disponibile la mappa madreâ†’figli come List<String>
                         LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
                     ) {
                         MainMenuBar(
@@ -578,8 +635,8 @@ fun EditorMenusOnly(
                 )
             }
             else {
-                // IN SOTTOMENU: seconda barra = SubMenuBar; sotto câ€™Ã¨ sempre il Breadcrumb.
-                // Imposta il â€œcontesto paginaâ€ per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
+// IN SOTTOMENU: seconda barra = SubMenuBar; sotto câ€™Ã¨ sempre il Breadcrumb.
+// Imposta il â€œcontesto paginaâ€ per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
                 val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
                 CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
                     SubMenuBar(
@@ -593,7 +650,7 @@ fun EditorMenusOnly(
                             }
                         },
                         onEnter = { label ->
-                            // evita accumulo â€œfoglie sorelleâ€ (Aggiungi foto/album/video)
+// evita accumulo â€œfoglie sorelleâ€ (Aggiungi foto/album/video)
                             val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
                             menuPath = when {
                                 menuPath.lastOrNull() == label -> menuPath
@@ -608,7 +665,7 @@ fun EditorMenusOnly(
                             menuSelections[key(menuPath, label)] = value
                             lastChanged = "$label: ${if (value) "ON" else "OFF"}"
                             dirty = true
-                            // qualsiasi modifica manuale annulla lo STILE (Default resta)
+// qualsiasi modifica manuale annulla lo STILE (Default resta)
                             val styleKey = key(listOf(root), "style")
                             val styleVal = (menuSelections[styleKey] as? String).orEmpty()
                             if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
@@ -644,7 +701,7 @@ fun EditorMenusOnly(
                                     }
                                 }
                                 else -> {
-                                    // modifica puntuale â†’ stile attivo passa a â€œNessunoâ€
+// modifica puntuale â†’ stile attivo passa a â€œNessunoâ€
                                     val styleKey = key(listOf(root), "style")
                                     val currentStyle = (menuSelections[styleKey] as? String).orEmpty()
                                     if (currentStyle.isNotEmpty() && !currentStyle.equals("Nessuno", true)) {
@@ -658,7 +715,7 @@ fun EditorMenusOnly(
                     BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
                 }
 
-                // Barra di conferma (quando risali con modifiche)
+// Barra di conferma (quando risali con modifiche)
                 if (showConfirm) {
                     ConfirmBar(
                         onCancel = {
@@ -675,513 +732,761 @@ fun EditorMenusOnly(
                         onSavePreset = {
                             if (LocalIsFree.current) showUpsell = true
                             else showSaveDialog = true
-                            )
-                        },
-
-                        // Dialog â€œSalva come stileâ€
-                        if (showSaveDialog) {
-                            AlertDialog(
-                                onDismissRequest = { showSaveDialog = false },
-                                title = { Text("Salva come stile") },
-                                text = {
-                                    Column {
-                                        Text("Dai un nome allo stile corrente. Se esiste giÃ , verrÃ  aggiornato.")
-                                        Spacer(Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = newPresetName,
-                                            onValueChange = { newPresetName = it },
-                                            singleLine = true,
-                                            label = { Text("Nome stile") },
-                                            colors = TextFieldDefaults.colors(
-                                                focusedTextColor = Color.White,
-                                                unfocusedTextColor = Color.White,
-                                                cursorColor = WIZ_AZURE,
-                                                focusedIndicatorColor = WIZ_AZURE,
-                                                unfocusedIndicatorColor = Color(0xFF2A3B5B),
-                                                focusedLabelColor = WIZ_AZURE,
-                                                unfocusedLabelColor = Color(0xFF9BA3AF)
-                                            )
-                                        )
-                                    }
-                                },
-                                confirmButton = {
-                                    TextButton(onClick = {
-                                        val root = menuPath.firstOrNull() ?: "Contenitore"
-                                        val name = newPresetName.trim()
-                                        if (name.isNotBlank()) {
-                                            savePreset(root, name)
-                                        }
-                                        newPresetName = ""
-                                        dirty = false
-                                        showSaveDialog = false
-                                        showConfirm = false
-                                        menuPath = emptyList()
-                                    }) { Text("Salva") }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = {
-                                        newPresetName = ""
-                                        showSaveDialog = false
-                                    }) { Text("Annulla") }
-                                }
-                            )
                         }
                     )
                 }
 
-                // 1) Deck laterale destro (apertura a scorrimento/tap)
-                InfoEdgeDeck(
-                    open = infoDeckOpen,
-                    onToggleOpen = { infoDeckOpen = !infoDeckOpen },
-                    infoEnabled = infoMode,
-                    onToggleInfo = { infoMode = !infoMode },
-                    enabled = menuPath.isEmpty()
-                )
-
-                // 2) Toast informativo (in alto, scompare con fade)
-                InfoToastCard(
-                    visible = infoCardVisible && infoCard != null,
-                    title = infoCard?.first ?: "",
-                    body = infoCard?.second ?: "",
-                    onDismiss = { infoCardVisible = false; infoCard = null }
-                )
-
-                if (showUpsell) {
-                    ProUpsellSheet(onClose = { showUpsell = false })
+// Dialog â€œSalva come stileâ€
+                if (showSaveDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSaveDialog = false },
+                        title = { Text("Salva come stile") },
+                        text = {
+                            Column {
+                                Text("Dai un nome allo stile corrente. Se esiste giÃ , verrÃ  aggiornato.")
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = newPresetName,
+                                    onValueChange = { newPresetName = it },
+                                    singleLine = true,
+                                    label = { Text("Nome stile") },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        cursorColor = WIZ_AZURE,
+                                        focusedIndicatorColor = WIZ_AZURE,
+                                        unfocusedIndicatorColor = Color(0xFF2A3B5B),
+                                        focusedLabelColor = WIZ_AZURE,
+                                        unfocusedLabelColor = Color(0xFF9BA3AF)
+                                    )
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val root = menuPath.firstOrNull() ?: "Contenitore"
+                                val name = newPresetName.trim()
+                                if (name.isNotBlank()) {
+                                    savePreset(root, name)
+                                }
+                                newPresetName = ""
+                                dirty = false
+                                showSaveDialog = false
+                                showConfirm = false
+                                menuPath = emptyList()
+                            }) { Text("Salva") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                newPresetName = ""
+                                showSaveDialog = false
+                            }) { Text("Annulla") }
+                        }
+                    )
                 }
+
+            }
+
+// 1) Deck laterale destro (apertura a scorrimento/tap)
+            InfoEdgeDeck(
+                open = infoDeckOpen,
+                onToggleOpen = { infoDeckOpen = !infoDeckOpen },
+                infoEnabled = infoMode,
+                onToggleInfo = { infoMode = !infoMode },
+                enabled = menuPath.isEmpty()
+            )
+
+// 2) Toast informativo (in alto, scompare con fade)
+            InfoToastCard(
+                visible = infoCardVisible && infoCard != null,
+                title = infoCard?.first ?: "",
+                body = infoCard?.second ?: "",
+                onDismiss = { infoCardVisible = false; infoCard = null }
+            )
+            if (showUpsell) {
+                ProUpsellSheet(onClose = { showUpsell = false })
             }
         }
     }
+}
 
-    /* =========================================================================================
-     *  BARRA PRINCIPALE (icone stile GitHub, scura, sempre visibile in HOME)
-     * ========================================================================================= */
-    @Composable
-    private fun BoxScope.MainBottomBar(
-        onUndo: () -> Unit,
-        onRedo: () -> Unit,
-        onSaveFile: () -> Unit,
-        onDelete: () -> Unit,
-        onDuplicate: () -> Unit,
-        onProperties: () -> Unit,
-        onLayout: () -> Unit,
-        onCreate: () -> Unit,            // rimane, se lo usi altrove
-        onCreatePage: () -> Unit = {},   // NEW
-        onCreateAlert: () -> Unit = {},  // NEW
-        onCreateMenuLaterale: () -> Unit = {}, // NEW
-        onCreateMenuCentrale: () -> Unit = {}, // NEW
-        onOpenList: () -> Unit,
-        onSaveProject: () -> Unit,
-        onOpenProject: () -> Unit,
-        onNewProject: () -> Unit,
-        onMeasured: (Int) -> Unit,
-        discontinuousBottom: Boolean = true
+/* =========================================================================================
+*  BARRA PRINCIPALE (icone stile GitHub, scura, sempre visibile in HOME)
+* ========================================================================================= */
+@Composable
+private fun BoxScope.MainBottomBar(
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onSaveFile: () -> Unit,
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onProperties: () -> Unit,
+    onLayout: () -> Unit,
+    onCreate: () -> Unit,            // rimane, se lo usi altrove
+    onCreatePage: () -> Unit = {},   // NEW
+    onCreateAlert: () -> Unit = {},  // NEW
+    onCreateMenuLaterale: () -> Unit = {}, // NEW
+    onCreateMenuCentrale: () -> Unit = {}, // NEW
+    onOpenList: () -> Unit,
+    onSaveProject: () -> Unit,
+    onOpenProject: () -> Unit,
+    onNewProject: () -> Unit,
+    onMeasured: (Int) -> Unit,
+    discontinuousBottom: Boolean = true
+) {
+// --- stato locale ---
+    var showCreateMenu by remember { mutableStateOf(false) }
+    var showListMenu by remember { mutableStateOf(false) }
+
+// densitÃ  e misure contenitore
+    val localDensity = LocalDensity.current
+    var containerHeightPx by remember { mutableStateOf(0f) }
+    var containerLeftInRoot by remember { mutableStateOf(0f) }
+
+// misure per etichette
+    var firstBlockCenter by remember { mutableStateOf<Float?>(null) }   // 4 icone sinistra
+    var lastBlockCenter by remember { mutableStateOf<Float?>(null) }    // icone progetti
+    var wElementi by remember { mutableStateOf(0f) }
+    var wPagine by remember { mutableStateOf(0f) }
+    var wProgressi by remember { mutableStateOf(0f) }
+
+// misure per "gap tra gruppi" (piÃ¹ affidabile dei puntini)
+    var firstBlockRightEdge by remember { mutableStateOf<Float?>(null) }      // destra blocco 1
+    var middleBlockLeftEdge by remember { mutableStateOf<Float?>(null) }      // sinistra blocco Pagine&MenÃ¹
+    var preSecondBlockRightEdge by remember { mutableStateOf<Float?>(null) }  // destra blocco Crea+Lista
+    var lastBlockLeftEdge by remember { mutableStateOf<Float?>(null) }        // sinistra blocco Progetti
+
+// misure dei puntini (se servono in futuro)
+    var firstDotCenter by remember { mutableStateOf<Float?>(null) }
+    var secondDotCenter by remember { mutableStateOf<Float?>(null) }
+
+// --- varia colore linea (scritte + linea) ---
+    val lineAccent = DECK_HIGHLIGHT // varia colore linea
+// --- alza etichette di poco rispetto alla linea ---
+    val labelLift = 3.dp
+
+// stile etichette (usa lineAccent)
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Medium,
+        color = lineAccent
+    )
+
+// parametri linea a filo del bordo inferiore
+    val underlineStroke = 1.dp // spessore
+    val extraGapPad = 2.dp     // piccolo margine extra su entrambi i lati dei gap
+
+    Surface(
+        color = Color(0xFF0D1117),
+        contentColor = Color.White,
+        tonalElevation = 10.dp,
+        shadowElevation = 12.dp,
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
+            .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
+            .onGloballyPositioned { onMeasured(it.size.height) }
     ) {
-        // --- stato locale ---
-        var showCreateMenu by remember { mutableStateOf(false) }
-        var showListMenu by remember { mutableStateOf(false) }
+        val scroll = rememberScrollState()
 
-        // densitÃ  e misure contenitore
-        val localDensity = LocalDensity.current
-        var containerHeightPx by remember { mutableStateOf(0f) }
-        var containerLeftInRoot by remember { mutableStateOf(0f) }
-
-        // misure per etichette
-        var firstBlockCenter by remember { mutableStateOf<Float?>(null) }   // 4 icone sinistra
-        var lastBlockCenter by remember { mutableStateOf<Float?>(null) }    // icone progetti
-        var wElementi by remember { mutableStateOf(0f) }
-        var wPagine by remember { mutableStateOf(0f) }
-        var wProgressi by remember { mutableStateOf(0f) }
-
-        // misure per "gap tra gruppi" (piÃ¹ affidabile dei puntini)
-        var firstBlockRightEdge by remember { mutableStateOf<Float?>(null) }      // destra blocco 1
-        var middleBlockLeftEdge by remember { mutableStateOf<Float?>(null) }      // sinistra blocco Pagine&MenÃ¹
-        var preSecondBlockRightEdge by remember { mutableStateOf<Float?>(null) }  // destra blocco Crea+Lista
-        var lastBlockLeftEdge by remember { mutableStateOf<Float?>(null) }        // sinistra blocco Progetti
-
-        // misure dei puntini (se servono in futuro)
-        var firstDotCenter by remember { mutableStateOf<Float?>(null) }
-        var secondDotCenter by remember { mutableStateOf<Float?>(null) }
-
-        // --- varia colore linea (scritte + linea) ---
-        val lineAccent = DECK_HIGHLIGHT // varia colore linea
-        // --- alza etichette di poco rispetto alla linea ---
-        val labelLift = 3.dp
-
-        // stile etichette (usa lineAccent)
-        val labelStyle = MaterialTheme.typography.labelSmall.copy(
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = lineAccent
-        )
-
-        // parametri linea a filo del bordo inferiore
-        val underlineStroke = 1.dp // spessore
-        val extraGapPad = 2.dp     // piccolo margine extra su entrambi i lati dei gap
-
-        Surface(
-            color = Color(0xFF0D1117),
-            contentColor = Color.White,
-            tonalElevation = 10.dp,
-            shadowElevation = 12.dp,
-            shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
-                .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
-                .onGloballyPositioned { onMeasured(it.size.height) }
+                .fillMaxSize()
+                .onGloballyPositioned {
+                    containerHeightPx = it.size.height.toFloat()
+                    containerLeftInRoot = it.positionInRoot().x
+                }
         ) {
-            val scroll = rememberScrollState()
-
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .onGloballyPositioned {
-                        containerHeightPx = it.size.height.toFloat()
-                        containerLeftInRoot = it.positionInRoot().x
-                    }
+                    .padding(horizontal = 10.dp)
+                    .horizontalScroll(scroll),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 10.dp)
-                        .horizontalScroll(scroll),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // --------- GRUPPO SINISTRO ---------
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+// --------- GRUPPO SINISTRO ---------
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
 
-                        // BLOCCO 1: quattro icone (ELEMENTI)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.onGloballyPositioned { coords ->
-                                val left = coords.positionInRoot().x - containerLeftInRoot
-                                val width = coords.size.width.toFloat()
-                                firstBlockCenter = left + width / 2f
-                                firstBlockRightEdge = left + width
-                            }
-                        ) {
-                            // BLOCCO 1
-                            ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo,
-                                infoTitle = "Annulla", infoBody = "Annulla lâ€™ultima modifica", allowLongPressInInfo = false )
-                            ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo,
-                                infoTitle = "Ripeti", infoBody = "Ripristina lâ€™ultima azione annullata", allowLongPressInInfo = false )
-                            ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete,
-                                infoTitle = "Cestino", infoBody = "Elimina lâ€™elemento corrente", allowLongPressInInfo = false )
-                            ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate,
-                                infoTitle = "Duplica", infoBody = "Crea una copia dellâ€™elemento corrente", allowLongPressInInfo = false )
+// BLOCCO 1: quattro icone (ELEMENTI)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            firstBlockCenter = left + width / 2f
+                            firstBlockRightEdge = left + width
                         }
-
-                        // PUNTINO 1
-                        Box(
-                            modifier = Modifier.onGloballyPositioned { coords ->
-                                val left = coords.positionInRoot().x - containerLeftInRoot
-                                val width = coords.size.width.toFloat()
-                                firstDotCenter = left + width / 2f
-                            }
-                        ) { dividerDot() }
-
-                        // BLOCCO INTERMEDIO (PAGINE E MENU'™)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.onGloballyPositioned { coords ->
-                                val left = coords.positionInRoot().x - containerLeftInRoot
-                                middleBlockLeftEdge = left
-                            }
-                        ) {
-                            ToolbarIconButton(EditorIcons.Settings, "ProprietÃ ", onClick = onProperties,
-                                infoTitle = "ProprietÃ ", infoBody = "Impostazioni dellâ€™elemento corrente")
-                            ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout,
-                                infoTitle = "Layout pagina", infoBody = "Apri le impostazioni di layout")
-                            ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile,
-                                infoTitle = "Salva", infoBody = "Salva lâ€™elemento corrente")
-                        }
+                    ) {
+// BLOCCO 1
+                        ToolbarIconButton(Icons.Outlined.Undo, "Undo", onClick = onUndo,
+                            infoTitle = "Annulla", infoBody = "Annulla lâ€™ultima modifica", allowLongPressInInfo = false )
+                        ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo,
+                            infoTitle = "Ripeti", infoBody = "Ripristina lâ€™ultima azione annullata", allowLongPressInInfo = false )
+                        ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete,
+                            infoTitle = "Cestino", infoBody = "Elimina lâ€™elemento corrente", allowLongPressInInfo = false )
+                        ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate,
+                            infoTitle = "Duplica", infoBody = "Crea una copia dellâ€™elemento corrente", allowLongPressInInfo = false )
                     }
 
-                    // --------- GRUPPO DESTRO ---------
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-
-                        // BLOCCO PRE-SECONDO PUNTINO: CREA + LISTA
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.onGloballyPositioned { coords ->
-                                val left = coords.positionInRoot().x - containerLeftInRoot
-                                val width = coords.size.width.toFloat()
-                                preSecondBlockRightEdge = left + width
-                            }
-                        ) {
-                            // CREA
-                            DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
-                                DropdownMenuItem(text = { Text("Nuova pagina") },
-                                    onClick = { showCreateMenu = false; onCreatePage() })
-                                DropdownMenuItem(text = { Text("Nuovo avviso") },
-                                    onClick = { showCreateMenu = false; onCreateAlert() })
-                                DropdownMenuItem(text = { Text("MenÃ¹ laterale") },
-                                    onClick = { showCreateMenu = false; onCreateMenuLaterale() })
-                                DropdownMenuItem(text = { Text("MenÃ¹ centrale") },
-                                    onClick = { showCreateMenu = false; onCreateMenuCentrale() })
-                            }
-
-                            Box {
-                                ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
-                                DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
-                                    DropdownMenuItem(text = { Text("Nuova pagina")  }, onClick = { showCreateMenu = false; onCreatePage() })
-                                    DropdownMenuItem(text = { Text("Nuovo avviso")  }, onClick = { showCreateMenu = false; onCreateAlert() })
-                                    DropdownMenuItem(text = { Text("MenÃ¹ laterale") }, onClick = { showCreateMenu = false; onCreateMenuLaterale() })
-                                    DropdownMenuItem(text = { Text("MenÃ¹ centrale") }, onClick = { showCreateMenu = false; onCreateMenuCentrale() })
-                                }
-                            }
-
-                            // LISTA
-                            Box {
-                                ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true; onOpenList() })
-                                DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
-                                    DropdownMenuItem(text = { Text("Pagineâ€¦") }, onClick = { showListMenu = false })
-                                    DropdownMenuItem(text = { Text("Avvisiâ€¦") }, onClick = { showListMenu = false })
-                                    DropdownMenuItem(text = { Text("Menu lateraliâ€¦") }, onClick = { showListMenu = false })
-                                    DropdownMenuItem(text = { Text("Menu centraliâ€¦") }, onClick = { showListMenu = false })
-                                }
-                            }
+// PUNTINO 1
+                    Box(
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            firstDotCenter = left + width / 2f
                         }
+                    ) { dividerDot() }
 
-                        // PUNTINO 2
-                        Box(
-                            modifier = Modifier.onGloballyPositioned { coords ->
-                                val left = coords.positionInRoot().x - containerLeftInRoot
-                                val width = coords.size.width.toFloat()
-                                secondDotCenter = left + width / 2f
-                            }
-                        ) { dividerDot() }
-
-                        // BLOCCO PROGETTI / PROGRESSI
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.onGloballyPositioned { coords ->
-                                val left = coords.positionInRoot().x - containerLeftInRoot
-                                val width = coords.size.width.toFloat()
-                                lastBlockCenter = left + width / 2f
-                                lastBlockLeftEdge = left
-                            }
-                        ) {
-                            ToolbarIconButton(Icons.Outlined.Save, "Salva progetto", onClick = onSaveProject,
-                                infoTitle = "Salva progetto", infoBody = "Salva lo stato del progetto")
-                            ToolbarIconButton(Icons.Outlined.FolderOpen, "Apri", onClick = onOpenProject,
-                                infoTitle = "Apri progetto", infoBody = "Apri un progetto esistente")
-                            ToolbarIconButton(Icons.Outlined.CreateNewFolder, "Nuovo progetto", onClick = onNewProject,
-                                infoTitle = "Nuovo progetto", infoBody = "Crea un nuovo progetto")
+                    // BLOCCO INTERMEDIO (PAGINE E MENU'™)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            middleBlockLeftEdge = left
                         }
+                    ) {
+                        ToolbarIconButton(EditorIcons.Settings, "ProprietÃ ", onClick = onProperties,
+                            infoTitle = "ProprietÃ ", infoBody = "Impostazioni dellâ€™elemento corrente")
+                        ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout,
+                            infoTitle = "Layout pagina", infoBody = "Apri le impostazioni di layout")
+                        ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile,
+                            infoTitle = "Salva", infoBody = "Salva lâ€™elemento corrente")
                     }
                 }
 
-                // ---------- BORDO BIANCO: top/sinistra/destra SEMPRE continui; bottom condizionale ----------
-                androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                    val stroke = with(localDensity) { underlineStroke.toPx() }
-                    val y = containerHeightPx - stroke / 2f
-                    val pad = with(localDensity) { 6.dp.toPx() }
-                    val extra = with(localDensity) { extraGapPad.toPx() }
+// --------- GRUPPO DESTRO ---------
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
 
-                    // TOP (curvo + segmento) â€” segue gli angoli arrotondati della Surface
-                    val corner = with(localDensity) { 18.dp.toPx() } // deve combaciare con RoundedCornerShape(topStart/topEnd)
-                    val topY = stroke / 2f
-                    // segmento centrale
-                    drawLine(
-                        color = lineAccent,
-                        start = androidx.compose.ui.geometry.Offset(corner, topY),
-                        end   = androidx.compose.ui.geometry.Offset(size.width - corner, topY),
-                        strokeWidth = stroke,
-                        cap = androidx.compose.ui.graphics.StrokeCap.Butt
-                    )
-                    // arco top-left (180Â° â†’ 270Â°)
-                    drawArc(
-                        color = lineAccent,
-                        startAngle = 180f,
-                        sweepAngle = 90f,
-                        useCenter = false,
-                        topLeft = androidx.compose.ui.geometry.Offset(stroke / 2f, stroke / 2f),
-                        size = androidx.compose.ui.geometry.Size(2 * corner - stroke, 2 * corner - stroke),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
-                    )
-                    // arco top-right (270Â° â†’ 360Â°)
-                    drawArc(
-                        color = lineAccent,
-                        startAngle = 270f,
-                        sweepAngle = 90f,
-                        useCenter = false,
-                        topLeft = androidx.compose.ui.geometry.Offset(size.width - (2 * corner) + stroke / 2f, stroke / 2f),
-                        size = androidx.compose.ui.geometry.Size(2 * corner - stroke, 2 * corner - stroke),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
-                    )
-                    // LEFT
-                    drawLine(
-                        color = lineAccent,
-                        start = androidx.compose.ui.geometry.Offset(stroke / 2f, 0f),
-                        end   = androidx.compose.ui.geometry.Offset(stroke / 2f, size.height),
-                        strokeWidth = stroke
-                    )
-                    // RIGHT
-                    drawLine(
-                        color = lineAccent,
-                        start = androidx.compose.ui.geometry.Offset(size.width - stroke / 2f, 0f),
-                        end   = androidx.compose.ui.geometry.Offset(size.width - stroke / 2f, size.height),
-                        strokeWidth = stroke
-                    )
-
-                    if (!discontinuousBottom) {
-                        // PATH ATTIVO â†’ bordo inferiore CONTINUO
-                        drawLine(
-                            color = lineAccent,
-                            start = androidx.compose.ui.geometry.Offset(0f, y),
-                            end   = androidx.compose.ui.geometry.Offset(size.width, y),
-                            strokeWidth = stroke,
-                            cap = androidx.compose.ui.graphics.StrokeCap.Round
-                        )
-                        return@Canvas
-                    }
-
-                    // STATO HOME â†’ bordo inferiore con GAP sotto le scritte e tra i gruppi (come ora)
-                    val gaps = mutableListOf<Pair<Float, Float>>()
-
-                    firstBlockCenter?.let { cx ->
-                        if (wElementi > 0f) gaps += (cx - wElementi / 2f - pad) to (cx + wElementi / 2f + pad)
-                    }
-                    if (firstDotCenter != null && secondDotCenter != null && wPagine > 0f) {
-                        val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
-                        gaps += (cx - wPagine / 2f - pad) to (cx + wPagine / 2f + pad)
-                    }
-                    lastBlockCenter?.let { cx ->
-                        if (wProgressi > 0f) gaps += (cx - wProgressi / 2f - pad) to (cx + wProgressi / 2f + pad)
-                    }
-                    if (firstBlockRightEdge != null && middleBlockLeftEdge != null) {
-                        val s = (firstBlockRightEdge!! - extra).coerceAtLeast(0f)
-                        val e = (middleBlockLeftEdge!! + extra).coerceAtMost(size.width)
-                        if (e > s) gaps += s to e
-                    }
-                    if (preSecondBlockRightEdge != null && lastBlockLeftEdge != null) {
-                        val s = (preSecondBlockRightEdge!! - extra).coerceAtLeast(0f)
-                        val e = (lastBlockLeftEdge!! + extra).coerceAtMost(size.width)
-                        if (e > s) gaps += s to e
-                    }
-
-                    gaps.sortBy { it.first }
-                    var x0 = 0f
-                    for ((gs, ge) in gaps) {
-                        val startX = gs.coerceAtLeast(0f)
-                        if (startX > x0) {
-                            drawLine(
-                                color = lineAccent,
-                                start = androidx.compose.ui.geometry.Offset(x0, y),
-                                end   = androidx.compose.ui.geometry.Offset(startX, y),
-                                strokeWidth = stroke,
-                                cap = androidx.compose.ui.graphics.StrokeCap.Round
-                            )
+// BLOCCO PRE-SECONDO PUNTINO: CREA + LISTA
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            preSecondBlockRightEdge = left + width
                         }
-                        x0 = ge.coerceAtLeast(x0)
+                    ) {
+// CREA
+                        DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
+                            DropdownMenuItem(text = { Text("Nuova pagina") },
+                                onClick = { showCreateMenu = false; onCreatePage() })
+                            DropdownMenuItem(text = { Text("Nuovo avviso") },
+                                onClick = { showCreateMenu = false; onCreateAlert() })
+                            DropdownMenuItem(text = { Text("MenÃ¹ laterale") },
+                                onClick = { showCreateMenu = false; onCreateMenuLaterale() })
+                            DropdownMenuItem(text = { Text("MenÃ¹ centrale") },
+                                onClick = { showCreateMenu = false; onCreateMenuCentrale() })
+                        }
+
+                        Box {
+                            ToolbarIconButton(EditorIcons.Insert, "Crea", onClick = { showCreateMenu = true })
+                            DropdownMenu(expanded = showCreateMenu, onDismissRequest = { showCreateMenu = false }) {
+                                DropdownMenuItem(text = { Text("Nuova pagina")  }, onClick = { showCreateMenu = false; onCreatePage() })
+                                DropdownMenuItem(text = { Text("Nuovo avviso")  }, onClick = { showCreateMenu = false; onCreateAlert() })
+                                DropdownMenuItem(text = { Text("MenÃ¹ laterale") }, onClick = { showCreateMenu = false; onCreateMenuLaterale() })
+                                DropdownMenuItem(text = { Text("MenÃ¹ centrale") }, onClick = { showCreateMenu = false; onCreateMenuCentrale() })
+                            }
+                        }
+
+// LISTA
+                        Box {
+                            ToolbarIconButton(Icons.Outlined.List, "Lista", onClick = { showListMenu = true; onOpenList() })
+                            DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
+                                DropdownMenuItem(text = { Text("Pagineâ€¦") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Avvisiâ€¦") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Menu lateraliâ€¦") }, onClick = { showListMenu = false })
+                                DropdownMenuItem(text = { Text("Menu centraliâ€¦") }, onClick = { showListMenu = false })
+                            }
+                        }
                     }
-                    if (x0 < size.width) {
+
+// PUNTINO 2
+                    Box(
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            secondDotCenter = left + width / 2f
+                        }
+                    ) { dividerDot() }
+
+// BLOCCO PROGETTI / PROGRESSI
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val left = coords.positionInRoot().x - containerLeftInRoot
+                            val width = coords.size.width.toFloat()
+                            lastBlockCenter = left + width / 2f
+                            lastBlockLeftEdge = left
+                        }
+                    ) {
+                        ToolbarIconButton(Icons.Outlined.Save, "Salva progetto", onClick = onSaveProject,
+                            infoTitle = "Salva progetto", infoBody = "Salva lo stato del progetto")
+                        ToolbarIconButton(Icons.Outlined.FolderOpen, "Apri", onClick = onOpenProject,
+                            infoTitle = "Apri progetto", infoBody = "Apri un progetto esistente")
+                        ToolbarIconButton(Icons.Outlined.CreateNewFolder, "Nuovo progetto", onClick = onNewProject,
+                            infoTitle = "Nuovo progetto", infoBody = "Crea un nuovo progetto")
+                    }
+                }
+            }
+
+// ---------- BORDO BIANCO: top/sinistra/destra SEMPRE continui; bottom condizionale ----------
+            androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                val stroke = with(localDensity) { underlineStroke.toPx() }
+                val y = containerHeightPx - stroke / 2f
+                val pad = with(localDensity) { 6.dp.toPx() }
+                val extra = with(localDensity) { extraGapPad.toPx() }
+
+// TOP (curvo + segmento) â€” segue gli angoli arrotondati della Surface
+                val corner = with(localDensity) { 18.dp.toPx() } // deve combaciare con RoundedCornerShape(topStart/topEnd)
+                val topY = stroke / 2f
+// segmento centrale
+                drawLine(
+                    color = lineAccent,
+                    start = androidx.compose.ui.geometry.Offset(corner, topY),
+                    end   = androidx.compose.ui.geometry.Offset(size.width - corner, topY),
+                    strokeWidth = stroke,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Butt
+                )
+// arco top-left (180Â° â†’ 270Â°)
+                drawArc(
+                    color = lineAccent,
+                    startAngle = 180f,
+                    sweepAngle = 90f,
+                    useCenter = false,
+                    topLeft = androidx.compose.ui.geometry.Offset(stroke / 2f, stroke / 2f),
+                    size = androidx.compose.ui.geometry.Size(2 * corner - stroke, 2 * corner - stroke),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+                )
+// arco top-right (270Â° â†’ 360Â°)
+                drawArc(
+                    color = lineAccent,
+                    startAngle = 270f,
+                    sweepAngle = 90f,
+                    useCenter = false,
+                    topLeft = androidx.compose.ui.geometry.Offset(size.width - (2 * corner) + stroke / 2f, stroke / 2f),
+                    size = androidx.compose.ui.geometry.Size(2 * corner - stroke, 2 * corner - stroke),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+                )
+// LEFT
+                drawLine(
+                    color = lineAccent,
+                    start = androidx.compose.ui.geometry.Offset(stroke / 2f, 0f),
+                    end   = androidx.compose.ui.geometry.Offset(stroke / 2f, size.height),
+                    strokeWidth = stroke
+                )
+// RIGHT
+                drawLine(
+                    color = lineAccent,
+                    start = androidx.compose.ui.geometry.Offset(size.width - stroke / 2f, 0f),
+                    end   = androidx.compose.ui.geometry.Offset(size.width - stroke / 2f, size.height),
+                    strokeWidth = stroke
+                )
+
+                if (!discontinuousBottom) {
+// PATH ATTIVO â†’ bordo inferiore CONTINUO
+                    drawLine(
+                        color = lineAccent,
+                        start = androidx.compose.ui.geometry.Offset(0f, y),
+                        end   = androidx.compose.ui.geometry.Offset(size.width, y),
+                        strokeWidth = stroke,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    return@Canvas
+                }
+
+// STATO HOME â†’ bordo inferiore con GAP sotto le scritte e tra i gruppi (come ora)
+                val gaps = mutableListOf<Pair<Float, Float>>()
+
+                firstBlockCenter?.let { cx ->
+                    if (wElementi > 0f) gaps += (cx - wElementi / 2f - pad) to (cx + wElementi / 2f + pad)
+                }
+                if (firstDotCenter != null && secondDotCenter != null && wPagine > 0f) {
+                    val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
+                    gaps += (cx - wPagine / 2f - pad) to (cx + wPagine / 2f + pad)
+                }
+                lastBlockCenter?.let { cx ->
+                    if (wProgressi > 0f) gaps += (cx - wProgressi / 2f - pad) to (cx + wProgressi / 2f + pad)
+                }
+                if (firstBlockRightEdge != null && middleBlockLeftEdge != null) {
+                    val s = (firstBlockRightEdge!! - extra).coerceAtLeast(0f)
+                    val e = (middleBlockLeftEdge!! + extra).coerceAtMost(size.width)
+                    if (e > s) gaps += s to e
+                }
+                if (preSecondBlockRightEdge != null && lastBlockLeftEdge != null) {
+                    val s = (preSecondBlockRightEdge!! - extra).coerceAtLeast(0f)
+                    val e = (lastBlockLeftEdge!! + extra).coerceAtMost(size.width)
+                    if (e > s) gaps += s to e
+                }
+
+                gaps.sortBy { it.first }
+                var x0 = 0f
+                for ((gs, ge) in gaps) {
+                    val startX = gs.coerceAtLeast(0f)
+                    if (startX > x0) {
                         drawLine(
                             color = lineAccent,
                             start = androidx.compose.ui.geometry.Offset(x0, y),
-                            end   = androidx.compose.ui.geometry.Offset(size.width, y),
+                            end   = androidx.compose.ui.geometry.Offset(startX, y),
                             strokeWidth = stroke,
                             cap = androidx.compose.ui.graphics.StrokeCap.Round
                         )
                     }
+                    x0 = ge.coerceAtLeast(x0)
                 }
-                // ---------- ETICHETTE (baseline allineata alla linea inferiore) ----------
-                // "elementi"
-                if (firstBlockCenter != null) {
-                    var baselineElemPx by remember { mutableStateOf(0f) }
-                    Text(
-                        "elementi",
-                        style = labelStyle,
-                        onTextLayout = { tlr -> baselineElemPx = tlr.getLineBaseline(0).toFloat() },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .onGloballyPositioned { wElementi = it.size.width.toFloat() }
-                            .offset {
-                                val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                                val y = (lineY - baselineElemPx - with(localDensity) { labelLift.toPx() }).toInt()
-                                val x = ((firstBlockCenter ?: 0f) - wElementi / 2f).toInt()
-                                IntOffset(x, y)
-                            }
+                if (x0 < size.width) {
+                    drawLine(
+                        color = lineAccent,
+                        start = androidx.compose.ui.geometry.Offset(x0, y),
+                        end   = androidx.compose.ui.geometry.Offset(size.width, y),
+                        strokeWidth = stroke,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                 }
-                // "pagine e menÃ¹"
-                if (firstDotCenter != null && secondDotCenter != null) {
-                    var baselinePagPx by remember { mutableStateOf(0f) }
-                    Text(
-                        "pagine e menÃ¹",
-                        style = labelStyle,
-                        onTextLayout = { tlr -> baselinePagPx = tlr.getLineBaseline(0).toFloat() },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .onGloballyPositioned { wPagine = it.size.width.toFloat() }
-                            .offset {
-                                val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
-                                val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                                val y = (lineY - baselinePagPx - with(localDensity) { labelLift.toPx() }).toInt()
-                                val x = (cx - wPagine / 2f).toInt()
-                                IntOffset(x, y)
-                            }
+            }
+// ---------- ETICHETTE (baseline allineata alla linea inferiore) ----------
+// "elementi"
+            if (firstBlockCenter != null) {
+                var baselineElemPx by remember { mutableStateOf(0f) }
+                Text(
+                    "elementi",
+                    style = labelStyle,
+                    onTextLayout = { tlr -> baselineElemPx = tlr.getLineBaseline(0).toFloat() },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .onGloballyPositioned { wElementi = it.size.width.toFloat() }
+                        .offset {
+                            val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
+                            val y = (lineY - baselineElemPx - with(localDensity) { labelLift.toPx() }).toInt()
+                            val x = ((firstBlockCenter ?: 0f) - wElementi / 2f).toInt()
+                            IntOffset(x, y)
+                        }
+                )
+            }
+// "pagine e menÃ¹"
+            if (firstDotCenter != null && secondDotCenter != null) {
+                var baselinePagPx by remember { mutableStateOf(0f) }
+                Text(
+                    "pagine e menÃ¹",
+                    style = labelStyle,
+                    onTextLayout = { tlr -> baselinePagPx = tlr.getLineBaseline(0).toFloat() },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .onGloballyPositioned { wPagine = it.size.width.toFloat() }
+                        .offset {
+                            val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
+                            val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
+                            val y = (lineY - baselinePagPx - with(localDensity) { labelLift.toPx() }).toInt()
+                            val x = (cx - wPagine / 2f).toInt()
+                            IntOffset(x, y)
+                        }
+                )
+            }
+// "progressi"
+            if (lastBlockCenter != null) {
+                var baselineProgPx by remember { mutableStateOf(0f) }
+                Text(
+                    "progetti",
+                    style = labelStyle,
+                    onTextLayout = { tlr -> baselineProgPx = tlr.getLineBaseline(0).toFloat() },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .onGloballyPositioned { wProgressi = it.size.width.toFloat() }
+                        .offset {
+                            val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
+                            val y = (lineY - baselineProgPx - with(localDensity) { labelLift.toPx() }).toInt()
+                            val x = ((lastBlockCenter ?: 0f) - wProgressi / 2f).toInt()
+                            IntOffset(x, y)
+                        }
+                )
+            }
+        }
+    }
+}
+
+
+/* Barretta categorie (sopra la barra principale), icone-only */
+@Composable
+private fun BoxScope.MainMenuBar(
+    onLayout: () -> Unit,
+    onContainer: () -> Unit,
+    onText: () -> Unit,
+    onAdd: () -> Unit,
+    bottomBarHeightPx: Int
+) {
+    val dy = with(LocalDensity.current) {
+        (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) +
+                BARS_GAP + SAFE_BOTTOM_MARGIN
+    }
+    Surface(
+        color = Color(0xFF111621),
+        contentColor = Color.White,
+        tonalElevation = 8.dp,
+        shadowElevation = 10.dp,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .offset { IntOffset(0, -dy.roundToPx()) }
+            .height(TOP_BAR_HEIGHT)
+    ) {
+        val scroll = rememberScrollState()
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .horizontalScroll(scroll)
+                .padding(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            when (LocalSecondBarMode.current) {
+                SecondBarMode.Classic -> {
+                    LocalExitClassic.current?.let { exitClassic ->
+                        ToolbarIconButton(
+                            icon = Icons.Outlined.ArrowBack,
+                            contentDescription = "Indietro",
+                            onClick = LocalExitClassic.current
+                        )
+                    }
+
+                    ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText,
+                        infoTitle = "Testo", infoBody = "Stili e proprietÃ  del testo", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer,
+                        infoTitle = "Contenitore", infoBody = "Aspetto e comportamenti del contenitore", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout,
+                        infoTitle = "Layout", infoBody = "Colori/immagini ed effetti dellâ€™area", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd,
+                        infoTitle = "Aggiungi", infoBody = "Inserisci nuovi elementi", allowLongPressInInfo = false)
+                    ToolbarIconButton(
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_question),
+                        contentDescription = "Info",
+                        onClick = { /* stub */ },
+                        infoTitle = "Info elemento", infoBody = "Dati descrittivi (stub)", allowLongPressInInfo = false
                     )
                 }
-                // "progressi"
-                if (lastBlockCenter != null) {
-                    var baselineProgPx by remember { mutableStateOf(0f) }
-                    Text(
-                        "progetti",
-                        style = labelStyle,
-                        onTextLayout = { tlr -> baselineProgPx = tlr.getLineBaseline(0).toFloat() },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .onGloballyPositioned { wProgressi = it.size.width.toFloat() }
-                            .offset {
-                                val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                                val y = (lineY - baselineProgPx - with(localDensity) { labelLift.toPx() }).toInt()
-                                val x = ((lastBlockCenter ?: 0f) - wProgressi / 2f).toInt()
-                                IntOffset(x, y)
-                            }
+
+                SecondBarMode.Deck -> {
+// NUOVA ROOT â€” MADRI + CLUSTER, con hiding delle madri a destra
+                    val deck = LocalDeckState.current
+                    val controller = LocalDeckController.current
+
+                    // Ordine e mapping: serve per stabilire cosa "sta a destra"
+                    data class Mother(val key: String, val iconRes: Int, val root: DeckRoot, val sampleId: String)
+                    val mothers = listOf(
+                        Mother("pagina", R.drawable.ic_page, DeckRoot.PAGINA, "pg001"),
+                        Mother("menuL", R.drawable.ic_menu_laterale, DeckRoot.MENU_LATERALE, "ml001"),
+                        Mother("menuC", R.drawable.ic_menu_centrale, DeckRoot.MENU_CENTRALE, "mc001"),
+                        Mother("avviso", R.drawable.ic_avviso, DeckRoot.AVVISO, "al001")
                     )
+                    val activeIdx = mothers.indexOfFirst { it.key == deck.openKey }  // -1 = nessun cluster aperto
+
+                    mothers.forEachIndexed { idx, m ->
+                        val showMother = (activeIdx == -1) || (idx <= activeIdx)   // nascondi madri a destra
+                        if (showMother) {
+                            MotherIcon(
+                                icon = ImageVector.vectorResource(id = m.iconRes),
+                                contentDescription = when (m.root) {
+                                    DeckRoot.PAGINA -> "Pagina"
+                                    DeckRoot.MENU_LATERALE -> "MenÃ¹ laterale"
+                                    DeckRoot.MENU_CENTRALE -> "MenÃ¹ centrale"
+                                    DeckRoot.AVVISO -> "Avviso"
+                                },
+                                selected = deck.openKey == m.key,
+                                onClick = { deck.toggle(m.key) },
+                                infoTitle = when (m.root) {
+                                    DeckRoot.PAGINA -> "Pagine"
+                                    DeckRoot.MENU_LATERALE -> "MenÃ¹ laterale"
+                                    DeckRoot.MENU_CENTRALE -> "MenÃ¹ centrale"
+                                    DeckRoot.AVVISO -> "Avvisi"
+                                },
+                                infoBody = "Tieni premuto per mostrare/nascondere le icone figlie"
+                            )
+
+                            if (deck.openKey == m.key) {
+                                CPlusIcon(
+                                    onClick = { controller.openWizard(m.root) },
+                                    infoTitle = "Crea",
+                                    infoBody = "Crea un nuovo elemento in questo cluster"
+                                )
+
+                                val children: List<String> = LocalDeckItems.current[m.root].orEmpty()
+                                children.forEach { childId ->
+                                    ChildIconWithBadge(
+                                        icon = ImageVector.vectorResource(id = m.iconRes),
+                                        id = childId,
+                                        onClick = { controller.openChild(m.root) }, // long-press lo richiama comunque
+                                        badgeBg = DECK_BADGE_BG,
+                                        badgeTxt = DECK_BADGE_TXT
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+}
 
-
-    /* Barretta categorie (sopra la barra principale), icone-only */
-    @Composable
-    private fun BoxScope.MainMenuBar(
-        onLayout: () -> Unit,
-        onContainer: () -> Unit,
-        onText: () -> Unit,
-        onAdd: () -> Unit,
-        bottomBarHeightPx: Int
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun MotherIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit,                 // azione â€œapri/chiudi clusterâ€
+    infoTitle: String? = null,
+    infoBody: String? = null
+) {
+    val info = LocalInfoMode.current
+    Surface(
+        shape = CircleShape,
+        color = Color(0xFF1B2334),
+        contentColor = Color.White,
+        tonalElevation = if (selected) 6.dp else 0.dp,
+        shadowElevation = if (selected) 6.dp else 0.dp,
+        border = if (selected) BorderStroke(2.dp, DECK_HIGHLIGHT) else null,
+        modifier = Modifier.size(42.dp)
     ) {
-        val dy = with(LocalDensity.current) {
-            (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) +
-                    BARS_GAP + SAFE_BOTTOM_MARGIN
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .combinedClickable(
+                    onClick = {
+                        if (info.enabled) {
+                            info.show(infoTitle ?: contentDescription, infoBody ?: "â€”")
+                        } else {
+                            onClick()
+                        }
+                    },
+// IN INFO MODE: il cluster si apre solo con longâ€‘press
+                    onLongClick = { onClick() }
+                )
+        ) {
+            Icon(icon, contentDescription = contentDescription, modifier = Modifier.align(Alignment.Center))
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CPlusIcon(
+    onClick: () -> Unit,
+    icon: ImageVector = ImageVector.vectorResource(id = R.drawable.ic_add_circle),
+    infoTitle: String = "Crea",
+    infoBody: String = "Crea un nuovo elemento in questo cluster"
+) {
+    val info = LocalInfoMode.current
+    Surface(shape = CircleShape, color = Color(0xFF1B2334), contentColor = Color.White) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .combinedClickable(
+                    onClick = {
+                        if (info.enabled) {
+                            info.show(infoTitle, infoBody)  // in info mode: SOLO descrizione
+                        } else {
+                            onClick()
+                        }
+                    },
+                    onLongClick = { /* nessuna azione */ } // â† disabilitato
+                )
+        ) {
+            Icon(icon, contentDescription = "Nuovo", modifier = Modifier.align(Alignment.Center))
+        }
+    }
+}
+
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChildIconWithBadge(
+    icon: ImageVector,
+    id: String,
+    onClick: () -> Unit,
+    badgeBg: Color = DECK_BADGE_BG,
+    badgeTxt: Color = DECK_BADGE_TXT
+) {
+    val info = LocalInfoMode.current
+    val shown = id.take(8)
+    Box(contentAlignment = Alignment.Center) {
+        Surface(shape = CircleShape, color = Color(0xFF1B2334), contentColor = Color.White) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .combinedClickable(
+                        onClick = {
+                            if (info.enabled) {
+                                info.show("Elemento $shown", "Tieni premuto per aprire lâ€™editor classico")
+                            } else {
+                                onClick()
+                            }
+                        },
+                        onLongClick = { onClick() }    // longâ€‘press = apri editor classico
+                    )
+            ) {
+                Icon(icon, contentDescription = shown, modifier = Modifier.align(Alignment.Center))
+            }
         }
         Surface(
-            color = Color(0xFF111621),
-            contentColor = Color.White,
-            tonalElevation = 8.dp,
-            shadowElevation = 10.dp,
-            shape = RoundedCornerShape(14.dp),
+            color = badgeBg,
+            contentColor = badgeTxt,
+            shape = RoundedCornerShape(6.dp),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .offset { IntOffset(0, -dy.roundToPx()) }
-                .height(TOP_BAR_HEIGHT)
+                .offset { IntOffset(0, 14) }
         ) {
-            val scroll = rememberScrollState()
+            Text(
+                text = shown,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                fontSize = 10.sp
+            )
+        }
+    }
+}
 
+/* =========================================================================================
+*  SUBMENU â€” barra icone livello corrente (menÃ¹ â€œad alberoâ€)
+*  SOLO UI: nessuna modifica applicata al documento.
+* ========================================================================================= */
+
+@Composable
+private fun BoxScope.SubMenuBar(
+    path: List<String>,
+    selections: MutableMap<String, Any?>,
+    onBack: () -> Unit,
+    onEnter: (String) -> Unit,
+    onToggle: (label: String, value: Boolean) -> Unit,
+    onPick: (label: String, value: String) -> Unit,
+    savedPresets: Map<String, MutableList<String>>
+) {
+    val offsetY = with(LocalDensity.current) { (BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA + BARS_GAP + SAFE_BOTTOM_MARGIN).roundToPx() }
+    Surface(
+        color = Color(0xFF0F141E),
+        contentColor = Color.White,
+        tonalElevation = 8.dp,
+        shadowElevation = 10.dp,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .offset { IntOffset(0, -offsetY) }
+            .height(TOP_BAR_HEIGHT)
+    ) {
+        val scroll = rememberScrollState()
+        CompositionLocalProvider(
+            LocalInfoMode provides InfoModeEnv(enabled = false) { _, _ -> }
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1191,1727 +1496,1406 @@ fun EditorMenusOnly(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                when (LocalSecondBarMode.current) {
-                    SecondBarMode.Classic -> {
-                        LocalExitClassic.current?.let { exitClassic ->
-                            ToolbarIconButton(
-                                icon = Icons.Outlined.ArrowBack,
-                                contentDescription = "Indietro",
-                                onClick = LocalExitClassic.current
-                            )
-                        }
+// back icon
+                ToolbarIconButton(Icons.Outlined.ArrowBack, "Indietro", onClick = onBack)
 
-                        ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText,
-                            infoTitle = "Testo", infoBody = "Stili e proprietÃ  del testo", allowLongPressInInfo = false)
-                        ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer,
-                            infoTitle = "Contenitore", infoBody = "Aspetto e comportamenti del contenitore", allowLongPressInInfo = false)
-                        ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout,
-                            infoTitle = "Layout", infoBody = "Colori/immagini ed effetti dellâ€™area", allowLongPressInInfo = false)
-                        ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd,
-                            infoTitle = "Aggiungi", infoBody = "Inserisci nuovi elementi", allowLongPressInInfo = false)
-                        ToolbarIconButton(
-                            icon = ImageVector.vectorResource(id = R.drawable.ic_question),
-                            contentDescription = "Info",
-                            onClick = { /* stub */ },
-                            infoTitle = "Info elemento", infoBody = "Dati descrittivi (stub)", allowLongPressInInfo = false
-                        )
-                    }
-
-                    SecondBarMode.Deck -> {
-                        // NUOVA ROOT â€” MADRI + CLUSTER, con hiding delle madri a destra
-                        val deck = LocalDeckState.current
-                        val controller = LocalDeckController.current
-
-                        // Ordine e mapping: serve per stabilire cosa "sta a destra"
-                        data class Mother(val key: String, val iconRes: Int, val root: DeckRoot, val sampleId: String)
-                        val mothers = listOf(
-                            Mother("pagina", R.drawable.ic_page, DeckRoot.PAGINA, "pg001"),
-                            Mother("menuL", R.drawable.ic_menu_laterale, DeckRoot.MENU_LATERALE, "ml001"),
-                            Mother("menuC", R.drawable.ic_menu_centrale, DeckRoot.MENU_CENTRALE, "mc001"),
-                            Mother("avviso", R.drawable.ic_avviso, DeckRoot.AVVISO, "al001")
-                        )
-                        val activeIdx = mothers.indexOfFirst { it.key == deck.openKey }  // -1 = nessun cluster aperto
-
-                        mothers.forEachIndexed { idx, m ->
-                            val showMother = (activeIdx == -1) || (idx <= activeIdx)   // nascondi madri a destra
-                            if (showMother) {
-                                MotherIcon(
-                                    icon = ImageVector.vectorResource(id = m.iconRes),
-                                    contentDescription = when (m.root) {
-                                        DeckRoot.PAGINA -> "Pagina"
-                                        DeckRoot.MENU_LATERALE -> "MenÃ¹ laterale"
-                                        DeckRoot.MENU_CENTRALE -> "MenÃ¹ centrale"
-                                        DeckRoot.AVVISO -> "Avviso"
-                                    },
-                                    selected = deck.openKey == m.key,
-                                    onClick = { deck.toggle(m.key) },
-                                    infoTitle = when (m.root) {
-                                        DeckRoot.PAGINA -> "Pagine"
-                                        DeckRoot.MENU_LATERALE -> "MenÃ¹ laterale"
-                                        DeckRoot.MENU_CENTRALE -> "MenÃ¹ centrale"
-                                        DeckRoot.AVVISO -> "Avvisi"
-                                    },
-                                    infoBody = "Tieni premuto per mostrare/nascondere le icone figlie"
-                                )
-
-                                if (deck.openKey == m.key) {
-                                    CPlusIcon(
-                                        onClick = { controller.openWizard(m.root) },
-                                        infoTitle = "Crea",
-                                        infoBody = "Crea un nuovo elemento in questo cluster"
-                                    )
-
-                                    val children: List<String> = LocalDeckItems.current[m.root].orEmpty()
-                                    children.forEach { childId ->
-                                        ChildIconWithBadge(
-                                            icon = ImageVector.vectorResource(id = m.iconRes),
-                                            id = childId,
-                                            onClick = { controller.openChild(m.root) }, // long-press lo richiama comunque
-                                            badgeBg = DECK_BADGE_BG,
-                                            badgeTxt = DECK_BADGE_TXT
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                when (path.firstOrNull()) {
+                    "Layout" -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
+                    "Contenitore" -> ContainerLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
+                    "Testo" -> TextLevel(path, selections, onToggle, onPick, savedPresets)
+                    "Aggiungi" -> AddLevel(
+                        path = menuPath,
+                        selections = menuSelections,
+                        onEnter = onEnter,
+                        onFreeGate = { showUpsell = true } // ⬅️ fa comparire il banner piani
+                    )
                 }
             }
         }
     }
+}
 
-    @OptIn(ExperimentalFoundationApi::class)
-    @Composable
-    private fun MotherIcon(
-        icon: ImageVector,
-        contentDescription: String,
-        selected: Boolean,
-        onClick: () -> Unit,                 // azione â€œapri/chiudi clusterâ€
-        infoTitle: String? = null,
-        infoBody: String? = null
+/* =========================================================================================
+*  BREADCRUMB â€” path corrente + ultima opzione
+* ========================================================================================= */
+@Composable
+private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
+    Surface(
+        color = Color(0xFF0B0F16),
+        contentColor = Color(0xFF9BA3AF),
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(start = 12.dp, top = 0.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
+            .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
     ) {
-        val info = LocalInfoMode.current
-        Surface(
-            shape = CircleShape,
-            color = Color(0xFF1B2334),
-            contentColor = Color.White,
-            tonalElevation = if (selected) 6.dp else 0.dp,
-            shadowElevation = if (selected) 6.dp else 0.dp,
-            border = if (selected) BorderStroke(2.dp, DECK_HIGHLIGHT) else null,
-            modifier = Modifier.size(42.dp)
+        val pretty = buildString {
+            append(if (path.isEmpty()) "â€”" else path.joinToString("  â†’  "))
+            lastChanged?.let { append("   â€¢   "); append(it) } // â† mostra sempre scelte utente
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .combinedClickable(
-                        onClick = {
-                            if (info.enabled) {
-                                info.show(infoTitle ?: contentDescription, infoBody ?: "â€”")
-                            } else {
-                                onClick()
-                            }
-                        },
-                        // IN INFO MODE: il cluster si apre solo con longâ€‘press
-                        onLongClick = { onClick() }
-                    )
-            ) {
-                Icon(icon, contentDescription = contentDescription, modifier = Modifier.align(Alignment.Center))
-            }
+            Text(pretty, style = MaterialTheme.typography.labelLarge)
         }
     }
+}
 
-    @OptIn(ExperimentalFoundationApi::class)
-    @Composable
-    private fun CPlusIcon(
-        onClick: () -> Unit,
-        icon: ImageVector = ImageVector.vectorResource(id = R.drawable.ic_add_circle),
-        infoTitle: String = "Crea",
-        infoBody: String = "Crea un nuovo elemento in questo cluster"
-    ) {
-        val info = LocalInfoMode.current
-        Surface(shape = CircleShape, color = Color(0xFF1B2334), contentColor = Color.White) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .combinedClickable(
-                        onClick = {
-                            if (info.enabled) {
-                                info.show(infoTitle, infoBody)  // in info mode: SOLO descrizione
-                            } else {
-                                onClick()
-                            }
-                        },
-                        onLongClick = { /* nessuna azione */ } // â† disabilitato
-                    )
-            ) {
-                Icon(icon, contentDescription = "Nuovo", modifier = Modifier.align(Alignment.Center))
-            }
+/* =========================================================================================
+*  LIVELLI (Layout / Contenitore / Testo / Aggiungi)
+*  Icone-only + dropdown con badge valore corrente
+* ========================================================================================= */
+
+/* ---------- LAYOUT ---------- */
+/* ---------- LAYOUT ---------- */
+@Composable
+private fun LayoutLevel(
+    path: List<String>,
+    selections: MutableMap<String, Any?>,
+    onEnter: (String) -> Unit,
+    onToggle: (String, Boolean) -> Unit,
+    onPick: (String, String) -> Unit,
+    saved: Map<String, MutableList<String>>
+) {
+    fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
+
+// Aree "wrappate" del Layout che devono riusare SOLO i sottomenu whitelist (Colore/Immagini)
+    val layoutAreas = setOf("Bottom bar", "Top bar", "MenÃ¹ centrale", "MenÃ¹ laterale")
+
+    when (path.getOrNull(1)) {
+        null -> {
+// ROOT Layout
+            ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
+            ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
+
+// NEW: aree che riusano i sottomenu del Layout (whitelist)
+
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_call_to_action),
+                contentDescription = "Bottom bar",
+                onClick = { onEnter("Bottom bar") }
+            )
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_ad_units),
+                contentDescription = "Top bar",
+                onClick = { onEnter("Top bar") }
+            )
+
+// DEFAULT
+            IconDropdown(
+                icon = Icons.Outlined.BookmarkAdd,
+                contentDescription = "Scegli default",
+                current = get("default") ?: saved["Layout"]?.firstOrNull(),
+                options = saved["Layout"].orEmpty(),
+                onSelected = { onPick("default", it) },
+                locked = isFree,
+                onLockedAttempt = { showUpsell = true }
+            )
+
+// STILE (Outlined custom o Material)
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_style),
+                contentDescription = "Stile",
+                current = get("style") ?: "Nessuno",
+                options = saved["Layout"].orEmpty(),
+                onSelected = { onPick("style", it) }
+            )
+
         }
-    }
 
+// ----- WRAPPER AREE: whitelist solo Colore/Immagini (+ sottomenu relativi) -----
+        in layoutAreas -> {
+            when (path.getOrNull(2)) {
+                null -> {
+// Mostra SOLO le voci consentite (whitelist), non tutte quelle presenti/future
+                    ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
+                    ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
+                }
+                "Colore" -> {
+                    val isFree = LocalIsFree.current
 
-    @OptIn(ExperimentalFoundationApi::class)
-    @Composable
-    private fun ChildIconWithBadge(
-        icon: ImageVector,
-        id: String,
-        onClick: () -> Unit,
-        badgeBg: Color = DECK_BADGE_BG,
-        badgeTxt: Color = DECK_BADGE_TXT
-    ) {
-        val info = LocalInfoMode.current
-        val shown = id.take(8)
-        Box(contentAlignment = Alignment.Center) {
-            Surface(shape = CircleShape, color = Color(0xFF1B2334), contentColor = Color.White) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .combinedClickable(
-                            onClick = {
-                                if (info.enabled) {
-                                    info.show("Elemento $shown", "Tieni premuto per aprire lâ€™editor classico")
-                                } else {
-                                    onClick()
-                                }
-                            },
-                            onLongClick = { onClick() }    // longâ€‘press = apri editor classico
-                        )
-                ) {
-                    Icon(icon, contentDescription = shown, modifier = Modifier.align(Alignment.Center))
+                    IconDropdown(EditorIcons.Colors1, "Colore 1",
+                        current = get("col1") ?: "Bianco",
+                        options = if (isFree) listOf("Bianco", "Grigio", "Nero") else listOf("Bianco","Grigio","Nero","Ciano"),
+                        onSelected = { onPick("col1", it) }
+                    )
+
+                    IconDropdown(EditorIcons.Colors2, "Colore 2",
+                        current = get("col2") ?: "Grigio chiaro",
+                        options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
+                        onSelected = { onPick("col2", it) },
+                        locked = isFree,
+                        onLockedAttempt = { showUpsell = true }
+                    )
+
+                    IconDropdown(EditorIcons.Gradient, "Gradiente",
+                        current = get("grad") ?: "Orizzontale",
+                        options = listOf("Orizzontale", "Verticale"),
+                        onSelected = { onPick("grad", it) },
+                        locked = isFree,
+                        onLockedAttempt = { showUpsell = true }
+                    )
+                    IconDropdown(EditorIcons.Functions, "Effetti",
+                        current = get("fx") ?: "Vignettatura",
+                        options = listOf("Vignettatura", "Noise", "Strisce"),
+                        onSelected = { onPick("fx", it) }
+                    )
+                }
+                "Immagini" -> {
+                    ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine",
+                        locked = isFree,
+                        onLockedAttempt = { showUpsell = true }
+                    ) { onEnter("Aggiungi foto") }
+
+                    ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album",
+                        locked = isFree,
+                        onLockedAttempt = { showUpsell = true }
+                    ) { onEnter("Aggiungi album") }
+                }
+                "Aggiungi foto" -> {
+                    IconDropdown(EditorIcons.Crop, "Crop",
+                        current = get("crop") ?: "Nessuno",
+                        options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
+                        onSelected = { onPick("crop", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Cornice",
+                        current = get("frame") ?: "Sottile",
+                        options = listOf("Nessuna", "Sottile", "Marcata"),
+                        onSelected = { onPick("frame", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Filtri",
+                        current = get("filtro") ?: "Nessuno",
+                        options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
+                        onSelected = { onPick("filtro", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Adattamento",
+                        current = get("fit") ?: "Cover",
+                        options = listOf("Cover", "Contain", "Fill"),
+                        onSelected = { onPick("fit", it) }
+                    )
+                }
+                "Aggiungi album" -> {
+                    IconDropdown(EditorIcons.Crop, "Crop",
+                        current = get("cropAlbum") ?: "Nessuno",
+                        options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
+                        onSelected = { onPick("cropAlbum", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Cornice",
+                        current = get("frameAlbum") ?: "Sottile",
+                        options = listOf("Nessuna", "Sottile", "Marcata"),
+                        onSelected = { onPick("frameAlbum", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Filtri album",
+                        current = get("filtroAlbum") ?: "Nessuno",
+                        options = listOf("Nessuno", "Tutte foto stesso filtro"),
+                        onSelected = { onPick("filtroAlbum", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Adattamento",
+                        current = get("fit") ?: "Cover",
+                        options = listOf("Cover", "Contain", "Fill"),
+                        onSelected = { onPick("fit", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "Animazione",
+                        current = get("anim") ?: "Slide",
+                        options = listOf("Slide", "Fade", "Page flip"),
+                        onSelected = { onPick("anim", it) }
+                    )
+                    IconDropdown(EditorIcons.Layout, "VelocitÃ ",
+                        current = get("speed") ?: "Media",
+                        options = listOf("Lenta", "Media", "Veloce"),
+                        onSelected = { onPick("speed", it) }
+                    )
                 }
             }
+        }
+
+// ----- Layout â€œpianoâ€ (giÃ  esistente) -----
+        "Colore" -> {
+            val isFree = LocalIsFree.current
+
+            IconDropdown(EditorIcons.Colors1, "Colore 1",
+                current = get("col1") ?: "Bianco",
+                options = if (isFree) listOf("Bianco", "Grigio", "Nero") else listOf("Bianco","Grigio","Nero","Ciano"),
+                onSelected = { onPick("col1", it) }
+            )
+
+            IconDropdown(EditorIcons.Colors2, "Colore 2",
+                current = get("col2") ?: "Grigio chiaro",
+                options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
+                onSelected = { onPick("col2", it) },
+                locked = isFree,
+                onLockedAttempt = { showUpsell = true }
+            )
+
+            IconDropdown(EditorIcons.Gradient, "Gradiente",
+                current = get("grad") ?: "Orizzontale",
+                options = listOf("Orizzontale", "Verticale"),
+                onSelected = { onPick("grad", it) },
+                locked = isFree,
+                onLockedAttempt = { showUpsell = true }
+            )
+            IconDropdown(EditorIcons.Functions, "Effetti",
+                current = get("fx") ?: "Vignettatura",
+                options = listOf("Vignettatura", "Noise", "Strisce"),
+                onSelected = { onPick("fx", it) }
+            )
+        }
+        "Immagini" -> {
+            ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine") { onEnter("Aggiungi foto") }
+            ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album") { onEnter("Aggiungi album") }
+        }
+        "Aggiungi foto" -> {
+            IconDropdown(EditorIcons.Crop, "Crop",
+                current = get("crop") ?: "Nessuno",
+                options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
+                onSelected = { onPick("crop", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Cornice",
+                current = get("frame") ?: "Sottile",
+                options = listOf("Nessuna", "Sottile", "Marcata"),
+                onSelected = { onPick("frame", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Filtri",
+                current = get("filtro") ?: "Nessuno",
+                options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
+                onSelected = { onPick("filtro", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Adattamento",
+                current = get("fit") ?: "Cover",
+                options = listOf("Cover", "Contain", "Fill"),
+                onSelected = { onPick("fit", it) }
+            )
+        }
+        "Aggiungi album" -> {
+            IconDropdown(EditorIcons.Crop, "Crop",
+                current = get("cropAlbum") ?: "Nessuno",
+                options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
+                onSelected = { onPick("cropAlbum", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Cornice",
+                current = get("frameAlbum") ?: "Sottile",
+                options = listOf("Nessuna", "Sottile", "Marcata"),
+                onSelected = { onPick("frameAlbum", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Filtri album",
+                current = get("filtroAlbum") ?: "Nessuno",
+                options = listOf("Nessuno", "Tutte foto stesso filtro"),
+                onSelected = { onPick("filtroAlbum", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Adattamento",
+                current = get("fit") ?: "Cover",
+                options = listOf("Cover", "Contain", "Fill"),
+                onSelected = { onPick("fit", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Animazione",
+                current = get("anim") ?: "Slide",
+                options = listOf("Slide", "Fade", "Page flip"),
+                onSelected = { onPick("anim", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "VelocitÃ ",
+                current = get("speed") ?: "Media",
+                options = listOf("Lenta", "Media", "Veloce"),
+                onSelected = { onPick("speed", it) }
+            )
+        }
+    }
+}
+
+
+/* ---------- CONTENITORE ---------- */
+@Composable
+private fun ContainerLevel(
+    path: List<String>,
+    selections: MutableMap<String, Any?>,
+    onEnter: (String) -> Unit,
+    onToggle: (String, Boolean) -> Unit,
+    onPick: (String, String) -> Unit,
+    saved: Map<String, MutableList<String>>
+) {
+    fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
+    when (path.getOrNull(1)) {
+        null -> {
+            fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
+
+            ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
+            ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
+
+            IconDropdown(EditorIcons.SwipeVertical, "ScrollabilitÃ ",
+                current = get("scroll") ?: "Assente",
+                options = listOf("Assente", "Verticale", "Orizzontale"),
+                onSelected = { onPick("scroll", it) }
+            )
+            IconDropdown(EditorIcons.Square, "Shape",
+                current = get("shape") ?: "Rettangolo",
+                options = listOf("Rettangolo", "Quadrato", "Cerchio", "Altre"),
+                onSelected = { onPick("shape", it) }
+            )
+            IconDropdown(EditorIcons.Variant, "Variant",
+                current = get("variant") ?: "Full",
+                options = listOf("Full", "Outlined", "Text", "TopBottom"),
+                onSelected = { onPick("variant", it) }
+            )
+            IconDropdown(EditorIcons.LineWeight, "b_tick",
+                current = get("b_thick") ?: "1dp",
+                options = listOf("0dp", "1dp", "2dp", "3dp"),
+                onSelected = { onPick("b_thick", it) }
+            )
+            IconDropdown(EditorIcons.SwipeRight, "Tipo",
+                current = get("tipo") ?: "Normale",
+                options = listOf("Normale", "Sfogliabile", "Tab"),
+                onSelected = { onPick("tipo", it) }
+            )
+
+            IconDropdown(
+                icon = Icons.Outlined.BookmarkAdd,
+                contentDescription = "Scegli default",
+                current = (selections[key(path, "default")] as? String) ?: saved["Testo"]?.firstOrNull(),
+                options = saved["Testo"].orEmpty(),
+                onSelected = { onPick("default", it) },
+                locked = isFree,
+                onLockedAttempt = { showUpsell = true }
+            )
+
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_style),
+                contentDescription = "Stile",
+                current = (selections[key(path, "style")] as? String) ?: "Nessuno",
+                options = saved["Testo"].orEmpty(),
+                onSelected = { onPick("style", it) }
+            )
+
+        }
+        "Colore" -> {
+            val isFree = LocalIsFree.current
+
+            IconDropdown(EditorIcons.Colors1, "Colore 1",
+                current = get("col1") ?: "Bianco",
+                options = if (isFree) listOf("Bianco", "Grigio", "Nero") else listOf("Bianco","Grigio","Nero","Ciano"),
+                onSelected = { onPick("col1", it) }
+            )
+
+            IconDropdown(EditorIcons.Colors2, "Colore 2",
+                current = get("col2") ?: "Grigio chiaro",
+                options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
+                onSelected = { onPick("col2", it) },
+                locked = isFree,
+                onLockedAttempt = { showUpsell = true }
+            )
+
+            IconDropdown(EditorIcons.Gradient, "Gradiente",
+                current = get("grad") ?: "Orizzontale",
+                options = listOf("Orizzontale", "Verticale"),
+                onSelected = { onPick("grad", it) },
+                locked = isFree,
+                onLockedAttempt = { showUpsell = true }
+            )
+            IconDropdown(EditorIcons.Functions, "FX",
+                current = get("fx") ?: "Vignettatura",
+                options = listOf("Vignettatura", "Noise", "Strisce"),
+                onSelected = { onPick("fx", it) }
+            )
+        }
+        "Immagini" -> {
+            ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine") { onEnter("Aggiungi foto") }
+            ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album") { onEnter("Aggiungi album") }
+        }
+        "Aggiungi foto" -> {
+            IconDropdown(EditorIcons.Crop, "Crop",
+                current = get("crop") ?: "Nessuno",
+                options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
+                onSelected = { onPick("crop", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Cornice",
+                current = get("frame") ?: "Sottile",
+                options = listOf("Nessuna", "Sottile", "Marcata"),
+                onSelected = { onPick("frame", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Filtri",
+                current = get("filtro") ?: "Nessuno",
+                options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
+                onSelected = { onPick("filtro", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Adatta",
+                current = get("fitCont") ?: "Cover",
+                options = listOf("Cover", "Contain", "Fill", "FitWidth", "FitHeight"),
+                onSelected = { onPick("fitCont", it) }
+            )
+        }
+        "Aggiungi album" -> {
+            IconDropdown(EditorIcons.Crop, "Crop",
+                current = get("cropAlbum") ?: "Nessuno",
+                options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
+                onSelected = { onPick("cropAlbum", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Cornice",
+                current = get("frameAlbum") ?: "Sottile",
+                options = listOf("Nessuna", "Sottile", "Marcata"),
+                onSelected = { onPick("frameAlbum", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Filtri album",
+                current = get("filtroAlbum") ?: "Nessuno",
+                options = listOf("Nessuno", "Tutte foto stesso filtro"),
+                onSelected = { onPick("filtroAlbum", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Adattamento",
+                current = get("fit") ?: "Cover",
+                options = listOf("Cover", "Contain", "Fill"),
+                onSelected = { onPick("fit", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "Animazione",
+                current = get("anim") ?: "Slide",
+                options = listOf("Slide", "Fade", "Page flip"),
+                onSelected = { onPick("anim", it) }
+            )
+            IconDropdown(EditorIcons.Layout, "VelocitÃ ",
+                current = get("speed") ?: "Media",
+                options = listOf("Lenta", "Media", "Veloce"),
+                onSelected = { onPick("speed", it) }
+            )
+        }
+    }
+}
+
+/* ---------- TESTO ---------- */
+@Composable
+private fun TextLevel(
+    path: List<String>,
+    selections: MutableMap<String, Any?>,
+    onToggle: (String, Boolean) -> Unit,
+    onPick: (String, String) -> Unit,
+    saved: Map<String, MutableList<String>>
+) {
+// toggles (bordo piÃ¹ spesso se selezionati)
+    val uKey = key(path, "Sottolinea")
+    val iKey = key(path, "Corsivo")
+// Sottolinea
+    ToggleIcon(
+        selected = (selections[uKey] as? Boolean) == true,
+        onClick = { onToggle("Sottolinea", !((selections[uKey] as? Boolean) == true)) },
+        icon = EditorIcons.Underline
+    )
+// Corsivo
+    ToggleIcon(
+        selected = (selections[iKey] as? Boolean) == true,
+        onClick = { onToggle("Corsivo", !((selections[iKey] as? Boolean) == true)) },
+        icon = EditorIcons.Italic
+    )
+
+// dropdown (font / weight / size / evidenzia / colore) â€” chiavi allineate a keysForRoot("Testo")
+    IconDropdown(EditorIcons.Highlight, "Evidenzia",
+        current = (selections[key(path, "Evidenzia")] as? String) ?: "Nessuna",
+        options = listOf("Nessuna", "Marker", "Oblique", "Scribble"),
+        onSelected = { onPick("Evidenzia", it) }
+    )
+    IconDropdown(EditorIcons.CustomTypography, "Font",
+        current = (selections[key(path, "Font")] as? String) ?: "System",
+        options = listOf("System", "Inter", "Roboto", "SF Pro"),
+        onSelected = { onPick("Font", it) }
+    )
+    IconDropdown(EditorIcons.Bold, "Peso",
+        current = (selections[key(path, "Weight")] as? String) ?: "Regular",
+        options = listOf("Light", "Regular", "Medium", "Bold"),
+        onSelected = { onPick("Weight", it) }
+    )
+    IconDropdown(EditorIcons.Size, "Size",
+        current = (selections[key(path, "Size")] as? String) ?: "16sp",
+        options = listOf("12sp", "14sp", "16sp", "18sp", "22sp"),
+        onSelected = { onPick("Size", it) }
+    )
+    IconDropdown(EditorIcons.Brush, "Colore",
+        current = (selections[key(path, "Colore")] as? String) ?: "Nero",
+        options = listOf("Nero", "Bianco", "Blu", "Verde", "Rosso"),
+        onSelected = { onPick("Colore", it) }
+    )
+
+    IconDropdown(
+        icon = Icons.Outlined.BookmarkAdd,
+        contentDescription = "Scegli default",
+        current = (selections[key(path, "default")] as? String) ?: saved["Testo"]?.firstOrNull(),
+        options = saved["Testo"].orEmpty(),
+        onSelected = { onPick("default", it) },
+        locked = isFree,
+        onLockedAttempt = { showUpsell = true }
+    )
+
+    IconDropdown(
+        icon = ImageVector.vectorResource(id = R.drawable.ic_style),
+        contentDescription = "Stile",
+        current = (selections[key(path, "style")] as? String) ?: "Nessuno",
+        options = saved["Testo"].orEmpty(),
+        onSelected = { onPick("style", it) }
+    )
+
+    /* Variante senza risorsa:
+       IconDropdown(
+           icon = Icons.Outlined.Style,
+           contentDescription = "Stile",
+           current = (selections[key(path, "style")] as? String) ?: "Nessuno",
+           options = saved["Testo"].orEmpty(),
+           onSelected = { onPick("style", it) }
+       )
+       */
+}
+
+
+/* =========================================================================================
+*  WIDGET MENU â€” pulsanti a icona, toggle con bordo spesso, dropdown con badge
+* ========================================================================================= */
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ToolbarIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    selected: Boolean = false,
+    onLongPress: (() -> Unit)? = null,
+    infoTitle: String? = null,
+    infoBody: String? = null,
+    allowLongPressInInfo: Boolean = true,
+    locked: Boolean = false,                         // ⟵ NEW
+    onLockedAttempt: (() -> Unit)? = null,           // ⟵ NEW
+    onClick: () -> Unit
+) {
+    Surface(
+        color = if (selected) MaterialTheme.colorScheme.primary else Color(0xFF1B2334),
+        contentColor = Color.White,
+        shape = CircleShape,
+        tonalElevation = if (selected) 6.dp else 0.dp,
+        shadowElevation = if (selected) 6.dp else 0.dp,
+        modifier = modifier.size(42.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .combinedClickable(
+                    enabled = enabled,
+                    onClick = {
+                        if (locked && !info.enabled) { onLockedAttempt?.invoke(); return@combinedClickable }
+                        if (info.enabled) info.show(infoTitle ?: contentDescription, infoBody ?: "—")
+                        else onClick()
+                    },
+                    onLongClick = {
+                        if (locked && !info.enabled) { onLockedAttempt?.invoke(); return@combinedClickable }
+                        if (info.enabled) {
+                            if (allowLongPressInInfo) (onLongPress ?: onClick).invoke() else info.show(infoTitle ?: contentDescription, infoBody ?: "—")
+                        } else (onLongPress ?: onClick).invoke()
+                    },
+                    onLongClick = onLongPress
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = contentDescription)
+        }
+    }
+}
+
+
+@Composable
+private fun ToggleIcon(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Surface(
+        shape = CircleShape,
+        color = Color(0xFF1B2334),
+        contentColor = Color.White,
+        tonalElevation = if (selected) 6.dp else 0.dp,
+        shadowElevation = if (selected) 6.dp else 0.dp,
+        border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null,
+        modifier = Modifier.size(42.dp)
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
+            Icon(icon, contentDescription = null)
+        }
+    }
+}
+
+@Composable
+private fun IconDropdown(
+    icon: ImageVector,
+    contentDescription: String,
+    current: String?,
+    options: List<String>,
+    onSelected: (String) -> Unit,
+    locked: Boolean = false,
+    onLockedAttempt: (() -> Unit)? = null
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        ToolbarIconButton(icon, contentDescription,
+            locked = locked,
+            onLockedAttempt = onLockedAttempt
+        ) { expanded = true }
+// badge numerico angolare per "Colore 1"/"Colore 2"
+        if (!current.isNullOrBlank()) {
             Surface(
-                color = badgeBg,
-                contentColor = badgeTxt,
+                color = Color(0xFF22304B),
+                contentColor = Color.White,
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .offset { IntOffset(0, 14) }
+                    .offset { IntOffset(0, 14) } // poco sotto l'icona
             ) {
                 Text(
-                    text = shown,
+                    text = current,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     fontSize = 10.sp
                 )
             }
         }
-    }
-
-    /* =========================================================================================
-     *  SUBMENU â€” barra icone livello corrente (menÃ¹ â€œad alberoâ€)
-     *  SOLO UI: nessuna modifica applicata al documento.
-     * ========================================================================================= */
-
-    @Composable
-    private fun BoxScope.SubMenuBar(
-        path: List<String>,
-        selections: MutableMap<String, Any?>,
-        onBack: () -> Unit,
-        onEnter: (String) -> Unit,
-        onToggle: (label: String, value: Boolean) -> Unit,
-        onPick: (label: String, value: String) -> Unit,
-        savedPresets: Map<String, MutableList<String>>
-    ) {
-        val offsetY = with(LocalDensity.current) { (BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA + BARS_GAP + SAFE_BOTTOM_MARGIN).roundToPx() }
-        Surface(
-            color = Color(0xFF0F141E),
-            contentColor = Color.White,
-            tonalElevation = 8.dp,
-            shadowElevation = 10.dp,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .offset { IntOffset(0, -offsetY) }
-                .height(TOP_BAR_HEIGHT)
-        ) {
-            val scroll = rememberScrollState()
-            CompositionLocalProvider(
-                LocalInfoMode provides InfoModeEnv(enabled = false) { _, _ -> }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight()
-                        .horizontalScroll(scroll)
-                        .padding(horizontal = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // back icon
-                    ToolbarIconButton(Icons.Outlined.ArrowBack, "Indietro", onClick = onBack)
-
-                    when (path.firstOrNull()) {
-                        "Layout" -> LayoutLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
-                        "Contenitore" -> ContainerLevel(path, selections, onEnter, onToggle, onPick, savedPresets)
-                        "Testo" -> TextLevel(path, selections, onToggle, onPick, savedPresets)
-                        "Aggiungi" -> AddLevel(path, selections, onEnter)
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { opt ->
+                DropdownMenuItem(
+                    text = { Text(opt) },
+                    onClick = {
+                        onSelected(opt)
+                        expanded = false
                     }
-                }
+                )
             }
         }
     }
+}
 
-    /* =========================================================================================
-     *  BREADCRUMB â€” path corrente + ultima opzione
-     * ========================================================================================= */
-    @Composable
-    private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
-        Surface(
-            color = Color(0xFF0B0F16),
-            contentColor = Color(0xFF9BA3AF),
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(start = 12.dp, top = 0.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
-                .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
-        ) {
-            val pretty = buildString {
-                append(if (path.isEmpty()) "â€”" else path.joinToString("  â†’  "))
-                lastChanged?.let { append("   â€¢   "); append(it) } // â† mostra sempre scelte utente
-            }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(pretty, style = MaterialTheme.typography.labelLarge)
-            }
-        }
-    }
+/* =========================================================================================
+*  MINI CONFIRM BAR
+* ========================================================================================= */
 
-    /* =========================================================================================
-     *  LIVELLI (Layout / Contenitore / Testo / Aggiungi)
-     *  Icone-only + dropdown con badge valore corrente
-     * ========================================================================================= */
-
-    /* ---------- LAYOUT ---------- */
-    /* ---------- LAYOUT ---------- */
-    @Composable
-    private fun LayoutLevel(
-        path: List<String>,
-        selections: MutableMap<String, Any?>,
-        onEnter: (String) -> Unit,
-        onToggle: (String, Boolean) -> Unit,
-        onPick: (String, String) -> Unit,
-        saved: Map<String, MutableList<String>>
+@Composable
+private fun BoxScope.ConfirmBar(
+    onCancel: () -> Unit,
+    onOk: () -> Unit,
+    onSavePreset: () -> Unit
+) {
+    Surface(
+        color = Color(0xFF0B1220),
+        contentColor = Color.White,
+        tonalElevation = 10.dp,
+        shadowElevation = 10.dp,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(12.dp)
     ) {
-        fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
-
-        // Aree "wrappate" del Layout che devono riusare SOLO i sottomenu whitelist (Colore/Immagini)
-        val layoutAreas = setOf("Bottom bar", "Top bar", "MenÃ¹ centrale", "MenÃ¹ laterale")
-
-        when (path.getOrNull(1)) {
-            null -> {
-                // ROOT Layout
-                ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
-                ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
-
-                // NEW: aree che riusano i sottomenu del Layout (whitelist)
-
-                ToolbarIconButton(
-                    icon = ImageVector.vectorResource(id = R.drawable.ic_call_to_action),
-                    contentDescription = "Bottom bar",
-                    onClick = { onEnter("Bottom bar") }
-                )
-                ToolbarIconButton(
-                    icon = ImageVector.vectorResource(id = R.drawable.ic_ad_units),
-                    contentDescription = "Top bar",
-                    onClick = { onEnter("Top bar") }
-                )
-
-                IconDropdown(
-                    icon = Icons.Outlined.BookmarkAdd,
-                    contentDescription = "Scegli default",
-                    current = (selections[key(path, "default")] as? String) ?: saved["Testo"]?.firstOrNull(),
-                    options = saved["Testo"].orEmpty(),
-                    onSelected = { onPick("default", it) },
-                    locked = isFree,
-                    onLockedAttempt = { showUpsell = true }
-                )
-
-                IconDropdown(
-                    icon = ImageVector.vectorResource(id = R.drawable.ic_style),
-                    contentDescription = "Stile",
-                    current = (selections[key(path, "style")] as? String) ?: "Nessuno",
-                    options = saved["Testo"].orEmpty(),
-                    onSelected = { onPick("style", it) }
-                )
-
-                IconDropdown(
-                    icon = Icons.Outlined.Style,
-                    contentDescription = "Stile",
-                    current = get("style") ?: "Nessuno",
-                    options = saved["Layout"].orEmpty(),
-                    onSelected = { onPick("style", it) }
-                )
-
-            }
-
-            // ----- WRAPPER AREE: whitelist solo Colore/Immagini (+ sottomenu relativi) -----
-            in layoutAreas -> {
-                when (path.getOrNull(2)) {
-                    null -> {
-                        // Mostra SOLO le voci consentite (whitelist), non tutte quelle presenti/future
-                        ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
-                        ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
-                    }
-                    "Colore" -> {
-                        val isFree = LocalIsFree.current
-
-                        IconDropdown(EditorIcons.Colors1, "Colore 1",
-                            current = get("col1") ?: "Bianco",
-                            options = if (isFree) listOf("Bianco", "Grigio", "Nero") else listOf("Bianco","Grigio","Nero","Ciano"),
-                            onSelected = { onPick("col1", it) }
-                        )
-
-                        IconDropdown(EditorIcons.Colors2, "Colore 2",
-                            current = get("col2") ?: "Grigio chiaro",
-                            options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
-                            onSelected = { onPick("col2", it) },
-                            locked = isFree,
-                            onLockedAttempt = { showUpsell = true }
-                        )
-
-                        IconDropdown(EditorIcons.Gradient, "Gradiente",
-                            current = get("grad") ?: "Orizzontale",
-                            options = listOf("Orizzontale", "Verticale"),
-                            onSelected = { onPick("grad", it) },
-                            locked = isFree,
-                            onLockedAttempt = { showUpsell = true }
-                        )
-                        IconDropdown(EditorIcons.Functions, "Effetti",
-                            current = get("fx") ?: "Vignettatura",
-                            options = listOf("Vignettatura", "Noise", "Strisce"),
-                            onSelected = { onPick("fx", it) }
-                        )
-                    }
-                    "Immagini" -> {
-                        ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine",
-                            locked = isFree,
-                            onLockedAttempt = { showUpsell = true }
-                        ) { onEnter("Aggiungi foto") }
-
-                        ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album",
-                            locked = isFree,
-                            onLockedAttempt = { showUpsell = true }
-                        ) { onEnter("Aggiungi album") }
-                    }
-                    "Aggiungi foto" -> {
-                        IconDropdown(EditorIcons.Crop, "Crop",
-                            current = get("crop") ?: "Nessuno",
-                            options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                            onSelected = { onPick("crop", it) }
-                        )
-                        IconDropdown(EditorIcons.Layout, "Cornice",
-                            current = get("frame") ?: "Sottile",
-                            options = listOf("Nessuna", "Sottile", "Marcata"),
-                            onSelected = { onPick("frame", it) }
-                        )
-                        IconDropdown(EditorIcons.Layout, "Filtri",
-                            current = get("filtro") ?: "Nessuno",
-                            options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
-                            onSelected = { onPick("filtro", it) }
-                        )
-                        IconDropdown(EditorIcons.Layout, "Adattamento",
-                            current = get("fit") ?: "Cover",
-                            options = listOf("Cover", "Contain", "Fill"),
-                            onSelected = { onPick("fit", it) }
-                        )
-                    }
-                    "Aggiungi album" -> {
-                        IconDropdown(EditorIcons.Crop, "Crop",
-                            current = get("cropAlbum") ?: "Nessuno",
-                            options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                            onSelected = { onPick("cropAlbum", it) }
-                        )
-                        IconDropdown(EditorIcons.Layout, "Cornice",
-                            current = get("frameAlbum") ?: "Sottile",
-                            options = listOf("Nessuna", "Sottile", "Marcata"),
-                            onSelected = { onPick("frameAlbum", it) }
-                        )
-                        IconDropdown(EditorIcons.Layout, "Filtri album",
-                            current = get("filtroAlbum") ?: "Nessuno",
-                            options = listOf("Nessuno", "Tutte foto stesso filtro"),
-                            onSelected = { onPick("filtroAlbum", it) }
-                        )
-                        IconDropdown(EditorIcons.Layout, "Adattamento",
-                            current = get("fit") ?: "Cover",
-                            options = listOf("Cover", "Contain", "Fill"),
-                            onSelected = { onPick("fit", it) }
-                        )
-                        IconDropdown(EditorIcons.Layout, "Animazione",
-                            current = get("anim") ?: "Slide",
-                            options = listOf("Slide", "Fade", "Page flip"),
-                            onSelected = { onPick("anim", it) }
-                        )
-                        IconDropdown(EditorIcons.Layout, "VelocitÃ ",
-                            current = get("speed") ?: "Media",
-                            options = listOf("Lenta", "Media", "Veloce"),
-                            onSelected = { onPick("speed", it) }
-                        )
-                    }
-                }
-            }
-
-            // ----- Layout â€œpianoâ€ (giÃ  esistente) -----
-            "Colore" -> {
-                val isFree = LocalIsFree.current
-
-                IconDropdown(EditorIcons.Colors1, "Colore 1",
-                    current = get("col1") ?: "Bianco",
-                    options = if (isFree) listOf("Bianco", "Grigio", "Nero") else listOf("Bianco","Grigio","Nero","Ciano"),
-                    onSelected = { onPick("col1", it) }
-                )
-
-                IconDropdown(EditorIcons.Colors2, "Colore 2",
-                    current = get("col2") ?: "Grigio chiaro",
-                    options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
-                    onSelected = { onPick("col2", it) },
-                    locked = isFree,
-                    onLockedAttempt = { showUpsell = true }
-                )
-
-                IconDropdown(EditorIcons.Gradient, "Gradiente",
-                    current = get("grad") ?: "Orizzontale",
-                    options = listOf("Orizzontale", "Verticale"),
-                    onSelected = { onPick("grad", it) },
-                    locked = isFree,
-                    onLockedAttempt = { showUpsell = true }
-                )
-                IconDropdown(EditorIcons.Functions, "Effetti",
-                    current = get("fx") ?: "Vignettatura",
-                    options = listOf("Vignettatura", "Noise", "Strisce"),
-                    onSelected = { onPick("fx", it) }
-                )
-            }
-            "Immagini" -> {
-                ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine",
-                    locked = isFree,
-                    onLockedAttempt = { showUpsell = true }
-                ) { onEnter("Aggiungi foto") }
-
-                ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album",
-                    locked = isFree,
-                    onLockedAttempt = { showUpsell = true }
-                ) { onEnter("Aggiungi album") }
-            }
-            "Aggiungi foto" -> {
-                IconDropdown(EditorIcons.Crop, "Crop",
-                    current = get("crop") ?: "Nessuno",
-                    options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                    onSelected = { onPick("crop", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Cornice",
-                    current = get("frame") ?: "Sottile",
-                    options = listOf("Nessuna", "Sottile", "Marcata"),
-                    onSelected = { onPick("frame", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Filtri",
-                    current = get("filtro") ?: "Nessuno",
-                    options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
-                    onSelected = { onPick("filtro", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Adattamento",
-                    current = get("fit") ?: "Cover",
-                    options = listOf("Cover", "Contain", "Fill"),
-                    onSelected = { onPick("fit", it) }
-                )
-            }
-            "Aggiungi album" -> {
-                IconDropdown(EditorIcons.Crop, "Crop",
-                    current = get("cropAlbum") ?: "Nessuno",
-                    options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                    onSelected = { onPick("cropAlbum", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Cornice",
-                    current = get("frameAlbum") ?: "Sottile",
-                    options = listOf("Nessuna", "Sottile", "Marcata"),
-                    onSelected = { onPick("frameAlbum", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Filtri album",
-                    current = get("filtroAlbum") ?: "Nessuno",
-                    options = listOf("Nessuno", "Tutte foto stesso filtro"),
-                    onSelected = { onPick("filtroAlbum", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Adattamento",
-                    current = get("fit") ?: "Cover",
-                    options = listOf("Cover", "Contain", "Fill"),
-                    onSelected = { onPick("fit", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Animazione",
-                    current = get("anim") ?: "Slide",
-                    options = listOf("Slide", "Fade", "Page flip"),
-                    onSelected = { onPick("anim", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "VelocitÃ ",
-                    current = get("speed") ?: "Media",
-                    options = listOf("Lenta", "Media", "Veloce"),
-                    onSelected = { onPick("speed", it) }
-                )
-            }
-        }
-    }
-
-
-    /* ---------- CONTENITORE ---------- */
-    @Composable
-    private fun ContainerLevel(
-        path: List<String>,
-        selections: MutableMap<String, Any?>,
-        onEnter: (String) -> Unit,
-        onToggle: (String, Boolean) -> Unit,
-        onPick: (String, String) -> Unit,
-        saved: Map<String, MutableList<String>>
-    ) {
-        fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
-        when (path.getOrNull(1)) {
-            null -> {
-                fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
-
-                ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
-                ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
-
-                IconDropdown(EditorIcons.SwipeVertical, "ScrollabilitÃ ",
-                    current = get("scroll") ?: "Assente",
-                    options = listOf("Assente", "Verticale", "Orizzontale"),
-                    onSelected = { onPick("scroll", it) }
-                )
-                IconDropdown(EditorIcons.Square, "Shape",
-                    current = get("shape") ?: "Rettangolo",
-                    options = listOf("Rettangolo", "Quadrato", "Cerchio", "Altre"),
-                    onSelected = { onPick("shape", it) }
-                )
-                IconDropdown(EditorIcons.Variant, "Variant",
-                    current = get("variant") ?: "Full",
-                    options = listOf("Full", "Outlined", "Text", "TopBottom"),
-                    onSelected = { onPick("variant", it) }
-                )
-                IconDropdown(EditorIcons.LineWeight, "b_tick",
-                    current = get("b_thick") ?: "1dp",
-                    options = listOf("0dp", "1dp", "2dp", "3dp"),
-                    onSelected = { onPick("b_thick", it) }
-                )
-                IconDropdown(EditorIcons.SwipeRight, "Tipo",
-                    current = get("tipo") ?: "Normale",
-                    options = listOf("Normale", "Sfogliabile", "Tab"),
-                    onSelected = { onPick("tipo", it) }
-                )
-
-                IconDropdown(
-                    icon = Icons.Outlined.BookmarkAdd,
-                    contentDescription = "Scegli default",
-                    current = get("default") ?: saved["Layout"]?.firstOrNull(),
-                    options = saved["Layout"].orEmpty(),
-                    onSelected = { onPick("default", it) },
-                    locked = isFree,
-                    onLockedAttempt = { showUpsell = true }
-                )
-
-                IconDropdown(
-                    icon = ImageVector.vectorResource(id = R.drawable.ic_style),
-                    contentDescription = "Stile",
-                    current = (selections[key(path, "style")] as? String) ?: "Nessuno",
-                    options = saved["Testo"].orEmpty(),
-                    onSelected = { onPick("style", it) }
-                )
-
-            }
-            "Colore" -> {
-                val isFree = LocalIsFree.current
-
-                IconDropdown(EditorIcons.Colors1, "Colore 1",
-                    current = get("col1") ?: "Bianco",
-                    options = if (isFree) listOf("Bianco", "Grigio", "Nero") else listOf("Bianco","Grigio","Nero","Ciano"),
-                    onSelected = { onPick("col1", it) }
-                )
-
-                IconDropdown(EditorIcons.Colors2, "Colore 2",
-                    current = get("col2") ?: "Grigio chiaro",
-                    options = listOf("Grigio chiaro", "Blu", "Verde", "Arancio"),
-                    onSelected = { onPick("col2", it) },
-                    locked = isFree,
-                    onLockedAttempt = { showUpsell = true }
-                )
-
-                IconDropdown(EditorIcons.Gradient, "Gradiente",
-                    current = get("grad") ?: "Orizzontale",
-                    options = listOf("Orizzontale", "Verticale"),
-                    onSelected = { onPick("grad", it) },
-                    locked = isFree,
-                    onLockedAttempt = { showUpsell = true }
-                )
-                IconDropdown(EditorIcons.Functions, "FX",
-                    current = get("fx") ?: "Vignettatura",
-                    options = listOf("Vignettatura", "Noise", "Strisce"),
-                    onSelected = { onPick("fx", it) }
-                )
-            }
-            "Immagini" -> {
-                ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine") { onEnter("Aggiungi foto") }
-                ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album") { onEnter("Aggiungi album") }
-            }
-            "Aggiungi foto" -> {
-                IconDropdown(EditorIcons.Crop, "Crop",
-                    current = get("crop") ?: "Nessuno",
-                    options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                    onSelected = { onPick("crop", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Cornice",
-                    current = get("frame") ?: "Sottile",
-                    options = listOf("Nessuna", "Sottile", "Marcata"),
-                    onSelected = { onPick("frame", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Filtri",
-                    current = get("filtro") ?: "Nessuno",
-                    options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
-                    onSelected = { onPick("filtro", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Adatta",
-                    current = get("fitCont") ?: "Cover",
-                    options = listOf("Cover", "Contain", "Fill", "FitWidth", "FitHeight"),
-                    onSelected = { onPick("fitCont", it) }
-                )
-            }
-            "Aggiungi album" -> {
-                IconDropdown(EditorIcons.Crop, "Crop",
-                    current = get("cropAlbum") ?: "Nessuno",
-                    options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                    onSelected = { onPick("cropAlbum", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Cornice",
-                    current = get("frameAlbum") ?: "Sottile",
-                    options = listOf("Nessuna", "Sottile", "Marcata"),
-                    onSelected = { onPick("frameAlbum", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Filtri album",
-                    current = get("filtroAlbum") ?: "Nessuno",
-                    options = listOf("Nessuno", "Tutte foto stesso filtro"),
-                    onSelected = { onPick("filtroAlbum", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Adattamento",
-                    current = get("fit") ?: "Cover",
-                    options = listOf("Cover", "Contain", "Fill"),
-                    onSelected = { onPick("fit", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "Animazione",
-                    current = get("anim") ?: "Slide",
-                    options = listOf("Slide", "Fade", "Page flip"),
-                    onSelected = { onPick("anim", it) }
-                )
-                IconDropdown(EditorIcons.Layout, "VelocitÃ ",
-                    current = get("speed") ?: "Media",
-                    options = listOf("Lenta", "Media", "Veloce"),
-                    onSelected = { onPick("speed", it) }
-                )
-            }
-        }
-    }
-
-    /* ---------- TESTO ---------- */
-    @Composable
-    private fun TextLevel(
-        path: List<String>,
-        selections: MutableMap<String, Any?>,
-        onToggle: (String, Boolean) -> Unit,
-        onPick: (String, String) -> Unit,
-        saved: Map<String, MutableList<String>>
-    ) {
-        // toggles (bordo piÃ¹ spesso se selezionati)
-        val uKey = key(path, "Sottolinea")
-        val iKey = key(path, "Corsivo")
-        // Sottolinea
-        ToggleIcon(
-            selected = (selections[uKey] as? Boolean) == true,
-            onClick = { onToggle("Sottolinea", !((selections[uKey] as? Boolean) == true)) },
-            icon = EditorIcons.Underline
-        )
-        // Corsivo
-        ToggleIcon(
-            selected = (selections[iKey] as? Boolean) == true,
-            onClick = { onToggle("Corsivo", !((selections[iKey] as? Boolean) == true)) },
-            icon = EditorIcons.Italic
-        )
-
-        // dropdown (font / weight / size / evidenzia / colore) â€” chiavi allineate a keysForRoot("Testo")
-        IconDropdown(EditorIcons.Highlight, "Evidenzia",
-            current = (selections[key(path, "Evidenzia")] as? String) ?: "Nessuna",
-            options = listOf("Nessuna", "Marker", "Oblique", "Scribble"),
-            onSelected = { onPick("Evidenzia", it) }
-        )
-        val isFree = LocalIsFree.current
-
-        IconDropdown(
-            EditorIcons.CustomTypography, "Font",
-            current = (selections[key(path, "Font")] as? String) ?: "System",
-            options = if (isFree) listOf("System") else listOf("System", "Inter", "Roboto", "SF Pro"),
-            onSelected = { onPick("Font", it) }
-        )
-        IconDropdown(EditorIcons.Bold, "Peso",
-            current = (selections[key(path, "Weight")] as? String) ?: "Regular",
-            options = listOf("Light", "Regular", "Medium", "Bold"),
-            onSelected = { onPick("Weight", it) }
-        )
-        IconDropdown(EditorIcons.Size, "Size",
-            current = (selections[key(path, "Size")] as? String) ?: "16sp",
-            options = listOf("12sp", "14sp", "16sp", "18sp", "22sp"),
-            onSelected = { onPick("Size", it) }
-        )
-        IconDropdown(EditorIcons.Brush, "Colore",
-            current = (selections[key(path, "Colore")] as? String) ?: "Nero",
-            options = listOf("Nero", "Bianco", "Blu", "Verde", "Rosso"),
-            onSelected = { onPick("Colore", it) }
-        )
-
-        IconDropdown(
-            icon = Icons.Outlined.BookmarkAdd,
-            contentDescription = "Scegli default",
-            current = (selections[key(path, "default")] as? String) ?: saved["Testo"]?.firstOrNull(),
-            options = saved["Testo"].orEmpty(),
-            onSelected = { onPick("default", it) },
-            locked = isFree,
-            onLockedAttempt = { showUpsell = true }
-        )
-
-        IconDropdown(
-            icon = ImageVector.vectorResource(id = R.drawable.ic_style),
-            contentDescription = "Stile",
-            current = (selections[key(path, "style")] as? String) ?: "Nessuno",
-            options = saved["Testo"].orEmpty(),
-            onSelected = { onPick("style", it) }
-        )
-
-        IconDropdown(
-            icon = Icons.Outlined.Style,
-            contentDescription = "Stile",
-            current = (selections[key(path, "style")] as? String) ?: "Nessuno",
-            options = saved["Testo"].orEmpty(),
-            onSelected = { onPick("style", it) }
-        )
-
-    }
-
-
-    /* =========================================================================================
-     *  WIDGET MENU â€” pulsanti a icona, toggle con bordo spesso, dropdown con badge
-     * ========================================================================================= */
-
-    @OptIn(ExperimentalFoundationApi::class)
-    private fun ToolbarIconButton(
-        icon: ImageVector,
-        contentDescription: String,
-        modifier: Modifier = Modifier,
-        enabled: Boolean = true,
-        selected: Boolean = false,
-        onLongPress: (() -> Unit)? = null,
-        infoTitle: String? = null,
-        infoBody: String? = null,
-        allowLongPressInInfo: Boolean = true,
-        locked: Boolean = false,
-        onLockedAttempt: (() -> Unit)? = null,
-        onClick: () -> Unit
-    ) {
-        val container = if (selected) MaterialTheme.colorScheme.primary else Color(0xFF1B2334)
-        val content = Color.White
-        val info = LocalInfoMode.current
-
-        Surface(
-            color = container,
-            contentColor = content,
-            shape = CircleShape,
-            tonalElevation = if (selected) 6.dp else 0.dp,
-            shadowElevation = if (selected) 6.dp else 0.dp,
-            modifier = modifier.size(42.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .combinedClickable(
-                        enabled = enabled,
-                        onClick = {
-                            if (info.enabled) {
-                                info.show(infoTitle ?: contentDescription, infoBody ?: "â€”")
-                            } else {
-                                onClick()
-                            }
-                        },
-                        onLongClick = {
-                            if (info.enabled) {
-                                if (allowLongPressInInfo) {
-                                    (onLongPress ?: onClick).invoke()
-                                } else {
-                                    info.show(infoTitle ?: contentDescription, infoBody ?: "â€”")
-                                }
-                            } else {
-                                (onLongPress ?: onClick).invoke()
-                            }
-                        }
-                    )
-            ) {
-                Icon(icon, contentDescription = contentDescription, modifier = Modifier.align(Alignment.Center))
-            }
-        }
-    }
-
-
-    @Composable
-    private fun ToggleIcon(
-        selected: Boolean,
-        onClick: () -> Unit,
-        icon: androidx.compose.ui.graphics.vector.ImageVector
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color(0xFF1B2334),
-            contentColor = Color.White,
-            tonalElevation = if (selected) 6.dp else 0.dp,
-            shadowElevation = if (selected) 6.dp else 0.dp,
-            border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null,
-            modifier = Modifier.size(42.dp)
-        ) {
-            IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
-                Icon(icon, contentDescription = null)
-            }
-        }
-    }
-
-    @Composable
-    private fun IconDropdown(
-        icon: ImageVector,
-        contentDescription: String,
-        current: String?,
-        options: List<String>,
-        onSelected: (String) -> Unit,
-        locked: Boolean = false,
-        onLockedAttempt: (() -> Unit)? = null
-    ) {
-        var expanded by remember { mutableStateOf(false) }
-        Box {
-            ToolbarIconButton(icon, contentDescription,
-                locked = locked,
-                onLockedAttempt = onLockedAttempt
-            ) { expanded = true }
-            // badge numerico angolare per "Colore 1"/"Colore 2"
-            if (!current.isNullOrBlank()) {
-                Surface(
-                    color = Color(0xFF22304B),
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .offset { IntOffset(0, 14) } // poco sotto l'icona
-                ) {
-                    Text(
-                        text = current,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize = 10.sp
-                    )
-                }
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { opt ->
-                    DropdownMenuItem(
-                        text = { Text(opt) },
-                        onClick = {
-                            onSelected(opt)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-
-    /* =========================================================================================
-     *  MINI CONFIRM BAR
-     * ========================================================================================= */
-
-    @Composable
-    private fun BoxScope.ConfirmBar(
-        onCancel: () -> Unit,
-        onOk: () -> Unit,
-        onSavePreset: () -> Unit
-    ) {
-        Surface(
-            color = Color(0xFF0B1220),
-            contentColor = Color.White,
-            tonalElevation = 10.dp,
-            shadowElevation = 10.dp,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    "Salvare le modifiche?",
-                    modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Medium
-                )
-                // icone-only
-                ToolbarIconButton(EditorIcons.Cancel, "Annulla", onClick = onCancel)
-                ToolbarIconButton(Icons.Outlined.BookmarkAdd, "Salva impostazioni", onClick = onSavePreset)
-                ToolbarIconButton(EditorIcons.Ok, "OK", onClick = onOk, selected = true)
-            }
-        }
-    }
-
-    /* =========================================================================================
-     *  UTILITY
-     * ========================================================================================= */
-
-    private fun key(path: List<String>, leaf: String) = (path + leaf).joinToString(" / ")
-
-    @Composable
-    private fun dividerDot() {
-        Box(
+        Row(
             Modifier
-                .padding(horizontal = 6.dp)
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF233049))
-        )
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Salvare le modifiche?",
+                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.Medium
+            )
+// icone-only
+            ToolbarIconButton(EditorIcons.Cancel, "Annulla", onClick = onCancel)
+            ToolbarIconButton(Icons.Outlined.BookmarkAdd, "Salva impostazioni", onClick = onSavePreset)
+            ToolbarIconButton(EditorIcons.Ok, "OK", onClick = onOk, selected = true)
+        }
     }
+}
 
-    // ======================================================================
+/* =========================================================================================
+*  UTILITY
+* ========================================================================================= */
+
+private fun key(path: List<String>, leaf: String) = (path + leaf).joinToString(" / ")
+
+@Composable
+private fun dividerDot() {
+    Box(
+        Modifier
+            .padding(horizontal = 6.dp)
+            .size(6.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF233049))
+    )
+}
+
+// ======================================================================
 // WIZARD OVERLAY â€” crea Pagina / MenÃ¹ Laterale / MenÃ¹ Centrale / Avviso
 // Aspetto scuro, barre coperte da scrim, nessuna logica esterna.
 // ======================================================================
-    private data class CreationResult(
-        val kind: DeckRoot,
-        val id: String,
-        val title: String,
-        val description: String?,
-        val scroll: String,           // "Assente" | "Verticale" | "Orizzontale"
-        val assocId: String?,         // eventuale associazione
-        val side: String?,            // solo per menÃ¹ laterale: "Sinistra"|"Destra"|"Alto"|"Basso"
-        val setAsHome: Boolean        // solo per pagine
-    )
+private data class CreationResult(
+    val kind: DeckRoot,
+    val id: String,
+    val title: String,
+    val description: String?,
+    val scroll: String,           // "Assente" | "Verticale" | "Orizzontale"
+    val assocId: String?,         // eventuale associazione
+    val side: String?,            // solo per menÃ¹ laterale: "Sinistra"|"Destra"|"Alto"|"Basso"
+    val setAsHome: Boolean        // solo per pagine
+)
 
-    @Composable
-    private fun BoxScope.CreationWizardOverlay(
-        visible: Boolean,
-        target: DeckRoot?,
-        existingIds: Set<String>,      // â† NEW
-        onDismiss: () -> Unit,
-        onCreate: (WizardResult) -> Unit
+@Composable
+private fun BoxScope.CreationWizardOverlay(
+    visible: Boolean,
+    target: DeckRoot?,
+    existingIds: Set<String>,      // â† NEW
+    onDismiss: () -> Unit,
+    onCreate: (WizardResult) -> Unit
+) {
+    if (!visible) return
+    val darkBg  = Color(0xFF0D1117) // stile GitHub scuro
+    val panelBg = Color(0xFF131A24)
+    var idError by remember { mutableStateOf(false) }
+
+    var showIdHelp by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .align(Alignment.Center),
+        color = darkBg.copy(alpha = 0.98f),
+        contentColor = Color.White
     ) {
-        if (!visible) return
-        val darkBg  = Color(0xFF0D1117) // stile GitHub scuro
-        val panelBg = Color(0xFF131A24)
-        var idError by remember { mutableStateOf(false) }
+// stato campi
+        var name by remember { mutableStateOf("") }
+        var description by remember { mutableStateOf("") }
+        var id by remember { mutableStateOf("") }
+        var idEdited by remember { mutableStateOf(false) }
 
-        var showIdHelp by remember { mutableStateOf(false) }
+// associazione (ora dietro flag)
+        var assocEnabled by remember { mutableStateOf(false) }
+        var assocMode by remember { mutableStateOf("manual") } // "manual" | "tap3s"
+        var assocId by remember { mutableStateOf("") }
 
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .align(Alignment.Center),
-            color = darkBg.copy(alpha = 0.98f),
-            contentColor = Color.White
-        ) {
-            // stato campi
-            var name by remember { mutableStateOf("") }
-            var description by remember { mutableStateOf("") }
-            var id by remember { mutableStateOf("") }
-            var idEdited by remember { mutableStateOf(false) }
+// specifici per Pagine
+        var scroll by remember { mutableStateOf("Nessuna") } // Nessuna | Verticale | Orizzontale
+        var setAsHome by remember { mutableStateOf(false) }
 
-            // associazione (ora dietro flag)
-            var assocEnabled by remember { mutableStateOf(false) }
-            var assocMode by remember { mutableStateOf("manual") } // "manual" | "tap3s"
-            var assocId by remember { mutableStateOf("") }
+// specifici per MenÃ¹ laterale
+        var side by remember { mutableStateOf("Sinistra") } // Sinistra | Destra | Alto | Basso
 
-            // specifici per Pagine
-            var scroll by remember { mutableStateOf("Nessuna") } // Nessuna | Verticale | Orizzontale
-            var setAsHome by remember { mutableStateOf(false) }
+        // regole ID auto
+        fun prefixFor(root: DeckRoot?) = when (root) {
+            DeckRoot.PAGINA -> "pg"
+            DeckRoot.MENU_LATERALE -> "ml"
+            DeckRoot.MENU_CENTRALE -> "mc"
+            DeckRoot.AVVISO -> "al"
+            else -> "pg"
+        }
+        fun sanitize(s: String) = s.filter { it.isLetterOrDigit() }
+        fun autoIdFrom(name: String, root: DeckRoot?): String {
+            val p = prefixFor(root)
+            val base = sanitize(name).lowercase()
+            val candidate = if (base.length >= 5) base.take(8) else (base + "001").take(8)
+            val withPrefix = (p + candidate).take(8)
+            return if (withPrefix.length < 5) (withPrefix + "0".repeat(5 - withPrefix.length)) else withPrefix
+        }
+        LaunchedEffect(name, target) {
+            if (!idEdited) id = autoIdFrom(name, target)
+        }
 
-            // specifici per MenÃ¹ laterale
-            var side by remember { mutableStateOf("Sinistra") } // Sinistra | Destra | Alto | Basso
-
-            // regole ID auto
-            fun prefixFor(root: DeckRoot?) = when (root) {
-                DeckRoot.PAGINA -> "pg"
-                DeckRoot.MENU_LATERALE -> "ml"
-                DeckRoot.MENU_CENTRALE -> "mc"
-                DeckRoot.AVVISO -> "al"
-                else -> "pg"
-            }
-            fun sanitize(s: String) = s.filter { it.isLetterOrDigit() }
-            fun autoIdFrom(name: String, root: DeckRoot?): String {
-                val p = prefixFor(root)
-                val base = sanitize(name).lowercase()
-                val candidate = if (base.length >= 5) base.take(8) else (base + "001").take(8)
-                val withPrefix = (p + candidate).take(8)
-                return if (withPrefix.length < 5) (withPrefix + "0".repeat(5 - withPrefix.length)) else withPrefix
-            }
-            LaunchedEffect(name, target) {
-                if (!idEdited) id = autoIdFrom(name, target)
-            }
-
-            // header
-            Column(Modifier.fillMaxSize()) {
-                Surface(color = panelBg, tonalElevation = 6.dp, shadowElevation = 8.dp) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Outlined.ArrowBack, contentDescription = "Chiudi")
-                        }
-                        val title = when (target) {
-                            DeckRoot.PAGINA -> "Nuova pagina"
-                            DeckRoot.MENU_LATERALE -> "Nuovo menÃ¹ laterale"
-                            DeckRoot.MENU_CENTRALE -> "Nuovo menÃ¹ centrale"
-                            DeckRoot.AVVISO -> "Nuovo avviso"
-                            else -> "Nuovo elemento"
-                        }
-                        Text(title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { showIdHelp = true }) {
-                            Icon(Icons.Outlined.HelpOutline, contentDescription = "Regole ID")
-                        }
-                    }
-                }
-
-                // pannello centrale
-                Surface(
-                    color = panelBg,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    tonalElevation = 8.dp,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .weight(1f)
+// header
+        Column(Modifier.fillMaxSize()) {
+            Surface(color = panelBg, tonalElevation = 6.dp, shadowElevation = 8.dp) {
+                Row(
+                    Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        Modifier
-                            .padding(16.dp)
-                            .fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        // --- Associazione (fissa in alto, fuori dallo scorrimento dei campi) ---
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            androidx.compose.material3.Checkbox(
-                                checked = assocEnabled,
-                                onCheckedChange = { assocEnabled = it },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = WIZ_AZURE,
-                                    checkmarkColor = Color.Black
-                                )
-                            )
-                            Text("Abilita associazione")
-                        }
-                        if (assocEnabled) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(
-                                        selected = assocMode == "manual",
-                                        onClick = { assocMode = "manual" },
-                                        colors = RadioButtonDefaults.colors(selectedColor = WIZ_AZURE)
-                                    )
-                                    Text("ID manuale")
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(
-                                        selected = assocMode == "tap3s",
-                                        onClick = { assocMode = "tap3s" },
-                                        colors = RadioButtonDefaults.colors(selectedColor = WIZ_AZURE)
-                                    )
-                                    Text("Seleziona a schermo (3s)")
-                                }
-                            }
-                            if (assocMode == "manual") {
-                                OutlinedTextField(
-                                    value = assocId,
-                                    onValueChange = { assocId = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }.take(32) },
-                                    singleLine = true,
-                                    label = { Text("ID elemento associato") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = TextFieldDefaults.colors(
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black,
-                                        focusedContainerColor = Color.White,
-                                        unfocusedContainerColor = Color.White,
-                                        cursorColor = WIZ_AZURE,
-                                        focusedIndicatorColor = WIZ_AZURE,
-                                        unfocusedIndicatorColor = Color(0xFF2A3B5B),
-                                        focusedLabelColor = WIZ_AZURE,
-                                        unfocusedLabelColor = Color(0xFF9BA3AF)
-                                    )
-                                )
-                            } else {
-                                Text(
-                                    "Tieni premuto 3s sul componente desiderato (modalitÃ  stub).",
-                                    fontSize = 12.sp,
-                                    color = Color(0xFF9BA3AF)
-                                )
-                                OutlinedButton(
-                                    onClick = { /* TODO: abilita selezione */ },
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, WIZ_AZURE)
-                                ) { Text("Avvia selezione") }
-                            }
-                        }
-
-                        // --- Campi (scroll verticale) ---
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = name,
-                                onValueChange = { name = it },
-                                label = { Text("Nome") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color.Black,
-                                    unfocusedTextColor = Color.Black,
-                                    focusedContainerColor = Color.White,
-                                    unfocusedContainerColor = Color.White,
-                                    cursorColor = WIZ_AZURE,
-                                    focusedIndicatorColor = WIZ_AZURE,
-                                    unfocusedIndicatorColor = Color(0xFF2A3B5B),
-                                    focusedLabelColor = WIZ_AZURE,
-                                    unfocusedLabelColor = Color(0xFF9BA3AF)
-                                )
-                            )
-                            OutlinedTextField(
-                                value = id,
-                                onValueChange = {
-                                    id = it.lowercase()
-                                        .replace(' ', '_')
-                                        .filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }
-                                        .take(15)          // fino a 15 come da tue regole
-                                    idEdited = true
-                                    idError = false       // reset visuale all'editing
-                                },
-                                label = { Text("ID") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                isError = idError,
-                                colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color.Black,
-                                    unfocusedTextColor = Color.Black,
-                                    focusedContainerColor = Color.White,
-                                    unfocusedContainerColor = Color.White,
-                                    cursorColor = WIZ_AZURE,
-                                    focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
-                                    unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
-                                    focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
-                                    unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
-                                )
-                            )
-                            OutlinedTextField(
-                                value = description,
-                                onValueChange = { description = it },
-                                label = { Text("Descrizione (opzionale)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color.Black,
-                                    unfocusedTextColor = Color.Black,
-                                    focusedContainerColor = Color.White,
-                                    unfocusedContainerColor = Color.White,
-                                    cursorColor = WIZ_AZURE,
-                                    focusedIndicatorColor = WIZ_AZURE,
-                                    unfocusedIndicatorColor = Color(0xFF2A3B5B),
-                                    focusedLabelColor = WIZ_AZURE,
-                                    unfocusedLabelColor = Color(0xFF9BA3AF)
-                                )
-                            )
-                            // Campi specifici per tipo
-                            when (target) {
-                                DeckRoot.PAGINA -> {
-                                    Text("Opzioni pagina", fontWeight = FontWeight.SemiBold)
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.horizontalScroll(rememberScrollState())
-                                    ) {
-                                        Text("ScrollabilitÃ :")
-                                        OptionPill(selected = scroll == "Nessuna", onClick = { scroll = "Nessuna" }, label = "Nessuna")
-                                        OptionPill(selected = scroll == "Verticale", onClick = { scroll = "Verticale" }, label = "Verticale")
-                                        OptionPill(selected = scroll == "Orizzontale", onClick = { scroll = "Orizzontale" }, label = "Orizzontale")
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Switch(
-                                            checked = setAsHome,
-                                            onCheckedChange = { setAsHome = it },
-                                            colors = SwitchDefaults.colors(
-                                                checkedThumbColor = WIZ_AZURE,
-                                                checkedTrackColor = WIZ_AZURE.copy(alpha = 0.4f)
-                                            )
-                                        )
-                                        Text("Imposta come Home")
-                                    }
-                                }
-                                DeckRoot.MENU_LATERALE -> {
-                                    Text("Opzioni menÃ¹ laterale", fontWeight = FontWeight.SemiBold)
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.horizontalScroll(rememberScrollState())
-                                    ) {
-                                        Text("Lato:")
-                                        OptionPill(selected = side == "Sinistra", onClick = { side = "Sinistra" }, label = "Sinistra")
-                                        OptionPill(selected = side == "Destra",   onClick = { side = "Destra"   }, label = "Destra")
-                                        OptionPill(selected = side == "Alto",     onClick = { side = "Alto"     }, label = "Alto")
-                                        OptionPill(selected = side == "Basso",    onClick = { side = "Basso"    }, label = "Basso")
-                                    }
-                                }
-                                DeckRoot.MENU_CENTRALE -> {
-                                    Text("Opzioni menÃ¹ centrale", fontWeight = FontWeight.SemiBold)
-                                    Text("Nessuna opzione speciale per ora.", color = Color(0xFF9BA3AF), fontSize = 12.sp)
-                                }
-                                DeckRoot.AVVISO -> {
-                                    Text("Opzioni avviso", fontWeight = FontWeight.SemiBold)
-                                    OutlinedButton(
-                                        onClick = { /* apri ECA mode (stub) */ },
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, WIZ_AZURE)
-                                    ) {
-                                        Text("Apri Eventâ€“Conditionâ€“Action mode (stub)")
-                                    }
-                                }
-                                else -> Unit
-                            }
-                        }
-
-                        // footer fisso
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedButton(
-                                onClick = onDismiss,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
-                                border = androidx.compose.foundation.BorderStroke(1.5.dp, WIZ_AZURE)
-                            ) {
-                                Text("Annulla")
-                            }
-                            Button(
-                                onClick = {
-                                    // Costruzione ID finale secondo le tue regole attuali del file (con take(15) se vuoi estenderle qui)
-                                    val computedId = if (id.isNotBlank()) id else /* autoIdFrom(name, target) o tua logica */
-                                        (when (target) {
-                                            DeckRoot.PAGINA        -> "pg"
-                                            DeckRoot.MENU_LATERALE -> "ml"
-                                            DeckRoot.MENU_CENTRALE -> "mc"
-                                            DeckRoot.AVVISO        -> "al"
-                                            else -> "pg"
-                                        } + "-" + name.lowercase()
-                                            .replace(' ', '_')
-                                            .filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }
-                                            .take(15)
-                                                ).ifBlank {
-                                                // fallback se nome corto/vuoto: prefisso-00001 (basic, non incrementale qui)
-                                                val pref = when (target) {
-                                                    DeckRoot.PAGINA        -> "pg"
-                                                    DeckRoot.MENU_LATERALE -> "ml"
-                                                    DeckRoot.MENU_CENTRALE -> "mc"
-                                                    DeckRoot.AVVISO        -> "al"
-                                                    else -> "pg"
-                                                }
-                                                "${pref}-00001"
-                                            }
-
-                                    val finalId = computedId
-                                    val finalName = if (name.isBlank()) finalId else name
-
-                                    if (existingIds.contains(finalId)) {
-                                        idError = true
-                                        return@Button
-                                    }
-
-                                    onCreate(
-                                        WizardResult(
-                                            root = target ?: DeckRoot.PAGINA,
-                                            id = finalId,
-                                            name = finalName,
-                                            description = description.ifBlank { "n/a" },
-                                            assocId = if (assocEnabled && assocMode == "manual" && assocId.isNotBlank()) assocId else null,
-                                            scroll = scroll,
-                                            setAsHome = (target == DeckRoot.PAGINA && setAsHome),
-                                            side = if (target == DeckRoot.MENU_LATERALE) side else null
-                                        )
-                                    )
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black)
-                            ) {
-                                Text("Crea")
-                            }
-
-                        }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Outlined.ArrowBack, contentDescription = "Chiudi")
                     }
-                }
-
-                // Dialog help regole ID
-                if (showIdHelp) {
-                    AlertDialog(
-                        onDismissRequest = { showIdHelp = false },
-                        title = { Text("Regole per l'ID") },
-                        text = {
-                            Text(
-                                "â€¢ Se compili l'ID, viene usato quello.\n" +
-                                        "â€¢ Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
-                                        "â€¢ Se Nome Ã¨ corto o vuoto: il sistema completa fino a 5â€“8 caratteri.\n" +
-                                        "â€¢ L'ID deve essere univoco."
-                            )
-                        },
-                        confirmButton = {
-                            TextButton(
-                                onClick = { showIdHelp = false },
-                                colors = ButtonDefaults.textButtonColors(contentColor = WIZ_AZURE)
-                            ) { Text("OK") }
-                        }
-                    )
-                }
-            }
-        }
-    }
-
-
-    @Composable
-    private fun OptionPill(selected: Boolean, onClick: () -> Unit, label: String) {
-        val borderClr = if (selected) WIZ_AZURE else Color(0xFF2A3B5B)
-        val txtClr    = if (selected) WIZ_AZURE else Color.White
-        OutlinedButton(
-            onClick = onClick,
-            modifier = Modifier
-                .height(36.dp)
-                .padding(vertical = 0.dp),
-            border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, borderClr),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = txtClr)
-        ) {
-            Text(label, maxLines = 1, softWrap = false)
-        }
-    }
-
-
-    private data class WizardResult(
-        val root: DeckRoot,
-        val id: String,
-        val name: String,
-        val description: String,
-        val assocId: String?,
-        val scroll: String,
-        val setAsHome: Boolean = false,
-        val side: String? = null
-    )
-
-
-    // Piccolo dropdown â€œscuroâ€ in linea con lo stile
-    @Composable
-    private fun DropdownSmall(
-        current: String,
-        options: List<String>,
-        onSelected: (String) -> Unit
-    ) {
-        var open by remember { mutableStateOf(false) }
-        Box {
-            TextButton(onClick = { open = true }) { Text(current) }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                options.forEach { opt ->
-                    DropdownMenuItem(text = { Text(opt) }, onClick = { onSelected(opt); open = false })
-                }
-            }
-        }
-    }
-
-    // Chip minimale, aspetto scuro, niente API sperimentali
-    @Composable
-    private fun FilterChipLike(
-        selected: Boolean,
-        onClick: () -> Unit,
-        label: String
-    ) {
-        val bg = if (selected) Color(0xFF22304B) else Color(0xFF1B2334)
-        Surface(
-            color = bg,
-            contentColor = Color.White,
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            TextButton(onClick = onClick) {
-                Text(label)
-            }
-        }
-    }
-
-    @OptIn(ExperimentalFoundationApi::class)
-    @Composable
-    private fun BoxScope.InfoEdgeDeck(
-        open: Boolean,
-        onToggleOpen: () -> Unit,
-        infoEnabled: Boolean,
-        onToggleInfo: () -> Unit,
-        enabled: Boolean = true
-    ) {
-        // --- parametri estetici (puoi regolarli a piacere) ---
-        val tileSize   = 56.dp           // quadrato icona
-        val spacing    = 10.dp           // spazio tra tile
-        val corner     = 12.dp           // arrotondamento tile (quadrato "morbido")
-        val peekWidth  = 12.dp           // â€œpochi mmâ€ sempre visibili sul lato destro
-
-        // Larghezza animata del contenitore (solo a destra)
-        val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
-        val width by animateDpAsState(
-            targetValue = targetWidth,
-            animationSpec = tween(220),
-            label = "sideWidth"
-        )
-
-        // VisibilitÃ  a cascata (dallâ€™alto verso il basso)
-        var showHelp by remember(open) { mutableStateOf(false) }
-        var showGear by remember(open) { mutableStateOf(false) }
-        LaunchedEffect(open) {
-            if (open) {
-                showHelp = true; delay(60)
-                showGear = true
-            } else {
-                showGear = false; delay(40)
-                showHelp = false
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .width(width)
-                .fillMaxHeight()
-        ) {
-            // --- Peek: sottile fascia verticale con ombra/gradiente sempre visibile ---
-            val shadeAlpha = if (open) 0.08f else 0.25f
-            Box(
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .width(peekWidth)
-                    .fillMaxHeight()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x66000000).copy(alpha = shadeAlpha),
-                                Color(0x00000000),
-                                Color(0x66000000).copy(alpha = shadeAlpha)
-                            )
-                        )
-                    )
-                    // Swipe dalla destra verso sinistra per aprire/chiudere
-                    .pointerInput(open) {
-                        detectHorizontalDragGestures { _, dx ->
-                            // dx < 0 = trascina verso sinistra
-                            if (!open && dx < -18f) onToggleOpen()
-                            // dx > 0 = trascina verso destra
-                            if ( open && dx >  18f) onToggleOpen()
-                        }
+                    val title = when (target) {
+                        DeckRoot.PAGINA -> "Nuova pagina"
+                        DeckRoot.MENU_LATERALE -> "Nuovo menÃ¹ laterale"
+                        DeckRoot.MENU_CENTRALE -> "Nuovo menÃ¹ centrale"
+                        DeckRoot.AVVISO -> "Nuovo avviso"
+                        else -> "Nuovo elemento"
                     }
-                    // Tap vicino al bordo per aprire/chiudere
-                    .combinedClickable(
-                        onClick = onToggleOpen,
-                        onLongClick = onToggleOpen
-                    )
-            )
-
-            // --- Colonna dei tile quadrati (icona â€œ?â€ + ingranaggio) ---
-            if (open) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(spacing),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // â€œ?â€ â€” colore/abilitazione invariati (rispetta infoEnabled & enabled)
-                    AnimatedVisibility(
-                        visible = showHelp,
-                        enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
-                        exit  = fadeOut(tween(120)) + scaleOut(tween(120))
-                    ) {
-                        SquareTile(
-                            size = tileSize,
-                            corner = corner,
-                            icon = Icons.Outlined.HelpOutline,
-                            tint = when {
-                                !enabled     -> Color(0xFF6B7280) // grigio disattivo nei sottomenu
-                                infoEnabled  -> WIZ_AZURE        // azzurro quando attiva la info-mode
-                                else         -> Color.White
-                            },
-                            enabled = enabled,
-                            onClick = {
-                                if (enabled) {
-                                    onToggleInfo()
-                                    onToggleOpen() // chiudi dopo il tap
-                                }
-                            }
-                        )
-                    }
-
-                    // Ingranaggio â€” stub (chiude il menÃ¹ dopo il tap)
-                    AnimatedVisibility(
-                        visible = showGear,
-                        enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.85f),
-                        exit  = fadeOut(tween(120)) + scaleOut(tween(120))
-                    ) {
-                        SquareTile(
-                            size = tileSize,
-                            corner = corner,
-                            icon = EditorIcons.Settings,
-                            tint = Color.White,
-                            enabled = true,
-                            onClick = {
-                                // TODO: apri impostazioni (stub)
-                                onToggleOpen()
-                            }
-                        )
+                    Text(title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { showIdHelp = true }) {
+                        Icon(Icons.Outlined.HelpOutline, contentDescription = "Regole ID")
                     }
                 }
             }
-        }
-    }
 
-    @OptIn(ExperimentalFoundationApi::class)
-    @Composable
-    private fun SquareTile(
-        size: Dp,
-        corner: Dp,
-        icon: ImageVector,
-        tint: Color,
-        enabled: Boolean,
-        onClick: () -> Unit
-    ) {
-        Surface(
-            color = Color(0xFF111621),
-            contentColor = tint,
-            shape = RoundedCornerShape(corner),
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(size)
-                    .combinedClickable(
-                        enabled = enabled,
-                        onClick = onClick,
-                        onLongClick = onClick // stessa gesture per immediatezza
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-            }
-        }
-    }
-
-    @Composable
-    private fun BoxScope.InfoToastCard(
-        visible: Boolean,
-        title: String,
-        body: String,
-        onDismiss: () -> Unit
-    ) {
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(tween(150)),
-            exit  = fadeOut(tween(250)),
-            modifier = Modifier.align(Alignment.TopCenter)
-        ) {
+// pannello centrale
             Surface(
-                color = Color(0xFF0F141E),
+                color = panelBg,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, WIZ_AZURE),
                 tonalElevation = 8.dp,
                 shadowElevation = 8.dp,
                 modifier = Modifier
-                    .padding(top = 24.dp, start = 16.dp, end = 16.dp)
+                    .padding(16.dp)
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
-                Column(Modifier.padding(14.dp)) {
-                    Text(title, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(body, color = Color(0xFF9BA3AF))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(
+                Column(
+                    Modifier
+                        .padding(16.dp)
+                        .fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+// --- Associazione (fissa in alto, fuori dallo scorrimento dei campi) ---
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.Checkbox(
+                            checked = assocEnabled,
+                            onCheckedChange = { assocEnabled = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = WIZ_AZURE,
+                                checkmarkColor = Color.Black
+                            )
+                        )
+                        Text("Abilita associazione")
+                    }
+                    if (assocEnabled) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(
+                                    selected = assocMode == "manual",
+                                    onClick = { assocMode = "manual" },
+                                    colors = RadioButtonDefaults.colors(selectedColor = WIZ_AZURE)
+                                )
+                                Text("ID manuale")
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(
+                                    selected = assocMode == "tap3s",
+                                    onClick = { assocMode = "tap3s" },
+                                    colors = RadioButtonDefaults.colors(selectedColor = WIZ_AZURE)
+                                )
+                                Text("Seleziona a schermo (3s)")
+                            }
+                        }
+                        if (assocMode == "manual") {
+                            OutlinedTextField(
+                                value = assocId,
+                                onValueChange = { assocId = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }.take(32) },
+                                singleLine = true,
+                                label = { Text("ID elemento associato") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = TextFieldDefaults.colors(
+                                    focusedTextColor = Color.Black,
+                                    unfocusedTextColor = Color.Black,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White,
+                                    cursorColor = WIZ_AZURE,
+                                    focusedIndicatorColor = WIZ_AZURE,
+                                    unfocusedIndicatorColor = Color(0xFF2A3B5B),
+                                    focusedLabelColor = WIZ_AZURE,
+                                    unfocusedLabelColor = Color(0xFF9BA3AF)
+                                )
+                            )
+                        } else {
+                            Text(
+                                "Tieni premuto 3s sul componente desiderato (modalitÃ  stub).",
+                                fontSize = 12.sp,
+                                color = Color(0xFF9BA3AF)
+                            )
+                            OutlinedButton(
+                                onClick = { /* TODO: abilita selezione */ },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, WIZ_AZURE)
+                            ) { Text("Avvia selezione") }
+                        }
+                    }
+
+// --- Campi (scroll verticale) ---
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Nome") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedIndicatorColor = WIZ_AZURE,
+                                unfocusedIndicatorColor = Color(0xFF2A3B5B),
+                                focusedLabelColor = WIZ_AZURE,
+                                unfocusedLabelColor = Color(0xFF9BA3AF)
+                            )
+                        )
+                        OutlinedTextField(
+                            value = id,
+                            onValueChange = {
+                                id = it.lowercase()
+                                    .replace(' ', '_')
+                                    .filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }
+                                    .take(15)          // fino a 15 come da tue regole
+                                idEdited = true
+                                idError = false       // reset visuale all'editing
+                            },
+                            label = { Text("ID") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            isError = idError,
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedIndicatorColor = if (idError) Color.Red else WIZ_AZURE,
+                                unfocusedIndicatorColor = if (idError) Color.Red else Color(0xFF2A3B5B),
+                                focusedLabelColor = if (idError) Color.Red else WIZ_AZURE,
+                                unfocusedLabelColor = if (idError) Color.Red else Color(0xFF9BA3AF)
+                            )
+                        )
+                        OutlinedTextField(
+                            value = description,
+                            onValueChange = { description = it },
+                            label = { Text("Descrizione (opzionale)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
+                                cursorColor = WIZ_AZURE,
+                                focusedIndicatorColor = WIZ_AZURE,
+                                unfocusedIndicatorColor = Color(0xFF2A3B5B),
+                                focusedLabelColor = WIZ_AZURE,
+                                unfocusedLabelColor = Color(0xFF9BA3AF)
+                            )
+                        )
+// Campi specifici per tipo
+                        when (target) {
+                            DeckRoot.PAGINA -> {
+                                Text("Opzioni pagina", fontWeight = FontWeight.SemiBold)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                                ) {
+                                    Text("ScrollabilitÃ :")
+                                    OptionPill(selected = scroll == "Nessuna", onClick = { scroll = "Nessuna" }, label = "Nessuna")
+                                    OptionPill(selected = scroll == "Verticale", onClick = { scroll = "Verticale" }, label = "Verticale")
+                                    OptionPill(selected = scroll == "Orizzontale", onClick = { scroll = "Orizzontale" }, label = "Orizzontale")
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Switch(
+                                        checked = setAsHome,
+                                        onCheckedChange = { setAsHome = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = WIZ_AZURE,
+                                            checkedTrackColor = WIZ_AZURE.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                    Text("Imposta come Home")
+                                }
+                            }
+                            DeckRoot.MENU_LATERALE -> {
+                                Text("Opzioni menÃ¹ laterale", fontWeight = FontWeight.SemiBold)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                                ) {
+                                    Text("Lato:")
+                                    OptionPill(selected = side == "Sinistra", onClick = { side = "Sinistra" }, label = "Sinistra")
+                                    OptionPill(selected = side == "Destra",   onClick = { side = "Destra"   }, label = "Destra")
+                                    OptionPill(selected = side == "Alto",     onClick = { side = "Alto"     }, label = "Alto")
+                                    OptionPill(selected = side == "Basso",    onClick = { side = "Basso"    }, label = "Basso")
+                                }
+                            }
+                            DeckRoot.MENU_CENTRALE -> {
+                                Text("Opzioni menÃ¹ centrale", fontWeight = FontWeight.SemiBold)
+                                Text("Nessuna opzione speciale per ora.", color = Color(0xFF9BA3AF), fontSize = 12.sp)
+                            }
+                            DeckRoot.AVVISO -> {
+                                Text("Opzioni avviso", fontWeight = FontWeight.SemiBold)
+                                OutlinedButton(
+                                    onClick = { /* apri ECA mode (stub) */ },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, WIZ_AZURE)
+                                ) {
+                                    Text("Apri Eventâ€“Conditionâ€“Action mode (stub)")
+                                }
+                            }
+                            else -> Unit
+                        }
+                    }
+
+// footer fisso
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
                             onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, WIZ_AZURE)
+                        ) {
+                            Text("Annulla")
+                        }
+                        Button(
+                            onClick = {
+// Costruzione ID finale secondo le tue regole attuali del file (con take(15) se vuoi estenderle qui)
+                                val computedId = if (id.isNotBlank()) id else /* autoIdFrom(name, target) o tua logica */
+                                    (when (target) {
+                                        DeckRoot.PAGINA        -> "pg"
+                                        DeckRoot.MENU_LATERALE -> "ml"
+                                        DeckRoot.MENU_CENTRALE -> "mc"
+                                        DeckRoot.AVVISO        -> "al"
+                                        else -> "pg"
+                                    } + "-" + name.lowercase()
+                                        .replace(' ', '_')
+                                        .filter { ch -> ch.isLetterOrDigit() || ch == '-' || ch == '_' }
+                                        .take(15)
+                                            ).ifBlank {
+// fallback se nome corto/vuoto: prefisso-00001 (basic, non incrementale qui)
+                                            val pref = when (target) {
+                                                DeckRoot.PAGINA        -> "pg"
+                                                DeckRoot.MENU_LATERALE -> "ml"
+                                                DeckRoot.MENU_CENTRALE -> "mc"
+                                                DeckRoot.AVVISO        -> "al"
+                                                else -> "pg"
+                                            }
+                                            "${pref}-00001"
+                                        }
+
+                                val finalId = computedId
+                                val finalName = if (name.isBlank()) finalId else name
+
+                                if (existingIds.contains(finalId)) {
+                                    idError = true
+                                    return@Button
+                                }
+
+                                onCreate(
+                                    WizardResult(
+                                        root = target ?: DeckRoot.PAGINA,
+                                        id = finalId,
+                                        name = finalName,
+                                        description = description.ifBlank { "n/a" },
+                                        assocId = if (assocEnabled && assocMode == "manual" && assocId.isNotBlank()) assocId else null,
+                                        scroll = scroll,
+                                        setAsHome = (target == DeckRoot.PAGINA && setAsHome),
+                                        side = if (target == DeckRoot.MENU_LATERALE) side else null
+                                    )
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black)
+                        ) {
+                            Text("Crea")
+                        }
+
+                    }
+                }
+            }
+
+// Dialog help regole ID
+            if (showIdHelp) {
+                AlertDialog(
+                    onDismissRequest = { showIdHelp = false },
+                    title = { Text("Regole per l'ID") },
+                    text = {
+                        Text(
+                            "â€¢ Se compili l'ID, viene usato quello.\n" +
+                                    "â€¢ Altrimenti: prefisso per tipo (pg/ml/mc/al) + prime 5 lettere/cifre del Nome (solo alfanumerici).\n" +
+                                    "â€¢ Se Nome Ã¨ corto o vuoto: il sistema completa fino a 5â€“8 caratteri.\n" +
+                                    "â€¢ L'ID deve essere univoco."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = { showIdHelp = false },
                             colors = ButtonDefaults.textButtonColors(contentColor = WIZ_AZURE)
                         ) { Text("OK") }
                     }
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun OptionPill(selected: Boolean, onClick: () -> Unit, label: String) {
+    val borderClr = if (selected) WIZ_AZURE else Color(0xFF2A3B5B)
+    val txtClr    = if (selected) WIZ_AZURE else Color.White
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier
+            .height(36.dp)
+            .padding(vertical = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, borderClr),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = txtClr)
+    ) {
+        Text(label, maxLines = 1, softWrap = false)
+    }
+}
+
+
+private data class WizardResult(
+    val root: DeckRoot,
+    val id: String,
+    val name: String,
+    val description: String,
+    val assocId: String?,
+    val scroll: String,
+    val setAsHome: Boolean = false,
+    val side: String? = null
+)
+
+
+// Piccolo dropdown â€œscuroâ€ in linea con lo stile
+@Composable
+private fun DropdownSmall(
+    current: String,
+    options: List<String>,
+    onSelected: (String) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) { Text(current) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { opt ->
+                DropdownMenuItem(text = { Text(opt) }, onClick = { onSelected(opt); open = false })
+            }
+        }
+    }
+}
+
+// Chip minimale, aspetto scuro, niente API sperimentali
+@Composable
+private fun FilterChipLike(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String
+) {
+    val bg = if (selected) Color(0xFF22304B) else Color(0xFF1B2334)
+    Surface(
+        color = bg,
+        contentColor = Color.White,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        TextButton(onClick = onClick) {
+            Text(label)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BoxScope.InfoEdgeDeck(
+    open: Boolean,
+    onToggleOpen: () -> Unit,
+    infoEnabled: Boolean,
+    onToggleInfo: () -> Unit,
+    enabled: Boolean = true
+) {
+// --- parametri estetici (puoi regolarli a piacere) ---
+    val tileSize   = 56.dp           // quadrato icona
+    val spacing    = 10.dp           // spazio tra tile
+    val corner     = 12.dp           // arrotondamento tile (quadrato "morbido")
+    val peekWidth  = 12.dp           // â€œpochi mmâ€ sempre visibili sul lato destro
+
+// Larghezza animata del contenitore (solo a destra)
+    val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
+    val width by animateDpAsState(
+        targetValue = targetWidth,
+        animationSpec = tween(220),
+        label = "sideWidth"
+    )
+
+// VisibilitÃ  a cascata (dallâ€™alto verso il basso)
+    var showHelp by remember(open) { mutableStateOf(false) }
+    var showGear by remember(open) { mutableStateOf(false) }
+    LaunchedEffect(open) {
+        if (open) {
+            showHelp = true; delay(60)
+            showGear = true
+        } else {
+            showGear = false; delay(40)
+            showHelp = false
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .width(width)
+            .fillMaxHeight()
+    ) {
+// --- Peek: sottile fascia verticale con ombra/gradiente sempre visibile ---
+        val shadeAlpha = if (open) 0.08f else 0.25f
+        Box(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .width(peekWidth)
+                .fillMaxHeight()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0x66000000).copy(alpha = shadeAlpha),
+                            Color(0x00000000),
+                            Color(0x66000000).copy(alpha = shadeAlpha)
+                        )
+                    )
+                )
+// Swipe dalla destra verso sinistra per aprire/chiudere
+                .pointerInput(open) {
+                    detectHorizontalDragGestures { _, dx ->
+// dx < 0 = trascina verso sinistra
+                        if (!open && dx < -18f) onToggleOpen()
+// dx > 0 = trascina verso destra
+                        if ( open && dx >  18f) onToggleOpen()
+                    }
+                }
+// Tap vicino al bordo per aprire/chiudere
+                .combinedClickable(
+                    onClick = onToggleOpen,
+                    onLongClick = onToggleOpen
+                )
+        )
+
+// --- Colonna dei tile quadrati (icona â€œ?â€ + ingranaggio) ---
+        if (open) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+// â€œ?â€ â€” colore/abilitazione invariati (rispetta infoEnabled & enabled)
+                AnimatedVisibility(
+                    visible = showHelp,
+                    enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
+                    exit  = fadeOut(tween(120)) + scaleOut(tween(120))
+                ) {
+                    SquareTile(
+                        size = tileSize,
+                        corner = corner,
+                        icon = Icons.Outlined.HelpOutline,
+                        tint = when {
+                            !enabled     -> Color(0xFF6B7280) // grigio disattivo nei sottomenu
+                            infoEnabled  -> WIZ_AZURE        // azzurro quando attiva la info-mode
+                            else         -> Color.White
+                        },
+                        enabled = enabled,
+                        onClick = {
+                            if (enabled) {
+                                onToggleInfo()
+                                onToggleOpen() // chiudi dopo il tap
+                            }
+                        }
+                    )
+                }
+
+// Ingranaggio â€” stub (chiude il menÃ¹ dopo il tap)
+                AnimatedVisibility(
+                    visible = showGear,
+                    enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.85f),
+                    exit  = fadeOut(tween(120)) + scaleOut(tween(120))
+                ) {
+                    SquareTile(
+                        size = tileSize,
+                        corner = corner,
+                        icon = EditorIcons.Settings,
+                        tint = Color.White,
+                        enabled = true,
+                        onClick = {
+// TODO: apri impostazioni (stub)
+                            onToggleOpen()
+                        }
+                    )
                 }
             }
         }
     }
+}
 
-    @Composable
-    private fun BoxScope.ProUpsellSheet(onClose: () -> Unit) {
-        androidx.compose.material3.Surface(
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SquareTile(
+    size: Dp,
+    corner: Dp,
+    icon: ImageVector,
+    tint: Color,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        color = Color(0xFF111621),
+        contentColor = tint,
+        shape = RoundedCornerShape(corner),
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .combinedClickable(
+                    enabled = enabled,
+                    onClick = onClick,
+                    onLongClick = onClick // stessa gesture per immediatezza
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.InfoToastCard(
+    visible: Boolean,
+    title: String,
+    body: String,
+    onDismiss: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(150)),
+        exit  = fadeOut(tween(250)),
+        modifier = Modifier.align(Alignment.TopCenter)
+    ) {
+        Surface(
             color = Color(0xFF0F141E),
             contentColor = Color.White,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            shape = RoundedCornerShape(12.dp),
             border = BorderStroke(1.dp, WIZ_AZURE),
-            tonalElevation = 12.dp,
-            shadowElevation = 12.dp,
+            tonalElevation = 8.dp,
+            shadowElevation = 8.dp,
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(top = 24.dp, start = 16.dp, end = 16.dp)
         ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Sblocca Starter o Pro", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                Text(
-                    "Starter e Pro sbloccano: preset/“default”, più font, Colore 2 e Gradiente, Immagini/Album per Layout e Contenitore, e altro.",
-                    color = Color(0xFF9BA3AF)
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    androidx.compose.material3.OutlinedButton(
-                        onClick = onClose,
-                        border = BorderStroke(1.5.dp, WIZ_AZURE),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Chiudi") }
-
-                    androidx.compose.material3.Button(
-                        onClick = onClose,
-                        colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black),
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Vedi piani") }
-                }
-                // Mini tabella prezzi (stub)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Starter", fontWeight = FontWeight.SemiBold)
-                        Text("• Tutto ciò che serve\n• Supporto base\n", color = Color(0xFF9BA3AF))
-                        Text("€ X/mese", fontWeight = FontWeight.Medium)
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text("Pro", fontWeight = FontWeight.SemiBold)
-                        Text("• Tutto di Starter\n• Funzioni extra (stub)\n", color = Color(0xFF9BA3AF))
-                        Text("€ Y/mese", fontWeight = FontWeight.Medium)
-                    }
+            Column(Modifier.padding(14.dp)) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                Text(body, color = Color(0xFF9BA3AF))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.textButtonColors(contentColor = WIZ_AZURE)
+                    ) { Text("OK") }
                 }
             }
         }
