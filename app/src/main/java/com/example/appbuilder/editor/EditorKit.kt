@@ -786,7 +786,7 @@ private fun BoxScope.MainBottomBar(
     var secondDotCenter by remember { mutableStateOf<Float?>(null) }
 
     // --- varia colore linea (scritte + linea) ---
-    val lineAccent = Color(0xFF233049) // varia colore linea
+    val lineAccent = DECK_HIGHLIGHT   // varia colore linea
     // --- alza etichette di poco rispetto alla linea ---
     val labelLift = 3.dp
 
@@ -851,38 +851,13 @@ private fun BoxScope.MainBottomBar(
                             infoTitle = "Annulla", infoBody = "Annulla l’ultima modifica", allowLongPressInInfo = false )
                         ToolbarIconButton(Icons.Outlined.Redo, "Redo", onClick = onRedo,
                             infoTitle = "Ripeti", infoBody = "Ripristina l’ultima azione annullata", allowLongPressInInfo = false )
+                        ToolbarIconButton(EditorIcons.Save, "Salva elemento", onClick = onSaveFile,
+                            infoTitle = "Salva", infoBody = "Salva l’elemento corrente", allowLongPressInInfo = false)
                         ToolbarIconButton(EditorIcons.Delete, "Cestino", onClick = onDelete,
                             infoTitle = "Cestino", infoBody = "Elimina l’elemento corrente", allowLongPressInInfo = false )
                         ToolbarIconButton(EditorIcons.Duplicate, "Duplica", onClick = onDuplicate,
                             infoTitle = "Duplica", infoBody = "Crea una copia dell’elemento corrente", allowLongPressInInfo = false )
                     }
-
-                    // PUNTINO 1
-                    Box(
-                        modifier = Modifier.onGloballyPositioned { coords ->
-                            val left = coords.positionInRoot().x - containerLeftInRoot
-                            val width = coords.size.width.toFloat()
-                            firstDotCenter = left + width / 2f
-                        }
-                    ) { dividerDot() }
-
-                    // BLOCCO INTERMEDIO (PAGINE E MENÙ)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.onGloballyPositioned { coords ->
-                            val left = coords.positionInRoot().x - containerLeftInRoot
-                            middleBlockLeftEdge = left
-                        }
-                    ) {
-                        ToolbarIconButton(EditorIcons.Settings, "Proprietà", onClick = onProperties,
-                            infoTitle = "Proprietà", infoBody = "Impostazioni dell’elemento corrente")
-                        ToolbarIconButton(EditorIcons.Layout, "Layout pagina", onClick = onLayout,
-                            infoTitle = "Layout pagina", infoBody = "Apri le impostazioni di layout")
-                        ToolbarIconButton(EditorIcons.Save, "Salva pagina", onClick = onSaveFile,
-                            infoTitle = "Salva", infoBody = "Salva l’elemento corrente")
-                    }
-                }
 
                 // --------- GRUPPO DESTRO ---------
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1032,17 +1007,8 @@ private fun BoxScope.MainBottomBar(
                 firstBlockCenter?.let { cx ->
                     if (wElementi > 0f) gaps += (cx - wElementi / 2f - pad) to (cx + wElementi / 2f + pad)
                 }
-                if (firstDotCenter != null && secondDotCenter != null && wPagine > 0f) {
-                    val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
-                    gaps += (cx - wPagine / 2f - pad) to (cx + wPagine / 2f + pad)
-                }
                 lastBlockCenter?.let { cx ->
                     if (wProgressi > 0f) gaps += (cx - wProgressi / 2f - pad) to (cx + wProgressi / 2f + pad)
-                }
-                if (firstBlockRightEdge != null && middleBlockLeftEdge != null) {
-                    val s = (firstBlockRightEdge!! - extra).coerceAtLeast(0f)
-                    val e = (middleBlockLeftEdge!! + extra).coerceAtMost(size.width)
-                    if (e > s) gaps += s to e
                 }
                 if (preSecondBlockRightEdge != null && lastBlockLeftEdge != null) {
                     val s = (preSecondBlockRightEdge!! - extra).coerceAtLeast(0f)
@@ -1094,26 +1060,6 @@ private fun BoxScope.MainBottomBar(
                         }
                 )
             }
-            // "pagine e menù"
-            if (firstDotCenter != null && secondDotCenter != null) {
-                var baselinePagPx by remember { mutableStateOf(0f) }
-                Text(
-                    "pagine e menù",
-                    style = labelStyle,
-                    onTextLayout = { tlr -> baselinePagPx = tlr.getLineBaseline(0).toFloat() },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .onGloballyPositioned { wPagine = it.size.width.toFloat() }
-                        .offset {
-                            val cx = (firstDotCenter!! + secondDotCenter!!) / 2f
-                            val lineY = containerHeightPx - with(localDensity) { underlineStroke.toPx() } / 2f
-                            val y = (lineY - baselinePagPx - with(localDensity) { labelLift.toPx() }).toInt()
-                            val x = (cx - wPagine / 2f).toInt()
-                            IntOffset(x, y)
-                        }
-                )
-            }
-            // "progressi"
             if (lastBlockCenter != null) {
                 var baselineProgPx by remember { mutableStateOf(0f) }
                 Text(
