@@ -678,6 +678,8 @@ fun EditorMenusOnly(
                             classicEditing = false
                         }
                     )
+                // calcola il “contesto pagina” (serve per mostrare Top/Bottom bar solo per Pagine)
+                val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
                 CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
                     SubMenuBar(
                         path = menuPath,
