@@ -18,17 +18,10 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-// Importa i tuoi modelli definiti in CanvasModel.kt
-// (Assicurati che esistano lì e non qui per evitare "Redeclaration")
-import com.example.appbuilder.canvas.PageState
-import com.example.appbuilder.canvas.DrawItem
-
-/* -------------------------------------------------------------------------- */
-/* API “COMPATIBILE con EditorKit”                                            */
-/* -------------------------------------------------------------------------- */
+// QUI non importo PageState/DrawItem perché sono nello stesso package (CanvasModel.kt)
 
 /**
- * Overload allineato alla chiamata in EditorKit:
+ * Overload allineato a EditorKit:
  *
  * CanvasStage(
  *   page = pageState,
@@ -38,6 +31,9 @@ import com.example.appbuilder.canvas.DrawItem
  *   currentLevel = currentLevel,
  *   onAddItem = { item: DrawItem -> ... }
  * )
+ *
+ * Per ora NON costruiamo DrawItem qui dentro (è sealed): il callback resta per compatibilità,
+ * ma non viene invocato finché non ci allineiamo al factory/alle sottoclassi reali.
  */
 @Composable
 fun CanvasStage(
@@ -46,10 +42,9 @@ fun CanvasStage(
     gridPreviewOnly: Boolean = false,
     showFullGrid: Boolean = false,
     currentLevel: Int = page?.currentLevel ?: 0,
-    onAddItem: (DrawItem) -> Unit = {},
+    onAddItem: (DrawItem) -> Unit = {},     // ← compatibilità col call‑site, ma non usato qui
     modifier: Modifier = Modifier
 ) {
-    // griglia quadrata rows x cols
     val rows = gridDensity.coerceIn(1, 64)
     val cols = gridDensity.coerceIn(1, 64)
 
@@ -61,25 +56,12 @@ fun CanvasStage(
         grid = GridSpec(rows = rows, cols = cols, gap = 0.dp),
         showGrid = showGrid,
         spotlightCell = spotlight,
-        onTapCell = { r, c ->
-            // Esempio: aggiungo un item “cella” sul livello corrente
-            onAddItem(
-                DrawItem(
-                    id = "cell_${r}_${c}",
-                    level = currentLevel,
-                    kind = DrawItem.Kind.Cell,
-                    row = r,
-                    col = c
-                )
-            )
-        },
-        onLongPressCell = { _, _ -> /* opzionale */ }
+        onTapCell = { _, _ -> /* in futuro potrai usare onAddItem con una factory */ },
+        onLongPressCell = { _, _ -> }
     )
 }
 
-/* -------------------------------------------------------------------------- */
-/* Implementazione interna di disegno griglia                                 */
-/* -------------------------------------------------------------------------- */
+/* --------------------------- Disegno griglia interno --------------------------- */
 
 data class GridSpec(
     val rows: Int,
@@ -146,7 +128,7 @@ private fun CanvasStageInternal(
                         color = gridColor,
                         start = Offset(x, 0f),
                         end = Offset(x, h),
-                        strokeWidth = 1f // ← Float
+                        strokeWidth = 1f              // Float, non Int
                     )
                     x += cellW
                     if (c < grid.cols) x += gapPx
@@ -158,7 +140,7 @@ private fun CanvasStageInternal(
                         color = gridColor,
                         start = Offset(0f, y),
                         end = Offset(w, y),
-                        strokeWidth = 1f // ← Float
+                        strokeWidth = 1f              // Float, non Int
                     )
                     y += cellH
                     if (r < grid.rows) y += gapPx
@@ -174,7 +156,7 @@ private fun CanvasStageInternal(
                             topLeft = Offset(left, top),
                             size = Size(cellW, cellH),
                             style = Stroke(
-                                width = 2f, // ← Float
+                                width = 2f,
                                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
                             )
                         )
@@ -184,10 +166,6 @@ private fun CanvasStageInternal(
         }
     }
 }
-
-/* -------------------------------------------------------------------------- */
-/* Utilities                                                                   */
-/* -------------------------------------------------------------------------- */
 
 private fun cellAt(
     x: Float,

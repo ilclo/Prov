@@ -588,10 +588,10 @@ fun EditorMenusOnly(
                 gridPreviewOnly = gridPanelOpen && gridIsDragging,
                 showFullGrid = gridPanelOpen && showGridLines,
                 currentLevel = currentLevel,
-                onAddItem = { item: DrawItem ->                // ⬅️ aggiungi : DrawItem
+                onAddItem = { item: DrawItem ->               // ⟵ aggiungi il tipo qui
                     pageState?.items?.add(item)
                 }
-            )         
+            )        
             if (menuPath.isEmpty()) {
 // PRIMA BARRA
                 MainBottomBar(
