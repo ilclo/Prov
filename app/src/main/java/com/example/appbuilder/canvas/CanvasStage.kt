@@ -1,208 +1,182 @@
 package com.example.appbuilder.canvas
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Surface
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.max
-import kotlin.math.min
+import kotlin.math.floor
 
 /**
- * Stage centrale: rende la pagina, la griglia (preview vs full),
- * gestisce il tap breve/lungo per creare rettangoli/linee su griglia,
- * e disegna gli elementi fino al livello selezionato.
+ * Specifica della griglia “grammatura” (righe/colonne + gap tra celle).
+ */
+data class GridSpec(
+    val rows: Int,
+    val cols: Int,
+    val gap: Dp = 0.dp
+)
+
+/**
+ * Stage di lavoro renderizzato a schermo. Disegna opzionalmente una griglia
+ * e consente hit-test su cella con tap e long-press (delegati esterni).
+ *
+ * NOTA: tutti i calcoli interni sono in pixel float → niente errori Int/Float.
  */
 @Composable
 fun CanvasStage(
-    page: PageState?,                        // null => nessuna pagina (placeholder vuoto)
-    gridDensity: Int,                        // densità attuale
-    gridPreviewOnly: Boolean,                // true = mostra solo il 1° quadrato in alto-sx
-    showFullGrid: Boolean,                   // true = disegna tutta la griglia
-    currentLevel: Int,                       // livello di rendering selezionato
-    onAddItem: (DrawItem) -> Unit            // callback creazione elemento
+    modifier: Modifier = Modifier,
+    grid: GridSpec = GridSpec(rows = 12, cols = 8, gap = 0.dp),
+    showGrid: Boolean = true,
+    spotlightCell: Pair<Int, Int>? = null,            // es. primo quadrato in alto a sx durante lo slide
+    onTapCell: ((row: Int, col: Int) -> Unit)? = null,
+    onLongPressCell: ((row: Int, col: Int) -> Unit)? = null
 ) {
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0x00000000)),
-        contentAlignment = Alignment.Center
-    ) {
-        if (page == null) return@BoxWithConstraints
+    val gapPx = with(LocalDensity.current) { grid.gap.toPx() }
 
-        // Dimensionamento "pagina": rettangolo bianco centrato, 9:16, con limiti soft
-        val maxW = maxWidth - 48.dp
-        val pageW = minOf(maxW, 420.dp)
-        val pageH = minOf(maxHeight - 200.dp, pageW * (16f / 9f))
-        Surface(
-            color = Color.White,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            shadowElevation = 8.dp,
+    Box(modifier) {
+        Canvas(
             modifier = Modifier
-                .width(pageW)
-                .height(pageH)
+                .fillMaxSize()
+                .pointerInput(grid.rows, grid.cols) {
+                    detectTapGesturesCompat(
+                        onTap = { x, y, w, h ->
+                            val (r, c) = cellAt(x, y, w, h, grid.rows, grid.cols, gapPx)
+                            onTapCell?.invoke(r, c)
+                        },
+                        onLongPress = { x, y, w, h ->
+                            val (r, c) = cellAt(x, y, w, h, grid.rows, grid.cols, gapPx)
+                            onLongPressCell?.invoke(r, c)
+                        }
+                    )
+                }
         ) {
-            PageContent(
-                page = page,
-                grid = gridDensity.coerceIn(2, 40),
-                previewOnly = gridPreviewOnly,
-                showFullGrid = showFullGrid,
-                currentLevel = currentLevel,
-                onAddItem = onAddItem
-            )
+            val w = size.width
+            val h = size.height
+
+            if (showGrid) {
+                val cellW = (w - gapPx * (grid.cols - 1)) / grid.cols
+                val cellH = (h - gapPx * (grid.rows - 1)) / grid.rows
+                val gridColor = Color(0x40FFFFFF)
+
+                // Verticali
+                var x = 0f
+                for (c in 0..grid.cols) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(x, 0f),
+                        end = Offset(x, h),
+                        strokeWidth = 1f
+                    )
+                    x += cellW
+                    if (c < grid.cols) x += gapPx
+                }
+                // Orizzontali
+                var y = 0f
+                for (r in 0..grid.rows) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, y),
+                        end = Offset(w, y),
+                        strokeWidth = 1f
+                    )
+                    y += cellH
+                    if (r < grid.rows) y += gapPx
+                }
+
+                // Spotlight cella (outline tratteggiato)
+                spotlightCell?.let { (sr, sc) ->
+                    if (sr in 0 until grid.rows && sc in 0 until grid.cols) {
+                        val left = (cellW + gapPx) * sc
+                        val top  = (cellH + gapPx) * sr
+                        drawRect(
+                            color = Color.Transparent,
+                            topLeft = Offset(left, top),
+                            size = Size(cellW, cellH),
+                            style = Stroke(
+                                width = 2f,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-@Composable
-private fun PageContent(
-    page: PageState,
-    grid: Int,
-    previewOnly: Boolean,
-    showFullGrid: Boolean,
-    currentLevel: Int,
-    onAddItem: (DrawItem) -> Unit
+/* ---------------------------------------------------------------------------------------------- */
+/* Utilities                                                                                      */
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * Hit-test: converte coordinate touch (x,y) → (row,col) rispettando gap.
+ */
+private fun cellAt(
+    x: Float,
+    y: Float,
+    w: Float,
+    h: Float,
+    rows: Int,
+    cols: Int,
+    gapPx: Float
+): Pair<Int, Int> {
+    val cellW = (w - gapPx * (cols - 1)) / cols
+    val cellH = (h - gapPx * (rows - 1)) / rows
+    var col = floor(x / (cellW + gapPx)).toInt()
+    var row = floor(y / (cellH + gapPx)).toInt()
+    if (col < 0) col = 0
+    if (row < 0) row = 0
+    if (col >= cols) col = cols - 1
+    if (row >= rows) row = rows - 1
+    return row to col
+}
+
+/**
+ * Variante compatibile (senza dipendere da Gesture lib esterne): cattura tap e long-press
+ * ed espone le coordinate + dimensioni della canvas per il mapping cellAt.
+ */
+private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectTapGesturesCompat(
+    onTap: (x: Float, y: Float, w: Float, h: Float) -> Unit,
+    onLongPress: (x: Float, y: Float, w: Float, h: Float) -> Unit
 ) {
-    var firstCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Usiamo la dimensione disponibile della Canvas tramite size
+    awaitPointerEventScope {
+        while (true) {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val w = size.width.toFloat()
+            val h = size.height.toFloat()
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(grid) {
-                detectTapGestures(
-                    onTap = { pos ->
-                        val (r, c) = pos.toCell(size.width, size.height, grid) ?: return@detectTapGestures
-                        hoverCell = r to c
-                    },
-                    onLongPress = { pos ->
-                        val (r, c) = pos.toCell(size.width, size.height, grid) ?: return@detectTapGestures
-                        if (firstCell == null) {
-                            firstCell = r to c
-                        } else {
-                            val (r0, c0) = firstCell!!
-                            // stessa riga/colonna => linea; altrimenti rettangolo
-                            if (r0 == r || c0 == c) {
-                                onAddItem(
-                                    DrawItem.LineItem(
-                                        level = page.currentLevel,
-                                        row0 = r0, col0 = c0, row1 = r, col1 = c
-                                    )
-                                )
-                            } else {
-                                onAddItem(
-                                    DrawItem.RectItem(
-                                        level = page.currentLevel,
-                                        row0 = min(r0, r), col0 = min(c0, c),
-                                        row1 = max(r0, r), col1 = max(c0, c)
-                                    )
-                                )
-                            }
-                            page.levels.add(page.currentLevel)
-                            firstCell = null
-                            hoverCell = null
-                        }
-                    }
-                )
-            }
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val cw = size.width / grid
-            val ch = size.height / grid
+            var longPressed = false
+            var upHappened = false
 
-            // 1) Griglia: preview vs full
-            if (previewOnly) {
-                // solo cella [0,0]
-                drawRect(
-                    color = Color(0x3358A6FF),
-                    topLeft = Offset(0f, 0f),
-                    size = Size(cw, ch),
-                    style = Stroke(width = 2f)
-                )
-            } else if (showFullGrid) {
-                // tutte le righe/colonne
-                val stroke = Stroke(width = 1f)
-                val clr = Color(0x2258A6FF)
-                for (i in 0..grid) {
-                    val x = i * cw
-                    val y = i * ch
-                    drawLine(clr, Offset(x, 0f), Offset(x, size.height), stroke.width)
-                    drawLine(clr, Offset(0f, y), Offset(size.width, y), stroke.width)
+            // Timer long-press ~500ms
+            val job = kotlinx.coroutines.launch {
+                kotlinx.coroutines.delay(500)
+                if (!upHappened) {
+                    longPressed = true
+                    onLongPress(down.position.x, down.position.y, w, h)
                 }
             }
 
-            // 2) Righe/colonne evidenziate se ho scelto il 1° quadrato
-            firstCell?.let { (r0, c0) ->
-                val hi = Color(0x3358A6FF)
-                // colonna
-                drawRect(hi, topLeft = Offset(c0 * cw, 0f), size = Size(cw, size.height))
-                // riga
-                drawRect(hi, topLeft = Offset(0f, r0 * ch), size = Size(size.width, ch))
-            }
+            val up = waitForUpOrCancellation()
+            upHappened = true
+            job.cancel()
 
-            // 3) Cella "hover"
-            hoverCell?.let { (r, c) ->
-                drawRect(
-                    color = Color(0x6658A6FF),
-                    topLeft = Offset(c * cw, r * ch),
-                    size = Size(cw, ch),
-                    style = Stroke(width = 2f)
-                )
+            if (!longPressed && up != null) {
+                onTap(up.position.x, up.position.y, w, h)
             }
-
-            // 4) Elementi: disegno fino al livello corrente (incluso)
-            page.items
-                .filter { it.level <= currentLevel }
-                .forEach { item ->
-                    when (item) {
-                        is DrawItem.RectItem -> {
-                            val left = item.col0 * cw
-                            val top = item.row0 * ch
-                            val w = (item.col1 - item.col0 + 1) * cw
-                            val h = (item.row1 - item.row0 + 1) * ch
-                            drawRect(
-                                color = Color.Transparent,
-                                topLeft = Offset(left, top),
-                                size = Size(w, h),
-                                style = Stroke(width = 3f, miter = 1f),
-                                alpha = 1f
-                            )
-                        }
-                        is DrawItem.LineItem -> {
-                            val x0 = (item.col0 + 0.5f) * cw
-                            val y0 = (item.row0 + 0.5f) * ch
-                            val x1 = (item.col1 + 0.5f) * cw
-                            val y1 = (item.row1 + 0.5f) * ch
-                            drawLine(
-                                color = Color.Black,
-                                start = Offset(x0, y0),
-                                end = Offset(x1, y1),
-                                strokeWidth = 3f
-                            )
-                        }
-                    }
-                }
         }
     }
-}
-
-/** Conversione coordinate → cella griglia (riga, colonna), oppure null se fuori. */
-private fun Offset.toCell(w: Float, h: Float, g: Int): Pair<Int, Int>? {
-    if (x < 0f || y < 0f || x > w || y > h) return null
-    val cw = w / g
-    val ch = h / g
-    val c = (x / cw).toInt().coerceIn(0, g - 1)
-    val r = (y / ch).toInt().coerceIn(0, g - 1)
-    return r to c
 }
