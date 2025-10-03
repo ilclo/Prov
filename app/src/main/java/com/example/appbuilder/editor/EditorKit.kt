@@ -634,59 +634,50 @@ fun EditorMenusOnly(
 
                         LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
                     ) {
-                        MainMenuBar(
-                            onLayout = { menuPath = listOf("Layout") },
-                            onContainer = { menuPath = listOf("Contenitore") },
-                            onText     = { menuPath = listOf("Testo") },
-                            onAdd      = { menuPath = listOf("Aggiungi") },
-                            bottomBarHeightPx = actionsBarHeightPx
-                        )
-                    }
-                } else {
-                    CompositionLocalProvider(
-                        LocalSecondBarMode provides SecondBarMode.Classic,
-                        LocalExitClassic provides { classicEditing = false }    // torna alle icone madre
-                    ) {
-                        MainMenuBar(
-                            onLayout = { menuPath = listOf("Layout") },
-                            onContainer = { menuPath = listOf("Contenitore") },
-                            onText = { menuPath = listOf("Testo") },
-                            onAdd = { menuPath = listOf("Aggiungi") },
-                            bottomBarHeightPx = actionsBarHeightPx
-                        )
-                    }
-                }
-                onCreate = { wr ->
-                    // esistente: aggiunta figlio nel deck
-                    deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
-                    wizardVisible = false
 
-                    if (wr.root == DeckRoot.PAGINA) {
-                        // 1) crea una pagina bianca con la scroll come da wizard
-                        pageState = PageState(
-                            id = wr.id,
-                            scroll = wr.scroll,
-                            gridDensity = 6
-                        )
-                        // 2) entra nel menù della pagina (seconda barra in Classic)
-                        classicEditing = true
-                        editingClass = DeckRoot.PAGINA
+                    MainMenuBar(
+                        onLayout = { menuPath = listOf("Layout") },
+                        onContainer = { menuPath = listOf("Contenitore") },
+                        onText     = { menuPath = listOf("Testo") },
+                        onAdd      = { menuPath = listOf("Aggiungi") },
+                        bottomBarHeightPx = actionsBarHeightPx
+                    )
+                    } // <-- chiusura del CompositionLocalProvider Deck
+
                     } else {
-                        // comportamento attuale per gli altri
-                        deckOpen = when (wr.root) {
-                            DeckRoot.PAGINA        -> "pagina"
-                            DeckRoot.MENU_LATERALE -> "menuL"
-                            DeckRoot.MENU_CENTRALE -> "menuC"
-                            DeckRoot.AVVISO        -> "avviso"
+                        CompositionLocalProvider(
+                            LocalSecondBarMode provides SecondBarMode.Classic,
+                            LocalExitClassic provides { classicEditing = false } // torna alle madri
+                        ) {
+                            MainMenuBar(
+                                onLayout = { menuPath = listOf("Layout") },
+                                onContainer = { menuPath = listOf("Contenitore") },
+                                onText = { menuPath = listOf("Testo") },
+                                onAdd = { menuPath = listOf("Aggiungi") },
+                                bottomBarHeightPx = actionsBarHeightPx
+                            )
                         }
-                        classicEditing = false
                     }
-                }
-            }
-            else {
-// IN SOTTOMENU: seconda barra = SubMenuBar; sotto c'è sempre il Breadcrumb.
-// Imposta il "contesto pagina" per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
-                val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
+
+                    // ⬇️ QUI (fratello della MainMenuBar), NON come "onCreate = { ... }"
+                    CreationWizardOverlay(
+                        visible    = wizardVisible,
+                        target     = wizardTarget,
+                        existingIds = deckItems.values.flatten().toSet(),
+                        onDismiss  = { wizardVisible = false },
+                        onCreate   = { wr: WizardResult ->        // tipizza il parametro per evitare "Cannot infer type"
+                            deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
+                            wizardVisible = false
+                            deckOpen = when (wr.root) {
+                                DeckRoot.PAGINA        -> "pagina"
+                                DeckRoot.MENU_LATERALE -> "menuL"
+                                DeckRoot.MENU_CENTRALE -> "menuC"
+                                DeckRoot.AVVISO        -> "avviso"
+                                else                   -> null      // fallback per il when esaustivo
+                            }
+                            classicEditing = false
+                        }
+                    )
                 CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
                     SubMenuBar(
                         path = menuPath,
@@ -905,11 +896,11 @@ private fun BoxScope.MainBottomBar(
     onDuplicate: () -> Unit,
     onProperties: () -> Unit,
     onLayout: () -> Unit,
-    onCreate: () -> Unit,            // rimane, se lo usi altrove
-    onCreatePage: () -> Unit = {},   // NEW
-    onCreateAlert: () -> Unit = {},  // NEW
-    onCreateMenuLaterale: () -> Unit = {}, // NEW
-    onCreateMenuCentrale: () -> Unit = {}, // NEW
+    onCreate: () -> Unit,                  // ← deve ESISTERE
+    onCreatePage: () -> Unit = {},         // ← default
+    onCreateAlert: () -> Unit = {},        // ← default
+    onCreateMenuLaterale: () -> Unit = {}, // ← default
+    onCreateMenuCentrale: () -> Unit = {}, // ← default
     onOpenList: () -> Unit,
     onSaveProject: () -> Unit,
     onOpenProject: () -> Unit,
