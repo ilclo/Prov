@@ -1,6 +1,5 @@
 package com.example.appbuilder.editor
 
-
 import com.example.appbuilder.canvas.PageState
 import com.example.appbuilder.canvas.DrawItem
 import com.example.appbuilder.canvas.CanvasStage
@@ -589,11 +588,10 @@ fun EditorMenusOnly(
                 gridPreviewOnly = gridPanelOpen && gridIsDragging,
                 showFullGrid = gridPanelOpen && showGridLines,
                 currentLevel = currentLevel,
-                onAddItem = { item ->
-                    // salva l’elemento nel modello
+                onAddItem = { item: DrawItem ->                // ⬅️ aggiungi : DrawItem
                     pageState?.items?.add(item)
                 }
-            )            
+            )         
             if (menuPath.isEmpty()) {
 // PRIMA BARRA
                 MainBottomBar(

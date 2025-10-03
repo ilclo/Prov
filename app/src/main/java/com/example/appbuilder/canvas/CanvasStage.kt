@@ -18,28 +18,17 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-/* -------------------------------------------------------------------------- */
-/* Modello "leggero" per la pagina (compatibile con il tuo EditorKit)         */
-/* -------------------------------------------------------------------------- */
-
-data class CanvasItem(
-    val id: String = "",
-    val level: Int = 0
-)
-
-data class PageState(
-    val gridDensity: Int = 6,                       // densità griglia (intero)
-    var currentLevel: Int = 0,                      // livello attivo
-    val levels: MutableSet<Int> = mutableSetOf(0),  // insiemi di livelli creati
-    val items: MutableList<CanvasItem> = mutableListOf()
-)
+// Importa i tuoi modelli definiti in CanvasModel.kt
+// (Assicurati che esistano lì e non qui per evitare "Redeclaration")
+import com.example.appbuilder.canvas.PageState
+import com.example.appbuilder.canvas.DrawItem
 
 /* -------------------------------------------------------------------------- */
 /* API “COMPATIBILE con EditorKit”                                            */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Overload che rispetta la chiamata che fai da EditorKit:
+ * Overload allineato alla chiamata in EditorKit:
  *
  * CanvasStage(
  *   page = pageState,
@@ -47,7 +36,7 @@ data class PageState(
  *   gridPreviewOnly = ...,
  *   showFullGrid = ...,
  *   currentLevel = currentLevel,
- *   onAddItem = { item -> ... }
+ *   onAddItem = { item: DrawItem -> ... }
  * )
  */
 @Composable
@@ -57,10 +46,10 @@ fun CanvasStage(
     gridPreviewOnly: Boolean = false,
     showFullGrid: Boolean = false,
     currentLevel: Int = page?.currentLevel ?: 0,
-    onAddItem: (Any) -> Unit = {},                 // tipo “Any” per evitare problemi di inferenza
+    onAddItem: (DrawItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // mapping semplice: griglia quadrata “gridDensity x gridDensity”
+    // griglia quadrata rows x cols
     val rows = gridDensity.coerceIn(1, 64)
     val cols = gridDensity.coerceIn(1, 64)
 
@@ -73,8 +62,16 @@ fun CanvasStage(
         showGrid = showGrid,
         spotlightCell = spotlight,
         onTapCell = { r, c ->
-            // esempio: aggiungo un item “toccato” (se mai ti servirà)
-            onAddItem(CanvasItem(id = "cell_${r}_${c}", level = currentLevel))
+            // Esempio: aggiungo un item “cella” sul livello corrente
+            onAddItem(
+                DrawItem(
+                    id = "cell_${r}_${c}",
+                    level = currentLevel,
+                    kind = DrawItem.Kind.Cell,
+                    row = r,
+                    col = c
+                )
+            )
         },
         onLongPressCell = { _, _ -> /* opzionale */ }
     )
@@ -134,12 +131,12 @@ private fun CanvasStageInternal(
                     )
                 }
         ) {
-            val w = size.width
-            val h = size.height
+            val w: Float = size.width
+            val h: Float = size.height
 
             if (showGrid) {
-                val cellW = (w - gapPx * (grid.cols - 1)) / grid.cols
-                val cellH = (h - gapPx * (grid.rows - 1)) / grid.rows
+                val cellW: Float = (w - gapPx * (grid.cols - 1)) / grid.cols.toFloat()
+                val cellH: Float = (h - gapPx * (grid.rows - 1)) / grid.rows.toFloat()
                 val gridColor = Color(0x40FFFFFF)
 
                 // Colonne
@@ -149,7 +146,7 @@ private fun CanvasStageInternal(
                         color = gridColor,
                         start = Offset(x, 0f),
                         end = Offset(x, h),
-                        strokeWidth = 1f
+                        strokeWidth = 1f // ← Float
                     )
                     x += cellW
                     if (c < grid.cols) x += gapPx
@@ -161,7 +158,7 @@ private fun CanvasStageInternal(
                         color = gridColor,
                         start = Offset(0f, y),
                         end = Offset(w, y),
-                        strokeWidth = 1f
+                        strokeWidth = 1f // ← Float
                     )
                     y += cellH
                     if (r < grid.rows) y += gapPx
@@ -170,14 +167,14 @@ private fun CanvasStageInternal(
                 // Spotlight cella (outline tratteggiato)
                 spotlightCell?.let { (sr, sc) ->
                     if (sr in 0 until grid.rows && sc in 0 until grid.cols) {
-                        val left = (cellW + gapPx) * sc
-                        val top  = (cellH + gapPx) * sr
+                        val left = (cellW + gapPx) * sc.toFloat()
+                        val top  = (cellH + gapPx) * sr.toFloat()
                         drawRect(
                             color = Color.Transparent,
                             topLeft = Offset(left, top),
                             size = Size(cellW, cellH),
                             style = Stroke(
-                                width = 2f,
+                                width = 2f, // ← Float
                                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
                             )
                         )
@@ -201,8 +198,8 @@ private fun cellAt(
     cols: Int,
     gapPx: Float
 ): Pair<Int, Int> {
-    val cellW = (w - gapPx * (cols - 1)) / cols
-    val cellH = (h - gapPx * (rows - 1)) / rows
+    val cellW: Float = (w - gapPx * (cols - 1)) / cols.toFloat()
+    val cellH: Float = (h - gapPx * (rows - 1)) / rows.toFloat()
     var col = floor(x / (cellW + gapPx)).roundToInt()
     var row = floor(y / (cellH + gapPx)).roundToInt()
     if (col < 0) col = 0
