@@ -3046,7 +3046,8 @@ private fun BoxScope.InfoEdgeDeck(
                     }
                 }
 
-                // 4) NUOVO — pulsante "modalità" + etichetta 2s
+                // --- (dentro la Column dei tile) ---
+                // 4) NUOVO — pulsante "modalità"
                 AnimatedVisibility(
                     visible = show4,
                     enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f),
@@ -3075,41 +3076,44 @@ private fun BoxScope.InfoEdgeDeck(
                         hintVisible = false
                     }
 
-                    Box(contentAlignment = Alignment.Center) {
-                        // etichetta a sinistra, verso il centro dello schermo
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = hintVisible,
-                            enter = fadeIn(tween(200)),
-                            exit  = fadeOut(tween(200))
-                        ) {
-                            Surface(
-                                color = WIZ_AZURE.copy(alpha = 0.15f),
-                                contentColor = WIZ_AZURE,
-                                shape = RoundedCornerShape(10.dp),
-                                tonalElevation = 6.dp,
-                                shadowElevation = 12.dp,
-                                modifier = Modifier
-                                    .align(Alignment.CenterStart)
-                                    .offset(x = (-180).dp)
-                            ) {
-                                Text(
-                                    text = hintText,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                        SquareTile(
-                            size = tileSize,
-                            corner = corner,
-                            icon = modeIcon,
-                            tint = if (isContainerContext) WIZ_AZURE else Color(0xFF6B7280),
-                            enabled = isContainerContext,
-                            border = if (isContainerContext) BorderStroke(2.dp, WIZ_AZURE) else null,
-                            onClick = { if (isContainerContext) onCycleMode() } // non chiudo il menù
+                    // Solo il tile (il banner in alto è fuori dalla Column)
+                    SquareTile(
+                        size = tileSize,
+                        corner = corner,
+                        icon = modeIcon,
+                        tint = if (isContainerContext) WIZ_AZURE else Color(0xFF6B7280),
+                        enabled = isContainerContext,
+                        border = if (isContainerContext) BorderStroke(2.dp, WIZ_AZURE) else null,
+                        onClick = { if (isContainerContext) onCycleMode() } // non chiudo il menù
+                    )
+
+                    // ⬇️⬇️ Banner spostato in alto (fuori dalla Column, stesso Composable) ⬇️⬇️
+                }
+
+                // --- (ancora dentro InfoEdgeDeck, ma FUORI dalla Column dei tile) ---
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = hintVisible,   // è lo stesso state definito sopra
+                    enter = fadeIn(tween(200)),
+                    exit  = fadeOut(tween(200)),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp)
+                ) {
+                    Surface(
+                        color = WIZ_AZURE.copy(alpha = 0.15f),
+                        contentColor = WIZ_AZURE,
+                        shape = RoundedCornerShape(10.dp),
+                        tonalElevation = 6.dp,
+                        shadowElevation = 12.dp
+                    ) {
+                        Text(
+                            text = hintText,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            fontSize = 12.sp
                         )
                     }
                 }
+
                 // 5) ingranaggio (stub)
                 AnimatedVisibility(
                     visible = show5,
