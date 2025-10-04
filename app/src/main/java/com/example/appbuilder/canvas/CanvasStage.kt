@@ -91,8 +91,8 @@ private fun CanvasStageInternal(
                             val (r, c) = cellAt(
                                 x = offset.x,
                                 y = offset.y,
-                                w = size.width,
-                                h = size.height,
+                                w = size.width.toFloat(),
+                                h = size.height.toFloat(),
                                 rows = grid.rows,
                                 cols = grid.cols,
                                 gapPx = gapPx
@@ -103,8 +103,8 @@ private fun CanvasStageInternal(
                             val (r, c) = cellAt(
                                 x = offset.x,
                                 y = offset.y,
-                                w = size.width,
-                                h = size.height,
+                                w = size.width.toFloat(),
+                                h = size.height.toFloat(),
                                 rows = grid.rows,
                                 cols = grid.cols,
                                 gapPx = gapPx
