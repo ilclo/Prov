@@ -1,5 +1,6 @@
 package com.example.appbuilder.overlay
 
+import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -52,14 +53,10 @@ fun GridSliderOverlay(
 ) {
     if (!visible) return
 
-    // Mappo il valore alla posizione nello step array
-    var sentStart by remember { mutableStateOf(false) }
-    var index by remember(value) { mutableStateOf(idx) }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xAA000000)) // “sfocato” simulato con scrim scuro (blur globale non applicabile al contenuto sottostante)
+            .background(Color(0xAA000000)) // scrim scuro
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -78,10 +75,17 @@ fun GridSliderOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text("Densità griglia", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                Text("${DENSITY_STEPS[index]} × ${DENSITY_STEPS[index]}", color = Color(0xFF9BA3AF))
-                val index = allowedValues.indexOf(value).let { if (it < 0) 0 else it }
-                var sliderIndex by remember(value, allowedValues) { mutableStateOf(index) }
-                var started by remember { mutableStateOf(false) } // per onStartDrag una sola volta
+
+                // Mappa il "value" sull'indice della lista di passi ammessi
+                val initialIndex = allowedValues.indexOf(value).let { if (it < 0) 0 else it }
+                var sliderIndex by remember(value, allowedValues) { mutableStateOf(initialIndex) }
+                var started by remember { mutableStateOf(false) }
+
+                // Mostra l'attuale passo in forma "N × N"
+                Text(
+                    "${allowedValues[sliderIndex]} × ${allowedValues[sliderIndex]}",
+                    color = Color(0xFF9BA3AF)
+                )
 
                 Slider(
                     value = sliderIndex.toFloat(),
@@ -90,10 +94,13 @@ fun GridSliderOverlay(
                         if (!started) { onStartDrag(); started = true }
                         if (i != sliderIndex) {
                             sliderIndex = i
-                            onValueChange(allowedValues[i]) // restituisci il valore "non arbitrario"
+                            onValueChange(allowedValues[i]) // restituisce il passo "non arbitrario"
                         }
                     },
-                    onValueChangeFinished = { started = false; onEndDrag() },
+                    onValueChangeFinished = {
+                        started = false
+                        onEndDrag()
+                    },
                     steps = (allowedValues.size - 2).coerceAtLeast(0),
                     valueRange = 0f..allowedValues.lastIndex.toFloat(),
                     colors = SliderDefaults.colors(
@@ -103,8 +110,6 @@ fun GridSliderOverlay(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
-
-
 
                 Row(
                     Modifier.fillMaxWidth(),
@@ -119,13 +124,17 @@ fun GridSliderOverlay(
                     Button(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = WIZ_AZURE,
+                            contentColor = Color.Black
+                        )
                     ) { Text("OK") }
                 }
             }
         }
     }
 }
+
 
 /**
  * Overlay selettore livelli “a slot”.

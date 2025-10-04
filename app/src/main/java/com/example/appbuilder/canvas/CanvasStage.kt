@@ -1,5 +1,7 @@
 package com.example.appbuilder.canvas
 
+import com.example.appbuilder.canvas.PageState
+import com.example.appbuilder.canvas.DrawItem
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box

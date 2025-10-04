@@ -30,8 +30,6 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.appbuilder.canvas.CanvasStage
 import com.example.appbuilder.canvas.PageState
-import com.example.appbuilder.overlay.GridSliderOverlay
-import com.example.appbuilder.overlay.LevelPickerOverlay
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -683,13 +681,13 @@ fun EditorMenusOnly(
                         }
                     
                         if (wr.root == DeckRoot.PAGINA) {
-                            // pagina bianca con livello 0 e densità griglia default 6
                             pageState = PageState(
                                 id = wr.id,
                                 scroll = wr.scroll,
                                 gridDensity = 6,
                                 currentLevel = 0
                             )
+
                             // entra nella “pagina figlia” appena creata (seconda barra in Classic)
                             editingClass   = DeckRoot.PAGINA
                             classicEditing = true
@@ -860,16 +858,13 @@ fun EditorMenusOnly(
                 infoEnabled = infoMode,
                 onToggleInfo = { infoMode = !infoMode },
                 enabled = menuPath.isEmpty(),
-
-                // ⬇️ nuovi parametri
+                // <-- NUOVI: griglia e livelli
                 gridEnabled = gridPanelOpen,
                 onToggleGrid = { gridPanelOpen = !gridPanelOpen },
                 levelEnabled = levelPanelOpen,
                 onToggleLevel = { levelPanelOpen = !levelPanelOpen },
                 currentLevel = currentLevel
             )
-
-            
             /* ⬇️⬇️ INSERISCI QUI ⬇️⬇️ */
             
             // Overlay: Slider densità griglia (valori NON arbitrari)
