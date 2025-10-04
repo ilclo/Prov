@@ -1,60 +1,42 @@
 package com.example.appbuilder.canvas
 
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
-/** Stato minimo della pagina renderizzata sul canvas. */
+/**
+ * Stato minimo di una “pagina di lavoro”.
+ * scrollable: "Nessuna" | "Verticale" | "Orizzontale"
+ */
 data class PageState(
-    val id: String,
-    var scroll: String = "Nessuna",
+    var scrollable: String = "Nessuna",
     var gridDensity: Int = 6,
-    val items: MutableList<DrawItem> = mutableListOf()
-) {
-    val levels: MutableSet<Int> = mutableSetOf(0)
+    val items: SnapshotStateList<DrawItem> = mutableStateListOf(),
+    val levels: SnapshotStateList<Int> = mutableStateListOf(0),
     var currentLevel: Int = 0
-}
+)
 
-/** Elementi disegnabili: rettangoli e linee, con livello (z-order logico). */
-sealed class DrawItem(open var level: Int) {
+/** Elementi disegnabili su griglia. */
+sealed class DrawItem(open val level: Int) {
+
+    /** Rettangolo definito da due celle (estremi inclusivi) in coordinate di griglia. */
     data class RectItem(
-        override var level: Int,
-        var row0: Int, var col0: Int,
-        var row1: Int, var col1: Int,
-        var strokeArgb: Int = 0xFF000000.toInt()  // nero
+        override val level: Int,
+        val r0: Int, val c0: Int,
+        val r1: Int, val c1: Int,
+        val borderColor: Color = Color.Black,
+        val borderWidth: Dp = 1.dp,
+        val fillColor: Color = Color.White
     ) : DrawItem(level)
 
+    /** Linea fra due celle (per step successivo). */
     data class LineItem(
-        override var level: Int,
-        var row0: Int, var col0: Int,
-        var row1: Int, var col1: Int,
-        var strokeArgb: Int = 0xFF000000.toInt()
+        override val level: Int,
+        val r0: Int, val c0: Int,
+        val r1: Int, val c1: Int,
+        val color: Color = Color.Black,
+        val width: Dp = 1.dp
     ) : DrawItem(level)
-}
-
-/** Piccola history “undo/redo” (fino a 6 stati). */
-class History<T>(private val max: Int = 6, initial: T) {
-    private val past = ArrayDeque<T>()
-    private val future = ArrayDeque<T>()
-    var present: T = initial
-        private set
-
-    fun push(state: T) {
-        past.addLast(present)
-        present = state
-        future.clear()
-        while (past.size > max) past.removeFirst()
-    }
-
-    fun undo(): T? {
-        if (past.isEmpty()) return null
-        future.addLast(present)
-        present = past.removeLast()
-        return present
-    }
-
-    fun redo(): T? {
-        if (future.isEmpty()) return null
-        past.addLast(present)
-        present = future.removeLast()
-        return present
-    }
 }
