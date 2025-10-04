@@ -1,36 +1,40 @@
 package com.example.appbuilder.editor
 
-import com.example.appbuilder.canvas.ToolMode
+
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import com.example.appbuilder.canvas.ToolMode
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.derivedStateOf 
 import com.example.appbuilder.overlay.GridSliderOverlay
 import com.example.appbuilder.overlay.LevelPickerOverlay
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.appbuilder.canvas.CanvasStage
@@ -81,7 +85,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -119,8 +122,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.animation.core.animateDpAsState
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.Dp
 
 // Local per sapere ovunque se l’utente è free (true) o no
 private val LocalIsFree = staticCompositionLocalOf { true }
@@ -891,14 +892,12 @@ fun EditorMenusOnly(
                 onToggleInfo = { infoMode = !infoMode },
                 enabled = menuPath.isEmpty(),
 
-                // già presenti
                 gridEnabled = gridPanelOpen,
                 onToggleGrid = { gridPanelOpen = !gridPanelOpen },
                 levelEnabled = levelPanelOpen,
                 onToggleLevel = { levelPanelOpen = !levelPanelOpen },
                 currentLevel = currentLevel,
 
-                // NUOVI
                 isContainerContext = isContainerContext,
                 toolMode = toolMode,
                 onCycleMode = {
@@ -911,7 +910,6 @@ fun EditorMenusOnly(
                 }
             )
 
-            
             // Overlay: Slider densità griglia (valori NON arbitrari)
             GridSliderOverlay(
                 visible = gridPanelOpen,
@@ -2855,8 +2853,7 @@ private fun FilterChipLike(
     }
 }
 
-@file:OptIn(ExperimentalFoundationApi::class)
-
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BoxScope.InfoEdgeDeck(
     open: Boolean,
@@ -2873,7 +2870,7 @@ private fun BoxScope.InfoEdgeDeck(
     currentLevel: Int,
 
     // NUOVI parametri
-    isContainerContext: Boolean,          // true <=> sei nel menù "Contenitore"
+    isContainerContext: Boolean,          // true <=> nel menù "Contenitore"
     toolMode: com.example.appbuilder.canvas.ToolMode,
     onCycleMode: () -> Unit               // cambia modalità senza chiudere il menù
 ) {
@@ -2915,7 +2912,7 @@ private fun BoxScope.InfoEdgeDeck(
             .width(width)
             .fillMaxHeight()
     ) {
-        // fascia di "peek" sempre visibile
+        // fascia “peek” sempre visibile
         val shadeAlpha = if (open) 0.08f else 0.25f
         val peek = Modifier
             .align(Alignment.CenterEnd)
@@ -2934,9 +2931,7 @@ private fun BoxScope.InfoEdgeDeck(
                 detectHorizontalDragGestures { _, dx ->
                     // apertura: trascino a sinistra quando è chiuso
                     if (!open && dx < -18f) onToggleOpen()
-                    // chiusura:
-                    // - in "Contenitore": SOLO trascinando a destra
-                    // - altrove: anche a destra (comportamento standard)
+                    // chiusura: sempre trascinando a destra
                     if (open && dx > 18f) onToggleOpen()
                 }
             }
@@ -2975,7 +2970,7 @@ private fun BoxScope.InfoEdgeDeck(
                         onClick = {
                             if (enabled) {
                                 onToggleInfo()
-                                onToggleOpen() // comportamento storico: chiudo dopo tap
+                                onToggleOpen() // chiudo dopo tap (comportamento storico)
                             }
                         }
                     )
@@ -2987,15 +2982,10 @@ private fun BoxScope.InfoEdgeDeck(
                     enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
-                    val gridIcon = try {
-                        ImageVector.vectorResource(id = R.drawable.ic_grid)
-                    } catch (_: Throwable) {
-                        Icons.Outlined.GridOn // fallback
-                    }
                     SquareTile(
                         size = tileSize,
                         corner = corner,
-                        icon = gridIcon,
+                        icon = Icons.Outlined.GridOn, // niente vectorResource/try-catch
                         tint = Color.White,
                         enabled = true,
                         border = if (gridEnabled) BorderStroke(2.dp, WIZ_AZURE) else null,
@@ -3012,11 +3002,6 @@ private fun BoxScope.InfoEdgeDeck(
                     enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
-                    val stairsIcon = try {
-                        ImageVector.vectorResource(id = R.drawable.ic_stairs)
-                    } catch (_: Throwable) {
-                        Icons.Outlined.Stairs // se hai Material Extended
-                    }
                     Box(contentAlignment = Alignment.Center) {
                         // badge numerico a sinistra
                         Surface(
@@ -3038,7 +3023,7 @@ private fun BoxScope.InfoEdgeDeck(
                         SquareTile(
                             size = tileSize,
                             corner = corner,
-                            icon = stairsIcon,
+                            icon = Icons.Outlined.Layers, // più portabile di “Stairs”
                             tint = Color.White,
                             enabled = true,
                             border = if (levelEnabled) BorderStroke(2.dp, WIZ_AZURE) else null,
@@ -3056,7 +3041,7 @@ private fun BoxScope.InfoEdgeDeck(
                     enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
-                    // Scegli icona in base alla modalità corrente
+                    // icona in base alla modalità
                     val modeIcon: ImageVector = when (toolMode) {
                         com.example.appbuilder.canvas.ToolMode.Create -> Icons.Outlined.AddBox   // ic_createcontainer
                         com.example.appbuilder.canvas.ToolMode.Point  -> Icons.Outlined.TouchApp// ic_point
@@ -3100,7 +3085,6 @@ private fun BoxScope.InfoEdgeDeck(
     }
 }
 
-/** Tile quadrata riutilizzabile. */
 @Composable
 private fun SquareTile(
     size: Dp,
