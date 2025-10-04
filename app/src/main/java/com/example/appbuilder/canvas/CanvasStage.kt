@@ -35,78 +35,73 @@ fun CanvasStage(
     creationEnabled: Boolean = true,
     onAddItem: (DrawItem) -> Unit
 ) {
-    // Stato locale per hover (tap singolo) e primo ancoraggio (long‑press)
+    // Hover (tap singolo) e primo ancoraggio (long press)
     var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     val cols = max(1, gridDensity)
     val azure = Color(0xFF58A6FF)
+    val lineBlack = Color.Black
 
-    // ---------- Helper locali (solo funzioni, nessun enum/material) ----------
+    // ----------------- Helper locali (no Material/enum) -----------------
     fun rectBounds(r: DrawItem.RectItem): IntArray {
         val r0 = min(r.r0, r.r1); val r1 = max(r.r0, r.r1)
         val c0 = min(r.c0, r.c1); val c1 = max(r.c0, r.c1)
         return intArrayOf(r0, r1, c0, c1)
     }
-
     fun containsCell(r: DrawItem.RectItem, row: Int, col: Int): Boolean {
         val (r0, r1, c0, c1) = rectBounds(r)
         return row in r0..r1 && col in c0..c1
     }
+    // Ritorna il rettangolo "top-most" (livello più alto) che contiene la cella
+    fun topRectAtCell(row: Int, col: Int): DrawItem.RectItem? =
+        page?.items?.filterIsInstance<DrawItem.RectItem>()
+            ?.filter { containsCell(it, row, col) }
+            ?.maxByOrNull { it.level }
 
-    // Top-most level alla cella (considera SOLO rettangoli, e solo livello <= currentLevel)
-    fun topLevelAtCell(row: Int, col: Int): Int {
-        var top: Int? = null
-        page?.items?.forEach { it ->
-            if (it is DrawItem.RectItem && it.level <= currentLevel) {
-                if (containsCell(it, row, col)) {
-                    top = if (top == null) it.level else max(top!!, it.level)
-                }
-            }
-        }
-        return top ?: 0 // 0 = background
-    }
-
-    // Linea orizzontale sovrappone un rettangolo?
-    fun overlappedByHorizontal(row: Int, cStart: Int, cEnd: Int, rect: DrawItem.RectItem): Boolean {
+    // Divide un rettangolo con linea orizzontale alla "boundary" b (tra b e b+1)
+    fun splitHoriz(rect: DrawItem.RectItem, b: Int): List<DrawItem.RectItem> {
         val (r0, r1, c0, c1) = rectBounds(rect)
-        if (row !in r0..r1) return false
-        return !(cEnd < c0 || cStart > c1)
+        if (b !in r0 until r1) return listOf(rect)
+        val top = rect.copy(r0 = r0, r1 = b,    c0 = c0, c1 = c1)
+        val bot = rect.copy(r0 = b + 1, r1 = r1, c0 = c0, c1 = c1)
+        return listOf(top, bot)
     }
-
-    // Linea verticale sovrappone un rettangolo?
-    fun overlappedByVertical(col: Int, rStart: Int, rEnd: Int, rect: DrawItem.RectItem): Boolean {
+    // Divide un rettangolo con linea verticale alla "boundary" b (tra b e b+1)
+    fun splitVert(rect: DrawItem.RectItem, b: Int): List<DrawItem.RectItem> {
         val (r0, r1, c0, c1) = rectBounds(rect)
-        if (col !in c0..c1) return false
-        return !(rEnd < r0 || rStart > r1)
-    }
-
-    // La linea attraversa l'interno (non solo il bordo)?
-    fun crossesInsideHoriz(row: Int, rect: DrawItem.RectItem): Boolean {
-        val (r0, r1, _, _) = rectBounds(rect)
-        return row > r0 && row < r1
-    }
-    fun crossesInsideVert(col: Int, rect: DrawItem.RectItem): Boolean {
-        val (_, _, c0, c1) = rectBounds(rect)
-        return col > c0 && col < c1
-    }
-
-    // Split rettangolo in 2 parti lungo riga/colonna (se attraversa l'interno)
-    fun splitRectHoriz(row: Int, rect: DrawItem.RectItem): List<DrawItem.RectItem> {
-        val (r0, r1, c0, c1) = rectBounds(rect)
-        if (row <= r0 || row >= r1) return listOf(rect)
-        val top = rect.copy(r0 = r0, r1 = row,  c0 = c0, c1 = c1)
-        val bottom = rect.copy(r0 = row + 1, r1 = r1, c0 = c0, c1 = c1)
-        return listOf(top, bottom)
-    }
-    fun splitRectVert(col: Int, rect: DrawItem.RectItem): List<DrawItem.RectItem> {
-        val (r0, r1, c0, c1) = rectBounds(rect)
-        if (col <= c0 || col >= c1) return listOf(rect)
-        val left  = rect.copy(r0 = r0, r1 = r1, c0 = c0,     c1 = col)
-        val right = rect.copy(r0 = r0, r1 = r1, c0 = col + 1, c1 = c1)
+        if (b !in c0 until c1) return listOf(rect)
+        val left  = rect.copy(r0 = r0, r1 = r1, c0 = c0,     c1 = b)
+        val right = rect.copy(r0 = r0, r1 = r1, c0 = b + 1,  c1 = c1)
         return listOf(left, right)
     }
-    // ------------------------------------------------------------------------
+    // Dato un rect e una riga rr, scegli la boundary interna (rr‑1 oppure rr) più vicina al centro del rect
+    fun chooseBoundaryRow(rect: DrawItem.RectItem, rr: Int): Int? {
+        val (r0, r1, _, _) = rectBounds(rect)
+        val candidates = buildList {
+            val b1 = rr - 1
+            val b2 = rr
+            if (b1 in r0 until r1) add(b1)
+            if (b2 in r0 until r1) add(b2)
+        }
+        if (candidates.isEmpty()) return null
+        val mid = (r0 + r1) / 2.0
+        return candidates.minByOrNull { kotlin.math.abs((it + 0.5) - mid) }
+    }
+    // Dato un rect e una colonna cc, scegli la boundary interna (cc‑1 oppure cc) più vicina al centro del rect
+    fun chooseBoundaryCol(rect: DrawItem.RectItem, cc: Int): Int? {
+        val (_, _, c0, c1) = rectBounds(rect)
+        val candidates = buildList {
+            val b1 = cc - 1
+            val b2 = cc
+            if (b1 in c0 until c1) add(b1)
+            if (b2 in c0 until c1) add(b2)
+        }
+        if (candidates.isEmpty()) return null
+        val mid = (c0 + c1) / 2.0
+        return candidates.minByOrNull { kotlin.math.abs((it + 0.5) - mid) }
+    }
+    // --------------------------------------------------------------------
 
     Box(
         modifier = Modifier
@@ -115,8 +110,7 @@ fun CanvasStage(
                 detectTapGestures(
                     onTap = { ofs ->
                         if (!creationEnabled) return@detectTapGestures
-                        val cell = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-                        hoverCell = cell
+                        hoverCell = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
                     },
                     onLongPress = { ofs ->
                         if (!creationEnabled) return@detectTapGestures
@@ -128,102 +122,89 @@ fun CanvasStage(
                             val (r1, c1) = cell
                             firstAnchor = null
 
-                            // Caso cella identica: no-op
                             if (r0 == r1 && c0 == c1) return@detectTapGestures
 
-                            // Allineamento
                             val sameRow = (r0 == r1)
                             val sameCol = (c0 == c1)
 
+                            // --- SOLO split di un contenitore se: stesso rect e "da lato a lato" ---
+                            if (sameRow || sameCol) {
+                                val rr = r0.coerceAtLeast(0)
+                                val cc = c0.coerceAtLeast(0)
+
+                                // rettangolo (top-most) che contiene ENTRAMBE le celle
+                                val rectA = topRectAtCell(r0, c0)
+                                val rectB = topRectAtCell(r1, c1)
+                                val rect = if (rectA != null && rectA == rectB) rectA else null
+                                if (rect != null) {
+                                    val (R0, R1, C0, C1) = rectBounds(rect)
+
+                                    if (sameRow) {
+                                        // Richiesta: i due quadrati devono estendersi da sinistra a destra del contenitore
+                                        val ccMin = min(c0, c1)
+                                        val ccMax = max(c0, c1)
+                                        val fullSpan = (ccMin == C0 && ccMax == C1 && rr in R0..R1)
+                                        if (fullSpan) {
+                                            val b = chooseBoundaryRow(rect, rr) ?: return@detectTapGestures
+                                            // Sostituisci il rettangolo con i 2 split
+                                            page?.items?.remove(rect)
+                                            val parts = splitHoriz(rect, b)
+                                            parts.forEach { onAddItem(it) }
+                                            // Linea orizzontale nera sopra le parti (estesa all'intera larghezza del contenitore)
+                                            val line = DrawItem.LineItem(
+                                                level = rect.level + 1, // visibile sopra le due parti
+                                                r0 = b,          // useremo il nostro renderer per posizionarla
+                                                c0 = C0 - 1,     // hack per estendere fino ai bordi (vedi draw sotto)
+                                                r1 = b,
+                                                c1 = C1 + 1,
+                                                color = lineBlack,
+                                                width = 2.dp
+                                            )
+                                            onAddItem(line)
+                                            return@detectTapGestures
+                                        }
+                                    } else if (sameCol) {
+                                        // Richiesta: i due quadrati devono estendersi da alto a basso del contenitore
+                                        val rrMin = min(r0, r1)
+                                        val rrMax = max(r0, r1)
+                                        val fullSpan = (rrMin == R0 && rrMax == R1 && cc in C0..C1)
+                                        if (fullSpan) {
+                                            val b = chooseBoundaryCol(rect, cc) ?: return@detectTapGestures
+                                            page?.items?.remove(rect)
+                                            val parts = splitVert(rect, b)
+                                            parts.forEach { onAddItem(it) }
+                                            // Linea verticale nera sopra le parti (estesa all'intera altezza del contenitore)
+                                            val line = DrawItem.LineItem(
+                                                level = rect.level + 1,
+                                                r0 = R0 - 1,
+                                                c0 = b,
+                                                r1 = R1 + 1,
+                                                c1 = b,
+                                                color = lineBlack,
+                                                width = 2.dp
+                                            )
+                                            onAddItem(line)
+                                            return@detectTapGestures
+                                        }
+                                    }
+                                }
+
+                                // Se non soddisfa le condizioni (non stesso rect o non "da lato a lato") => no-op
+                                return@detectTapGestures
+                            }
+
+                            // Non allineati: crea un rettangolo al livello corrente
                             val rr0 = min(r0, r1); val rr1 = max(r0, r1)
                             val cc0 = min(c0, c1); val cc1 = max(c0, c1)
-
-                            if (sameRow || sameCol) {
-                                // 1) GATE per livello: entrambi i punti DEVONO avere lo stesso top-level
-                                val t0 = topLevelAtCell(r0, c0)
-                                val t1 = topLevelAtCell(r1, c1)
-                                if (t0 != t1) {
-                                    // Livelli diversi: non fare nulla (come da richiesta)
-                                    return@detectTapGestures
-                                }
-                                val targetLevel = t0 // == t1
-
-                                // Set rettangoli del livello target
-                                val rects = page?.items?.filterIsInstance<DrawItem.RectItem>().orEmpty()
-                                    .filter { it.level == targetLevel }
-
-                                if (sameRow) {
-                                    // orizzontale
-                                    val overlapped = rects.filter { overlappedByHorizontal(r0, cc0, cc1, it) }
-                                    val splitTargets = overlapped.filter { crossesInsideHoriz(r0, it) }
-
-                                    if (targetLevel == 0) {
-                                        // Background: niente split; linea a livello 0 (sotto i contenitori)
-                                        val line = DrawItem.LineItem(
-                                            level = 0,
-                                            r0 = r0, c0 = cc0,
-                                            r1 = r0, c1 = cc1,
-                                            color = azure,
-                                            width = 2.dp
-                                        )
-                                        onAddItem(line)
-                                    } else {
-                                        // Contenitori di un dato livello: split dove attraversa l'interno
-                                        splitTargets.forEach { rect ->
-                                            page?.items?.remove(rect)
-                                            page?.items?.addAll(splitRectHoriz(r0, rect))
-                                        }
-                                        // Aggiungi linea sopra (L+1) per evidenziare
-                                        val line = DrawItem.LineItem(
-                                            level = targetLevel + 1,
-                                            r0 = r0, c0 = cc0,
-                                            r1 = r0, c1 = cc1,
-                                            color = azure,
-                                            width = 2.dp
-                                        )
-                                        onAddItem(line)
-                                    }
-                                } else {
-                                    // verticale
-                                    val overlapped = rects.filter { overlappedByVertical(c0, rr0, rr1, it) }
-                                    val splitTargets = overlapped.filter { crossesInsideVert(c0, it) }
-
-                                    if (targetLevel == 0) {
-                                        val line = DrawItem.LineItem(
-                                            level = 0,
-                                            r0 = rr0, c0 = c0,
-                                            r1 = rr1, c1 = c0,
-                                            color = azure,
-                                            width = 2.dp
-                                        )
-                                        onAddItem(line)
-                                    } else {
-                                        splitTargets.forEach { rect ->
-                                            page?.items?.remove(rect)
-                                            page?.items?.addAll(splitRectVert(c0, rect))
-                                        }
-                                        val line = DrawItem.LineItem(
-                                            level = targetLevel + 1,
-                                            r0 = rr0, c0 = c0,
-                                            r1 = rr1, c1 = c0,
-                                            color = azure,
-                                            width = 2.dp
-                                        )
-                                        onAddItem(line)
-                                    }
-                                }
-                            } else {
-                                // Non stessa riga/colonna: crea RETTANGOLO al livello corrente
-                                val rect = DrawItem.RectItem(
-                                    level = currentLevel,
-                                    r0 = rr0, c0 = cc0,
-                                    r1 = rr1, c1 = cc1,
-                                    borderColor = Color.Black,
-                                    borderWidth = 1.dp,
-                                    fillColor = Color.White
-                                )
-                                onAddItem(rect)
-                            }
+                            val rect = DrawItem.RectItem(
+                                level = currentLevel,
+                                r0 = rr0, c0 = cc0,
+                                r1 = rr1, c1 = cc1,
+                                borderColor = Color.Black,
+                                borderWidth = 1.dp,
+                                fillColor = Color.White
+                            )
+                            onAddItem(rect)
                         }
                     }
                 )
@@ -233,7 +214,7 @@ fun CanvasStage(
             val cell = min(size.width / cols, size.height / cols)
             val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
 
-            // Fondo pagina bianco (copre il gradiente di background dell'Editor)
+            // Fondo pagina bianco se esiste una page
             if (page != null) {
                 drawRect(color = Color.White, topLeft = Offset.Zero, size = size)
             }
@@ -260,8 +241,9 @@ fun CanvasStage(
                             )
                         }
                         is DrawItem.LineItem -> {
+                            // Renderer linea “interna”:
                             if (item.r0 == item.r1) {
-                                // Orizzontale: lati interni
+                                // Orizzontale; estendi fino ai bordi (hack: c0-1 .. c1+1)
                                 val row = item.r0
                                 val cMin = min(item.c0, item.c1)
                                 val cMax = max(item.c0, item.c1)
@@ -277,7 +259,7 @@ fun CanvasStage(
                                     )
                                 }
                             } else if (item.c0 == item.c1) {
-                                // Verticale: lati interni
+                                // Verticale; estendi fino ai bordi (hack: r0-1 .. r1+1)
                                 val col = item.c0
                                 val rMin = min(item.r0, item.r1)
                                 val rMax = max(item.r0, item.r1)
@@ -298,7 +280,7 @@ fun CanvasStage(
                 }
             }
 
-            // Griglia: preview del 1° quadretto o griglia completa
+            // Griglia: preview del 1° quadretto o intera
             if (gridPreviewOnly) {
                 if (rows > 0 && cols > 0) {
                     drawRect(
@@ -351,22 +333,19 @@ fun CanvasStage(
                 }
             }
 
-            // Evidenziazione riga/colonna dal primo long‑press
+            // Evidenziazione riga/colonna del primo ancoraggio
             firstAnchor?.let { (rr, cc) ->
-                if (rr in 0 until rows && cc in 0 until cols) {
-                    // colonna
+                if (rr >= 0 && cc >= 0) {
                     drawRect(
                         color = azure.copy(alpha = 0.10f),
                         topLeft = Offset(cc.toFloat() * cell, 0f),
                         size = Size(cell, rows.toFloat() * cell)
                     )
-                    // riga
                     drawRect(
                         color = azure.copy(alpha = 0.10f),
                         topLeft = Offset(0f, rr.toFloat() * cell),
                         size = Size(cols.toFloat() * cell, cell)
                     )
-                    // cella stessa più marcata
                     drawRect(
                         color = azure.copy(alpha = 0.22f),
                         topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell),
@@ -383,6 +362,7 @@ fun CanvasStage(
         }
     }
 }
+
 
 
 /**
