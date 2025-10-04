@@ -3077,7 +3077,7 @@ private fun BoxScope.InfoEdgeDeck(
 
                     Box(contentAlignment = Alignment.Center) {
                         // etichetta a sinistra, verso il centro dello schermo
-                        AnimatedVisibility(
+                        androidx.compose.animation.AnimatedVisibility(
                             visible = hintVisible,
                             enter = fadeIn(tween(200)),
                             exit  = fadeOut(tween(200))
@@ -3090,7 +3090,7 @@ private fun BoxScope.InfoEdgeDeck(
                                 shadowElevation = 12.dp,
                                 modifier = Modifier
                                     .align(Alignment.CenterStart)
-                                    .offset(x = (-180).dp) // “verso il centro”
+                                    .offset(x = (-180).dp)
                             ) {
                                 Text(
                                     text = hintText,
@@ -3099,7 +3099,6 @@ private fun BoxScope.InfoEdgeDeck(
                                 )
                             }
                         }
-
                         SquareTile(
                             size = tileSize,
                             corner = corner,
