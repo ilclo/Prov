@@ -31,8 +31,7 @@ import androidx.compose.ui.unit.sp
 /* Stesso azzurro usato in EditorKit */
 private val WIZ_AZURE = Color(0xFF58A6FF)
 
-/** Valori discreti concessi per la “grammatura” (densità griglia). */
-private val DENSITY_STEPS = listOf(3, 4, 6, 8, 10, 12, 16, 20, 24)
+
 
 /**
  * Overlay centrale per la densità griglia.
@@ -55,7 +54,6 @@ fun GridSliderOverlay(
 
     // Mappo il valore alla posizione nello step array
     var sentStart by remember { mutableStateOf(false) }
-    val idx = DENSITY_STEPS.indexOf(value).let { if (it >= 0) it else DENSITY_STEPS.indexOf(6).coerceAtLeast(0) }
     var index by remember(value) { mutableStateOf(idx) }
 
     Box(
