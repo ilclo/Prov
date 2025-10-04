@@ -117,8 +117,6 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
-import kotlin.math.maxOf
-
 
 // Local per sapere ovunque se l’utente è free (true) o no
 private val LocalIsFree = staticCompositionLocalOf { true }
@@ -895,7 +893,7 @@ fun EditorMenusOnly(
             // Deriva il range livelli dagli items e dal livello corrente
             val minLvl = pageState?.items?.minOfOrNull { it.level } ?: 0
             val maxFromItems = pageState?.items?.maxOfOrNull { it.level } ?: 0
-            val maxLvl = maxOf(maxFromItems, currentLevel)
+            val maxLvl = currentLevel.coerceAtLeast(maxFromItems) // ← niente import
 
             LevelPickerOverlay(
                 visible = levelPanelOpen,
@@ -905,11 +903,11 @@ fun EditorMenusOnly(
                 onPick = { lvl ->
                     currentLevel = lvl
                     levelPanelOpen = false
-                    // PageState è immutabile: usa copy per aggiornare il livello
                     pageState = pageState?.copy(currentLevel = lvl) ?: pageState
                 },
                 onDismiss = { levelPanelOpen = false }
             )
+
             // 2) Toast informativo (in alto, scompare con fade)
             InfoToastCard(
                 visible = infoCardVisible && infoCard != null,
