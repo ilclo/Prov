@@ -3082,30 +3082,6 @@ private fun BoxScope.InfoEdgeDeck(
                         onClick = { if (isContainerContext) onCycleMode() } // non chiudo il menù
                     )
                 }
-                
-                // --- FUORI dalla Column, ma dentro Box di InfoEdgeDeck ---
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = modeHintVisible,
-                    enter = fadeIn(tween(200)),
-                    exit  = fadeOut(tween(200)),
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 12.dp)
-                ) {
-                    Surface(
-                        color = WIZ_AZURE.copy(alpha = 0.15f),
-                        contentColor = WIZ_AZURE,
-                        shape = RoundedCornerShape(10.dp),
-                        tonalElevation = 6.dp,
-                        shadowElevation = 12.dp
-                    ) {
-                        Text(
-                            text = modeHintText,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            fontSize = 12.sp
-                        )
-                    }
-                }
 
                 // 5) ingranaggio (stub)
                 AnimatedVisibility(
@@ -3124,11 +3100,38 @@ private fun BoxScope.InfoEdgeDeck(
                             onToggleOpen()
                         }
                     )
+                }    
+
+            }
+
+            // ⬇️⬇️ BANNER FUORI DALLA COLUMN, MA DENTRO AL BOX ⬇️⬇️
+            androidx.compose.animation.AnimatedVisibility(
+                visible = modeHintVisible,
+                enter = fadeIn(tween(200)),
+                exit  = fadeOut(tween(200)),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)   // ora funziona: siamo nel BoxScope
+                    .padding(top = 12.dp)
+            ) {
+                Surface(
+                    color = WIZ_AZURE.copy(alpha = 0.15f),
+                    contentColor = WIZ_AZURE,
+                    shape = RoundedCornerShape(10.dp),
+                    tonalElevation = 6.dp,
+                    shadowElevation = 12.dp
+                ) {
+                    Text(
+                        text = modeHintText,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        fontSize = 12.sp
+                    )
                 }
             }
+            // ⬆️⬆️ FINE BANNER ⬆️⬆️
         }
     }
 }
+
 
 @Composable
 private fun SquareTile(
