@@ -1,10 +1,37 @@
 package com.example.appbuilder.editor
 
-import com.example.appbuilder.canvas.PageState
-import com.example.appbuilder.canvas.DrawItem
-import com.example.appbuilder.canvas.CanvasStage
 import com.example.appbuilder.overlay.GridSliderOverlay
 import com.example.appbuilder.overlay.LevelPickerOverlay
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.appbuilder.canvas.CanvasStage
+import com.example.appbuilder.canvas.PageState
+import com.example.appbuilder.canvas.overlays.GridSliderOverlay
+import com.example.appbuilder.canvas.overlays.LevelPickerOverlay
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -12,7 +39,6 @@ import com.example.appbuilder.icons.EditorIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,8 +56,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -58,8 +82,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -67,23 +89,16 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.appbuilder.R
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material3.Switch
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.OutlinedButton
@@ -98,23 +113,11 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateDpAsState
 import kotlinx.coroutines.delay
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
-
 
 
 // Local per sapere ovunque se l’utente è free (true) o no
@@ -310,16 +313,16 @@ fun EditorMenusOnly(
     var infoCardVisible by remember { mutableStateOf(false) }
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
-
+    
     // Griglia
     var gridPanelOpen by remember { mutableStateOf(false) }
     var gridIsDragging by remember { mutableStateOf(false) }
     var showGridLines by remember { mutableStateOf(false) }
-
+    
     // Livelli
     var levelPanelOpen by remember { mutableStateOf(false) }
     var currentLevel by remember { mutableStateOf(0) }
-
+        
     // Auto‑show griglia completa dopo 500ms se lo slider non è in drag
     LaunchedEffect(gridPanelOpen, gridIsDragging) {
         if (gridPanelOpen && !gridIsDragging) {
@@ -329,7 +332,6 @@ fun EditorMenusOnly(
             showGridLines = false
         }
     }
-
 
 // Auto-hide del pannello descrittivo (5s)
     LaunchedEffect(infoCard) {
@@ -400,6 +402,8 @@ fun EditorMenusOnly(
             else -> Unit                                // ignora: evita che l'Activity si chiuda
         }
     }
+    BackHandler(enabled = gridPanelOpen)  { gridPanelOpen = false }
+    BackHandler(enabled = levelPanelOpen) { levelPanelOpen = false }
 
     // Elenco chiavi COMPLETE + default per ciascun root (usiamo le stesse label del menu)
     fun keysForRoot(root: String): List<Pair<String, Any?>> {
@@ -581,17 +585,25 @@ fun EditorMenusOnly(
                     )
                 )
         ) {
+            // 1) CANVAS — PRIMO FIGLIO del Box con gradiente
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    // quando la griglia è aperta, sfoca e abbassa l'alpha SOLO del canvas
+                    .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
+            ) {
+                CanvasStage(
+                    page            = pageState,
+                    gridDensity     = pageState?.gridDensity ?: 6,
+                    gridPreviewOnly = gridPanelOpen && gridIsDragging,  // anteprima 1° quadretto
+                    showFullGrid    = gridPanelOpen && showGridLines,   // griglia completa dopo 0.5s
+                    currentLevel    = currentLevel,
+                    onAddItem = { item ->
+                        pageState?.items?.add(item)
+                    }
+                )
+            }
             var idError by remember { mutableStateOf(false) }
-            CanvasStage(
-                page = pageState,
-                gridDensity = pageState?.gridDensity ?: 6,
-                gridPreviewOnly = gridPanelOpen && gridIsDragging,
-                showFullGrid = gridPanelOpen && showGridLines,
-                currentLevel = currentLevel,
-                onAddItem = { item: DrawItem ->               // ⟵ aggiungi il tipo qui
-                    pageState?.items?.add(item)
-                }
-            )        
             if (menuPath.isEmpty()) {
 // PRIMA BARRA
                 MainBottomBar(
@@ -632,51 +644,64 @@ fun EditorMenusOnly(
 
                         LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
                     ) {
-
-                    MainMenuBar(
-                        onLayout = { menuPath = listOf("Layout") },
-                        onContainer = { menuPath = listOf("Contenitore") },
-                        onText     = { menuPath = listOf("Testo") },
-                        onAdd      = { menuPath = listOf("Aggiungi") },
-                        bottomBarHeightPx = actionsBarHeightPx
-                    )
-                    } // <-- chiusura del CompositionLocalProvider Deck
-
-                    } else {
-                        CompositionLocalProvider(
-                            LocalSecondBarMode provides SecondBarMode.Classic,
-                            LocalExitClassic provides { classicEditing = false } // torna alle madri
-                        ) {
-                            MainMenuBar(
-                                onLayout = { menuPath = listOf("Layout") },
-                                onContainer = { menuPath = listOf("Contenitore") },
-                                onText = { menuPath = listOf("Testo") },
-                                onAdd = { menuPath = listOf("Aggiungi") },
-                                bottomBarHeightPx = actionsBarHeightPx
-                            )
-                        }
+                        MainMenuBar(
+                            onLayout = { menuPath = listOf("Layout") },
+                            onContainer = { menuPath = listOf("Contenitore") },
+                            onText     = { menuPath = listOf("Testo") },
+                            onAdd      = { menuPath = listOf("Aggiungi") },
+                            bottomBarHeightPx = actionsBarHeightPx
+                        )
                     }
-
-                    // ⬇️ QUI (fratello della MainMenuBar), NON come "onCreate = { ... }"
-                    CreationWizardOverlay(
-                        visible    = wizardVisible,
-                        target     = wizardTarget,
-                        existingIds = deckItems.values.flatten().toSet(),
-                        onDismiss  = { wizardVisible = false },
-                        onCreate   = { wr: WizardResult ->        // tipizza il parametro per evitare "Cannot infer type"
-                            deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
-                            wizardVisible = false
-                            deckOpen = when (wr.root) {
-                                DeckRoot.PAGINA        -> "pagina"
-                                DeckRoot.MENU_LATERALE -> "menuL"
-                                DeckRoot.MENU_CENTRALE -> "menuC"
-                                DeckRoot.AVVISO        -> "avviso"
-                                else                   -> null      // fallback per il when esaustivo
-                            }
+                } else {
+                    CompositionLocalProvider(
+                        LocalSecondBarMode provides SecondBarMode.Classic,
+                        LocalExitClassic provides { classicEditing = false }    // torna alle icone madre
+                    ) {
+                        MainMenuBar(
+                            onLayout = { menuPath = listOf("Layout") },
+                            onContainer = { menuPath = listOf("Contenitore") },
+                            onText = { menuPath = listOf("Testo") },
+                            onAdd = { menuPath = listOf("Aggiungi") },
+                            bottomBarHeightPx = actionsBarHeightPx
+                        )
+                    }
+                }
+                CreationWizardOverlay(
+                    visible = wizardVisible,
+                    target  = wizardTarget,
+                    existingIds = deckItems.values.flatten().toSet(),   // • tutti gli ID esistenti
+                    onDismiss = { wizardVisible = false },
+                    onCreate  = { wr ->
+                        deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
+                        wizardVisible = false
+                    
+                        deckOpen = when (wr.root) {
+                            DeckRoot.PAGINA        -> "pagina"
+                            DeckRoot.MENU_LATERALE -> "menuL"
+                            DeckRoot.MENU_CENTRALE -> "menuC"
+                            DeckRoot.AVVISO        -> "avviso"
+                        }
+                    
+                        if (wr.root == DeckRoot.PAGINA) {
+                            // pagina bianca con livello 0 e densità griglia default 6
+                            pageState = PageState(
+                                id = wr.id,
+                                scroll = wr.scroll,      // "Nessuna" | "Verticale" | "Orizzontale"
+                                gridDensity = 6,
+                                currentLevel = 0
+                            )
+                            // entra nella “pagina figlia” appena creata (seconda barra in Classic)
+                            editingClass   = DeckRoot.PAGINA
+                            classicEditing = true
+                        } else {
                             classicEditing = false
                         }
-                    )
-                // calcola il “contesto pagina” (serve per mostrare Top/Bottom bar solo per Pagine)
+                    }
+                )
+            }
+            else {
+// IN SOTTOMENU: seconda barra = SubMenuBar; sotto c'è sempre il Breadcrumb.
+// Imposta il "contesto pagina" per mostrare (in Layout) le voci Top/Bottom bar SOLO per Pagine.
                 val isPageCtx = classicEditing && (editingClass == DeckRoot.PAGINA)
                 CompositionLocalProvider(LocalIsPageContext provides isPageCtx) {
                     SubMenuBar(
@@ -829,32 +854,29 @@ fun EditorMenusOnly(
 
             }
 
-// 1) Deck laterale destro (apertura a scorrimento/tap)
+            // 1) Deck laterale destro (apertura a scorrimento/tap)
             InfoEdgeDeck(
                 open = infoDeckOpen,
                 onToggleOpen = { infoDeckOpen = !infoDeckOpen },
                 infoEnabled = infoMode,
                 onToggleInfo = { infoMode = !infoMode },
-                enabled = menuPath.isEmpty(),
-                // NEW: tasto "griglia"
-                gridEnabled = gridPanelOpen,
-                onToggleGrid = { gridPanelOpen = !gridPanelOpen },
-                // NEW: tasto "livello"
-                levelEnabled = levelPanelOpen,
-                onToggleLevel = { levelPanelOpen = !levelPanelOpen },
-                currentLevel = currentLevel
+                enabled = menuPath.isEmpty()
             )
-            // Overlay: Slider densità griglia
+            
+            /* ⬇️⬇️ INSERISCI QUI ⬇️⬇️ */
+            
+            // Overlay: Slider densità griglia (valori NON arbitrari)
             GridSliderOverlay(
                 visible = gridPanelOpen,
                 value = pageState?.gridDensity ?: 6,
+                allowedValues = listOf(4, 6, 8, 10, 12), // passi ammessi
                 onStartDrag = { gridIsDragging = true },
                 onValueChange = { v -> pageState = pageState?.copy(gridDensity = v) ?: pageState },
                 onEndDrag = { gridIsDragging = false },
                 onDismiss = { gridPanelOpen = false }
             )
-
-            // Overlay: Selettore livelli
+            
+            // Overlay: Selettore livelli “slot machine”
             LevelPickerOverlay(
                 visible = levelPanelOpen,
                 current = currentLevel,
@@ -864,13 +886,14 @@ fun EditorMenusOnly(
                     currentLevel = lvl
                     levelPanelOpen = false
                     pageState?.currentLevel = lvl
-                    pageState?.levels?.add(lvl)
+                    pageState?.levels?.add(lvl)   // se non presente
                 },
                 onDismiss = { levelPanelOpen = false }
             )
-
-
-// 2) Toast informativo (in alto, scompare con fade)
+            
+            /* ⬆️⬆️ FIN QUI ⬆️⬆️ */
+            
+            // 2) Toast informativo (in alto, scompare con fade)
             InfoToastCard(
                 visible = infoCardVisible && infoCard != null,
                 title = infoCard?.first ?: "",
@@ -896,11 +919,11 @@ private fun BoxScope.MainBottomBar(
     onDuplicate: () -> Unit,
     onProperties: () -> Unit,
     onLayout: () -> Unit,
-    onCreate: () -> Unit,                  // ← deve ESISTERE
-    onCreatePage: () -> Unit = {},         // ← default
-    onCreateAlert: () -> Unit = {},        // ← default
-    onCreateMenuLaterale: () -> Unit = {}, // ← default
-    onCreateMenuCentrale: () -> Unit = {}, // ← default
+    onCreate: () -> Unit,            // rimane, se lo usi altrove
+    onCreatePage: () -> Unit = {},   // NEW
+    onCreateAlert: () -> Unit = {},  // NEW
+    onCreateMenuLaterale: () -> Unit = {}, // NEW
+    onCreateMenuCentrale: () -> Unit = {}, // NEW
     onOpenList: () -> Unit,
     onSaveProject: () -> Unit,
     onOpenProject: () -> Unit,
@@ -2792,20 +2815,21 @@ private fun BoxScope.InfoEdgeDeck(
     infoEnabled: Boolean,
     onToggleInfo: () -> Unit,
     enabled: Boolean = true,
-    // NEW
-    gridEnabled: Boolean = false,
-    onToggleGrid: () -> Unit = {},
-    levelEnabled: Boolean = false,
-    onToggleLevel: () -> Unit = {},
-    currentLevel: Int = 0
+
+    // NUOVI PARAMETRI
+    gridEnabled: Boolean,
+    onToggleGrid: () -> Unit,
+    levelEnabled: Boolean,
+    onToggleLevel: () -> Unit,
+    currentLevel: Int
 ) {
-// --- parametri estetici (puoi regolarli a piacere) ---
+    // --- parametri estetici (puoi regolarli a piacere) ---
     val tileSize   = 56.dp           // quadrato icona
     val spacing    = 10.dp           // spazio tra tile
     val corner     = 12.dp           // arrotondamento tile (quadrato "morbido")
-    val peekWidth  = 12.dp           // "pochi mm" sempre visibili sul lato destro
+    val peekWidth  = 12.dp           // “pochi mm” sempre visibili sul lato destro
 
-// Larghezza animata del contenitore (solo a destra)
+    // Larghezza animata del contenitore (solo a destra)
     val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
     val width by animateDpAsState(
         targetValue = targetWidth,
@@ -2813,7 +2837,7 @@ private fun BoxScope.InfoEdgeDeck(
         label = "sideWidth"
     )
 
-// Visibilità  a cascata (dall'alto verso il basso)
+    // Visibilità a cascata (dall’alto verso il basso)
     var showHelp by remember(open) { mutableStateOf(false) }
     var showGear by remember(open) { mutableStateOf(false) }
     LaunchedEffect(open) {
@@ -2832,7 +2856,7 @@ private fun BoxScope.InfoEdgeDeck(
             .width(width)
             .fillMaxHeight()
     ) {
-// --- Peek: sottile fascia verticale con ombra/gradiente sempre visibile ---
+        // --- Peek: sottile fascia verticale con ombra/gradiente sempre visibile ---
         val shadeAlpha = if (open) 0.08f else 0.25f
         Box(
             Modifier
@@ -2848,23 +2872,23 @@ private fun BoxScope.InfoEdgeDeck(
                         )
                     )
                 )
-// Swipe dalla destra verso sinistra per aprire/chiudere
+                // Swipe dalla destra verso sinistra per aprire/chiudere
                 .pointerInput(open) {
                     detectHorizontalDragGestures { _, dx ->
-// dx < 0 = trascina verso sinistra
+                        // dx < 0 = trascina verso sinistra
                         if (!open && dx < -18f) onToggleOpen()
-// dx > 0 = trascina verso destra
+                        // dx > 0 = trascina verso destra
                         if ( open && dx >  18f) onToggleOpen()
                     }
                 }
-// Tap vicino al bordo per aprire/chiudere
+                // Tap vicino al bordo per aprire/chiudere
                 .combinedClickable(
                     onClick = onToggleOpen,
                     onLongClick = onToggleOpen
                 )
         )
 
-// --- Colonna dei tile quadrati (icona "?" + ingranaggio) ---
+        // --- Colonna dei tile quadrati (icona "?" + griglia + livelli + ingranaggio) ---
         if (open) {
             Column(
                 modifier = Modifier
@@ -2873,7 +2897,7 @@ private fun BoxScope.InfoEdgeDeck(
                 verticalArrangement = Arrangement.spacedBy(spacing),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-// "?" — colore/abilitazione invariati (rispetta infoEnabled & enabled)
+                // 1) "?" — colore/abilitazione invariati (rispetta infoEnabled & enabled)
                 AnimatedVisibility(
                     visible = showHelp,
                     enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
@@ -2898,7 +2922,70 @@ private fun BoxScope.InfoEdgeDeck(
                     )
                 }
 
-// Ingranaggio — stub (chiude il menù dopo il tap)
+                // 2) NUOVO — tasto GRIGLIA con bordo azzurro quando attivo
+                AnimatedVisibility(
+                    visible = showHelp,  // stesso ritmo a cascata dei tile esistenti
+                    enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
+                    exit  = fadeOut(tween(120)) + scaleOut(tween(120))
+                ) {
+                    SquareTile(
+                        size   = tileSize,
+                        corner = corner,
+                        icon   = ImageVector.vectorResource(id = R.drawable.ic_grid),
+                        tint   = Color.White,
+                        enabled = enabled,
+                        border  = if (gridEnabled) BorderStroke(2.dp, WIZ_AZURE) else null,
+                        onClick = {
+                            if (enabled) {
+                                onToggleGrid()
+                                onToggleOpen()  // richiudi subito il menù laterale
+                            }
+                        }
+                    )
+                }
+
+                // 3) NUOVO — tasto LIVELLI con numerino a sinistra
+                AnimatedVisibility(
+                    visible = showGear,   // usa la seconda “cadenza” già presente
+                    enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.85f),
+                    exit  = fadeOut(tween(120)) + scaleOut(tween(120))
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        // piccolo badge numerico a sinistra dell’icona
+                        Surface(
+                            color = Color(0xFF0F141E),
+                            contentColor = Color.White,
+                            shape = RoundedCornerShape(8.dp),
+                            tonalElevation = 4.dp,
+                            shadowElevation = 4.dp,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .offset(x = (-28).dp)   // posizionato a sinistra del tile
+                        ) {
+                            Text(
+                                currentLevel.toString(),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                fontSize = 12.sp
+                            )
+                        }
+                        SquareTile(
+                            size   = tileSize,
+                            corner = corner,
+                            icon   = ImageVector.vectorResource(id = R.drawable.ic_stairs),
+                            tint   = Color.White,
+                            enabled = enabled,
+                            border  = if (levelEnabled) BorderStroke(2.dp, WIZ_AZURE) else null,
+                            onClick = {
+                                if (enabled) {
+                                    onToggleLevel()
+                                    onToggleOpen()  // richiudi subito il menù laterale
+                                }
+                            }
+                        )
+                    }
+                }
+
+                // 4) Ingranaggio — stub (chiude il menù dopo il tap)
                 AnimatedVisibility(
                     visible = showGear,
                     enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.85f),
@@ -2911,69 +2998,16 @@ private fun BoxScope.InfoEdgeDeck(
                         tint = Color.White,
                         enabled = true,
                         onClick = {
-// TODO: apri impostazioni (stub)
+                            // TODO: apri impostazioni (stub)
                             onToggleOpen()
                         }
                     )
                 }
-                AnimatedVisibility(
-                    visible = open, enter = fadeIn(tween(180)), exit = fadeOut(tween(140))
-                ) {
-                    // TILE “Griglia”
-                    SquareTile(
-                        size = 56.dp,
-                        corner = 12.dp,
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_grid),
-                        tint = if (gridEnabled) WIZ_AZURE else Color.White,
-                        enabled = enabled,
-                        onClick = {
-                            if (enabled) {
-                                onToggleGrid()
-                                onToggleOpen()
-                            }
-                        }
-                    )
-                }
-
-                AnimatedVisibility(
-                    visible = open, enter = fadeIn(tween(200)), exit = fadeOut(tween(140))
-                ) {
-                    // TILE “Livello” (mostra badge con numero)
-                    Box(contentAlignment = Alignment.TopEnd) {
-                        SquareTile(
-                            size = 56.dp,
-                            corner = 12.dp,
-                            icon = ImageVector.vectorResource(id = R.drawable.ic_stairs),
-                            tint = if (levelEnabled) WIZ_AZURE else Color.White,
-                            enabled = enabled,
-                            onClick = {
-                                if (enabled) {
-                                    onToggleLevel()
-                                    onToggleOpen()
-                                }
-                            }
-                        )
-                        // badge piccolo con il livello corrente
-                        Surface(
-                            color = Color(0xFF22304B),
-                            contentColor = Color.White,
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .offset(x = (-6).dp, y = 6.dp)
-                                .align(Alignment.TopEnd)
-                        ) {
-                            Text(
-                                currentLevel.toString(),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
-                }
-            }                
+            }
         }
     }
 }
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -2983,14 +3017,16 @@ private fun SquareTile(
     icon: ImageVector,
     tint: Color,
     enabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    border: BorderStroke? = null      // ⬅️ NUOVO
 ) {
     Surface(
         color = Color(0xFF111621),
         contentColor = tint,
         shape = RoundedCornerShape(corner),
         tonalElevation = 6.dp,
-        shadowElevation = 8.dp
+        shadowElevation = 8.dp,
+        border = border                // ⬅️ USA IL BORDO
     ) {
         Box(
             modifier = Modifier
