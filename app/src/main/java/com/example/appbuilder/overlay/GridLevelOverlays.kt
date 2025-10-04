@@ -45,6 +45,7 @@ private val DENSITY_STEPS = listOf(3, 4, 6, 8, 10, 12, 16, 20, 24)
 fun GridSliderOverlay(
     visible: Boolean,
     value: Int,
+    allowedValues: List<Int> = listOf(4, 6, 8, 10, 12),
     onStartDrag: () -> Unit,
     onValueChange: (Int) -> Unit,
     onEndDrag: () -> Unit,
@@ -80,21 +81,23 @@ fun GridSliderOverlay(
             ) {
                 Text("Densità griglia", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
                 Text("${DENSITY_STEPS[index]} × ${DENSITY_STEPS[index]}", color = Color(0xFF9BA3AF))
+                val index = allowedValues.indexOf(value).let { if (it < 0) 0 else it }
+                var sliderIndex by remember(value, allowedValues) { mutableStateOf(index) }
+                var started by remember { mutableStateOf(false) } // per onStartDrag una sola volta
 
                 Slider(
-                    value = index.toFloat(),
+                    value = sliderIndex.toFloat(),
                     onValueChange = { f ->
-                        val newIdx = f.toInt().coerceIn(0, DENSITY_STEPS.lastIndex)
-                        if (!sentStart) { onStartDrag(); sentStart = true }
-                        index = newIdx
-                        onValueChange(DENSITY_STEPS[newIdx])
+                        val i = f.roundToInt().coerceIn(0, allowedValues.lastIndex)
+                        if (!started) { onStartDrag(); started = true }
+                        if (i != sliderIndex) {
+                            sliderIndex = i
+                            onValueChange(allowedValues[i]) // restituisci il valore "non arbitrario"
+                        }
                     },
-                    onValueChangeFinished = {
-                        onEndDrag()
-                        sentStart = false
-                    },
-                    valueRange = 0f..DENSITY_STEPS.lastIndex.toFloat(),
-                    steps = (DENSITY_STEPS.size - 2).coerceAtLeast(0),
+                    onValueChangeFinished = { started = false; onEndDrag() },
+                    steps = (allowedValues.size - 2).coerceAtLeast(0),
+                    valueRange = 0f..allowedValues.lastIndex.toFloat(),
                     colors = SliderDefaults.colors(
                         thumbColor = WIZ_AZURE,
                         activeTrackColor = WIZ_AZURE,
@@ -102,6 +105,8 @@ fun GridSliderOverlay(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
+
+
 
                 Row(
                     Modifier.fillMaxWidth(),

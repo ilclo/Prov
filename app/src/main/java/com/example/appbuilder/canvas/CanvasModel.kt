@@ -6,16 +6,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * Stato minimo di una “pagina di lavoro”.
- * scrollable: "Nessuna" | "Verticale" | "Orizzontale"
- */
 data class PageState(
-    var scrollable: String = "Nessuna",
+    val id: String,
+    val scroll: String,                // "Nessuna" | "Verticale" | "Orizzontale"
     var gridDensity: Int = 6,
-    val items: SnapshotStateList<DrawItem> = mutableStateListOf(),
+    var currentLevel: Int = 0,
     val levels: SnapshotStateList<Int> = mutableStateListOf(0),
-    var currentLevel: Int = 0
+    val items: SnapshotStateList<DrawItem> = mutableStateListOf()
 )
 
 /** Elementi disegnabili su griglia. */

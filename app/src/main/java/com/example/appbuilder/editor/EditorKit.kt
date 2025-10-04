@@ -30,8 +30,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.appbuilder.canvas.CanvasStage
 import com.example.appbuilder.canvas.PageState
-import com.example.appbuilder.canvas.overlays.GridSliderOverlay
-import com.example.appbuilder.canvas.overlays.LevelPickerOverlay
+import com.example.appbuilder.overlay.GridSliderOverlay
+import com.example.appbuilder.overlay.LevelPickerOverlay
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -686,7 +686,7 @@ fun EditorMenusOnly(
                             // pagina bianca con livello 0 e densità griglia default 6
                             pageState = PageState(
                                 id = wr.id,
-                                scroll = wr.scroll,      // "Nessuna" | "Verticale" | "Orizzontale"
+                                scroll = wr.scroll,
                                 gridDensity = 6,
                                 currentLevel = 0
                             )
@@ -854,14 +854,21 @@ fun EditorMenusOnly(
 
             }
 
-            // 1) Deck laterale destro (apertura a scorrimento/tap)
             InfoEdgeDeck(
                 open = infoDeckOpen,
                 onToggleOpen = { infoDeckOpen = !infoDeckOpen },
                 infoEnabled = infoMode,
                 onToggleInfo = { infoMode = !infoMode },
-                enabled = menuPath.isEmpty()
+                enabled = menuPath.isEmpty(),
+
+                // ⬇️ nuovi parametri
+                gridEnabled = gridPanelOpen,
+                onToggleGrid = { gridPanelOpen = !gridPanelOpen },
+                levelEnabled = levelPanelOpen,
+                onToggleLevel = { levelPanelOpen = !levelPanelOpen },
+                currentLevel = currentLevel
             )
+
             
             /* ⬇️⬇️ INSERISCI QUI ⬇️⬇️ */
             
