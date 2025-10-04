@@ -1,5 +1,7 @@
 package com.example.appbuilder.editor
 
+import com.example.appbuilder.canvas.ToolMode
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.derivedStateOf 
@@ -322,6 +324,7 @@ fun EditorMenusOnly(
     // Livelli
     var levelPanelOpen by remember { mutableStateOf(false) }
     var currentLevel by remember { mutableStateOf(0) }
+    var toolMode by remember { mutableStateOf(ToolMode.Create) }
         
     // Auto‑show griglia completa dopo 500ms se lo slider non è in drag
     LaunchedEffect(gridPanelOpen, gridIsDragging) {
@@ -345,6 +348,15 @@ fun EditorMenusOnly(
             !gridPanelOpen && !levelPanelOpen
         }
     }
+    // Sei nel menù Contenitore (icona madre, non sottoschede)
+    val isContainerContext by remember(classicEditing, editingClass, menuPath) {
+        derivedStateOf {
+            classicEditing &&
+            editingClass == DeckRoot.PAGINA &&
+            menuPath.size == 1 &&
+            menuPath.firstOrNull() == "Contenitore"
+        }
+    }
 // Auto-hide del pannello descrittivo (5s)
     LaunchedEffect(infoCard) {
         if (infoCard != null) {
@@ -361,6 +373,13 @@ fun EditorMenusOnly(
             infoCard = "Modalità  info" to
                     "Tocca un'icona per una descrizione. Tieni premuto per entrare dove consentito. " +
                     "Per uscire, riapri il deck a destra e tocca di nuovo '?'."
+        }
+    }
+    LaunchedEffect(isContainerContext) {
+        if (isContainerContext) {
+            // appena entro in "Contenitore" apro il menù laterale e riparto da "Create"
+            infoDeckOpen = true
+            toolMode = ToolMode.Create
         }
     }
     val deckItems = remember {
@@ -610,7 +629,7 @@ fun EditorMenusOnly(
                     gridPreviewOnly = gridPanelOpen && gridIsDragging,
                     showFullGrid    = gridPanelOpen && showGridLines,
                     currentLevel    = currentLevel,
-                    creationEnabled = canCreateContainer,   // ⟵ questo evita la “modalità contenitore” quando non sei in root Contenitore
+                    creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
                     onAddItem       = { item -> pageState?.items?.add(item) }
                 )
             }
@@ -871,15 +890,27 @@ fun EditorMenusOnly(
                 infoEnabled = infoMode,
                 onToggleInfo = { infoMode = !infoMode },
                 enabled = menuPath.isEmpty(),
-                // nuovi:
+
+                // già presenti
                 gridEnabled = gridPanelOpen,
                 onToggleGrid = { gridPanelOpen = !gridPanelOpen },
                 levelEnabled = levelPanelOpen,
                 onToggleLevel = { levelPanelOpen = !levelPanelOpen },
-                currentLevel = currentLevel
+                currentLevel = currentLevel,
+
+                // NUOVI
+                isContainerContext = isContainerContext,
+                toolMode = toolMode,
+                onCycleMode = {
+                    toolMode = when (toolMode) {
+                        ToolMode.Create -> ToolMode.Point
+                        ToolMode.Point  -> ToolMode.Grab
+                        ToolMode.Grab   -> ToolMode.Resize
+                        ToolMode.Resize -> ToolMode.Create
+                    }
+                }
             )
 
-            /* ⬇️⬇️ INSERISCI QUI ⬇️⬇️ */
             
             // Overlay: Slider densità griglia (valori NON arbitrari)
             GridSliderOverlay(
@@ -2824,7 +2855,8 @@ private fun FilterChipLike(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class)
+
 @Composable
 private fun BoxScope.InfoEdgeDeck(
     open: Boolean,
@@ -2833,37 +2865,47 @@ private fun BoxScope.InfoEdgeDeck(
     onToggleInfo: () -> Unit,
     enabled: Boolean = true,
 
-    // NUOVI PARAMETRI
+    // già presenti
     gridEnabled: Boolean,
     onToggleGrid: () -> Unit,
     levelEnabled: Boolean,
     onToggleLevel: () -> Unit,
-    currentLevel: Int
+    currentLevel: Int,
+
+    // NUOVI parametri
+    isContainerContext: Boolean,          // true <=> sei nel menù "Contenitore"
+    toolMode: com.example.appbuilder.canvas.ToolMode,
+    onCycleMode: () -> Unit               // cambia modalità senza chiudere il menù
 ) {
-    // --- parametri estetici (puoi regolarli a piacere) ---
-    val tileSize   = 56.dp           // quadrato icona
-    val spacing    = 10.dp           // spazio tra tile
-    val corner     = 12.dp           // arrotondamento tile (quadrato "morbido")
-    val peekWidth  = 12.dp           // “pochi mm” sempre visibili sul lato destro
+    // --- estetica ---
+    val tileSize  = 56.dp
+    val spacing   = 10.dp
+    val corner    = 12.dp
+    val peekWidth = 12.dp
 
-    // Larghezza animata del contenitore (solo a destra)
+    // larghezza animata
     val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
-    val width by animateDpAsState(
-        targetValue = targetWidth,
-        animationSpec = tween(220),
-        label = "sideWidth"
-    )
+    val width by animateDpAsState(targetValue = targetWidth, animationSpec = tween(220), label = "sideWidth")
 
-    // Visibilità a cascata (dall’alto verso il basso)
-    var showHelp by remember(open) { mutableStateOf(false) }
-    var showGear by remember(open) { mutableStateOf(false) }
+    // visibilità a cascata
+    var show1 by remember(open) { mutableStateOf(false) } // "?"
+    var show2 by remember(open) { mutableStateOf(false) } // grid
+    var show3 by remember(open) { mutableStateOf(false) } // level
+    var show4 by remember(open) { mutableStateOf(false) } // mode (NUOVO)
+    var show5 by remember(open) { mutableStateOf(false) } // gear
     LaunchedEffect(open) {
         if (open) {
-            showHelp = true; delay(60)
-            showGear = true
+            show1 = true; delay(50)
+            show2 = true; delay(50)
+            show3 = true; delay(50)
+            show4 = true; delay(50)
+            show5 = true
         } else {
-            showGear = false; delay(40)
-            showHelp = false
+            show5 = false; delay(40)
+            show4 = false; delay(40)
+            show3 = false; delay(40)
+            show2 = false; delay(40)
+            show1 = false
         }
     }
 
@@ -2873,39 +2915,39 @@ private fun BoxScope.InfoEdgeDeck(
             .width(width)
             .fillMaxHeight()
     ) {
-        // --- Peek: sottile fascia verticale con ombra/gradiente sempre visibile ---
+        // fascia di "peek" sempre visibile
         val shadeAlpha = if (open) 0.08f else 0.25f
-        Box(
-            Modifier
-                .align(Alignment.CenterEnd)
-                .width(peekWidth)
-                .fillMaxHeight()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x66000000).copy(alpha = shadeAlpha),
-                            Color(0x00000000),
-                            Color(0x66000000).copy(alpha = shadeAlpha)
-                        )
+        val peek = Modifier
+            .align(Alignment.CenterEnd)
+            .width(peekWidth)
+            .fillMaxHeight()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0x66000000).copy(alpha = shadeAlpha),
+                        Color(0x00000000),
+                        Color(0x66000000).copy(alpha = shadeAlpha)
                     )
                 )
-                // Swipe dalla destra verso sinistra per aprire/chiudere
-                .pointerInput(open) {
-                    detectHorizontalDragGestures { _, dx ->
-                        // dx < 0 = trascina verso sinistra
-                        if (!open && dx < -18f) onToggleOpen()
-                        // dx > 0 = trascina verso destra
-                        if ( open && dx >  18f) onToggleOpen()
-                    }
+            )
+            .pointerInput(open, isContainerContext) {
+                detectHorizontalDragGestures { _, dx ->
+                    // apertura: trascino a sinistra quando è chiuso
+                    if (!open && dx < -18f) onToggleOpen()
+                    // chiusura:
+                    // - in "Contenitore": SOLO trascinando a destra
+                    // - altrove: anche a destra (comportamento standard)
+                    if (open && dx > 18f) onToggleOpen()
                 }
-                // Tap vicino al bordo per aprire/chiudere
-                .combinedClickable(
-                    onClick = onToggleOpen,
-                    onLongClick = onToggleOpen
-                )
-        )
+            }
+            .combinedClickable(
+                // in "Contenitore" non chiudo/apro col tap (si apre già in automatico)
+                onClick = { if (!isContainerContext) onToggleOpen() },
+                onLongClick = { if (!isContainerContext) onToggleOpen() }
+            )
 
-        // --- Colonna dei tile quadrati (icona "?" + griglia + livelli + ingranaggio) ---
+        Box(peek) {} // disegna la fascia
+
         if (open) {
             Column(
                 modifier = Modifier
@@ -2914,9 +2956,9 @@ private fun BoxScope.InfoEdgeDeck(
                 verticalArrangement = Arrangement.spacedBy(spacing),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1) "?" — colore/abilitazione invariati (rispetta infoEnabled & enabled)
+                // 1) "?" info
                 AnimatedVisibility(
-                    visible = showHelp,
+                    visible = show1,
                     enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
@@ -2925,50 +2967,58 @@ private fun BoxScope.InfoEdgeDeck(
                         corner = corner,
                         icon = Icons.Outlined.HelpOutline,
                         tint = when {
-                            !enabled     -> Color(0xFF6B7280) // grigio disattivo nei sottomenu
-                            infoEnabled  -> WIZ_AZURE        // azzurro quando attiva la info-mode
+                            !enabled     -> Color(0xFF6B7280)
+                            infoEnabled  -> WIZ_AZURE
                             else         -> Color.White
                         },
                         enabled = enabled,
                         onClick = {
                             if (enabled) {
                                 onToggleInfo()
-                                onToggleOpen() // chiudi dopo il tap
+                                onToggleOpen() // comportamento storico: chiudo dopo tap
                             }
                         }
                     )
                 }
 
-                // 2) NUOVO — tasto GRIGLIA con bordo azzurro quando attivo
+                // 2) griglia
                 AnimatedVisibility(
-                    visible = showHelp,  // stesso ritmo a cascata dei tile esistenti
+                    visible = show2,
                     enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
+                    val gridIcon = try {
+                        ImageVector.vectorResource(id = R.drawable.ic_grid)
+                    } catch (_: Throwable) {
+                        Icons.Outlined.GridOn // fallback
+                    }
                     SquareTile(
-                        size   = tileSize,
+                        size = tileSize,
                         corner = corner,
-                        icon   = ImageVector.vectorResource(id = R.drawable.ic_grid),
-                        tint   = Color.White,
-                        enabled = enabled,
-                        border  = if (gridEnabled) BorderStroke(2.dp, WIZ_AZURE) else null,
+                        icon = gridIcon,
+                        tint = Color.White,
+                        enabled = true,
+                        border = if (gridEnabled) BorderStroke(2.dp, WIZ_AZURE) else null,
                         onClick = {
-                            if (enabled) {
-                                onToggleGrid()
-                                onToggleOpen()  // richiudi subito il menù laterale
-                            }
+                            onToggleGrid()
+                            onToggleOpen() // richiudo (comportamento storico)
                         }
                     )
                 }
 
-                // 3) NUOVO — tasto LIVELLI con numerino a sinistra
+                // 3) livelli
                 AnimatedVisibility(
-                    visible = showGear,   // usa la seconda “cadenza” già presente
-                    enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.85f),
+                    visible = show3,
+                    enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
+                    val stairsIcon = try {
+                        ImageVector.vectorResource(id = R.drawable.ic_stairs)
+                    } catch (_: Throwable) {
+                        Icons.Outlined.Stairs // se hai Material Extended
+                    }
                     Box(contentAlignment = Alignment.Center) {
-                        // piccolo badge numerico a sinistra dell’icona
+                        // badge numerico a sinistra
                         Surface(
                             color = Color(0xFF0F141E),
                             contentColor = Color.White,
@@ -2977,7 +3027,7 @@ private fun BoxScope.InfoEdgeDeck(
                             shadowElevation = 4.dp,
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .offset(x = (-28).dp)   // posizionato a sinistra del tile
+                                .offset(x = (-28).dp)
                         ) {
                             Text(
                                 currentLevel.toString(),
@@ -2986,36 +3036,61 @@ private fun BoxScope.InfoEdgeDeck(
                             )
                         }
                         SquareTile(
-                            size   = tileSize,
+                            size = tileSize,
                             corner = corner,
-                            icon   = ImageVector.vectorResource(id = R.drawable.ic_stairs),
-                            tint   = Color.White,
-                            enabled = enabled,
-                            border  = if (levelEnabled) BorderStroke(2.dp, WIZ_AZURE) else null,
+                            icon = stairsIcon,
+                            tint = Color.White,
+                            enabled = true,
+                            border = if (levelEnabled) BorderStroke(2.dp, WIZ_AZURE) else null,
                             onClick = {
-                                if (enabled) {
-                                    onToggleLevel()
-                                    onToggleOpen()  // richiudi subito il menù laterale
-                                }
+                                onToggleLevel()
+                                onToggleOpen() // richiudo (comportamento storico)
                             }
                         )
                     }
                 }
 
-                // 4) Ingranaggio — stub (chiude il menù dopo il tap)
+                // 4) NUOVO — pulsante "modalità"
                 AnimatedVisibility(
-                    visible = showGear,
-                    enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.85f),
+                    visible = show4,
+                    enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f),
+                    exit  = fadeOut(tween(120)) + scaleOut(tween(120))
+                ) {
+                    // Scegli icona in base alla modalità corrente
+                    val modeIcon: ImageVector = when (toolMode) {
+                        com.example.appbuilder.canvas.ToolMode.Create -> Icons.Outlined.AddBox   // ic_createcontainer
+                        com.example.appbuilder.canvas.ToolMode.Point  -> Icons.Outlined.TouchApp// ic_point
+                        com.example.appbuilder.canvas.ToolMode.Grab   -> Icons.Outlined.OpenWith// ic_grab
+                        com.example.appbuilder.canvas.ToolMode.Resize -> Icons.Outlined.Crop    // ic_resize
+                    }
+                    SquareTile(
+                        size = tileSize,
+                        corner = corner,
+                        icon = modeIcon,
+                        tint = if (isContainerContext) WIZ_AZURE else Color(0xFF6B7280),
+                        enabled = isContainerContext,               // cliccabile SOLO in "Contenitore"
+                        border = if (isContainerContext) BorderStroke(2.dp, WIZ_AZURE) else null,
+                        onClick = {
+                            // NON chiudo il menù: alterno le modalità
+                            if (isContainerContext) onCycleMode()
+                        }
+                    )
+                }
+
+                // 5) ingranaggio (stub)
+                AnimatedVisibility(
+                    visible = show5,
+                    enter = fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
                     SquareTile(
                         size = tileSize,
                         corner = corner,
-                        icon = EditorIcons.Settings,
+                        icon = Icons.Outlined.Settings,
                         tint = Color.White,
                         enabled = true,
                         onClick = {
-                            // TODO: apri impostazioni (stub)
+                            // TODO apri impostazioni
                             onToggleOpen()
                         }
                     )
@@ -3025,8 +3100,7 @@ private fun BoxScope.InfoEdgeDeck(
     }
 }
 
-
-@OptIn(ExperimentalFoundationApi::class)
+/** Tile quadrata riutilizzabile. */
 @Composable
 private fun SquareTile(
     size: Dp,
@@ -3034,31 +3108,26 @@ private fun SquareTile(
     icon: ImageVector,
     tint: Color,
     enabled: Boolean,
-    onClick: () -> Unit,
-    border: BorderStroke? = null      // ⬅️ NUOVO
+    border: BorderStroke? = null,
+    onClick: () -> Unit
 ) {
     Surface(
-        color = Color(0xFF111621),
-        contentColor = tint,
         shape = RoundedCornerShape(corner),
+        color = Color(0xFF0F141E),
+        contentColor = tint,
+        border = border,
         tonalElevation = 6.dp,
-        shadowElevation = 8.dp,
-        border = border                // ⬅️ USA IL BORDO
+        shadowElevation = 6.dp,
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(size)
     ) {
-        Box(
-            modifier = Modifier
-                .size(size)
-                .combinedClickable(
-                    enabled = enabled,
-                    onClick = onClick,
-                    onLongClick = onClick // stessa gesture per immediatezza
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(imageVector = icon, contentDescription = null)
         }
     }
 }
+
 
 @Composable
 private fun BoxScope.InfoToastCard(
