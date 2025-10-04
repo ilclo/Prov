@@ -1,7 +1,5 @@
 package com.example.appbuilder.canvas
 
-import com.example.appbuilder.canvas.PageState
-import com.example.appbuilder.canvas.DrawItem
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -23,12 +21,12 @@ import kotlin.math.min
  * Stage di disegno: mostra pagina, overlay griglia (preview singola cella o griglia intera),
  * e consente la creazione dei contenitori (rettangoli) con 2 tap lunghi.
  *
- * @param page           stato pagina (può essere null nelle fasi iniziali)
- * @param gridDensity    densità corrente (N celle per riga/colonna)
+ * @param page            stato pagina (può essere null nelle fasi iniziali)
+ * @param gridDensity     densità corrente (N celle per riga/colonna)
  * @param gridPreviewOnly true => mostra solo il primo quadrato in alto-sx (mentre trascini lo slider)
- * @param showFullGrid   true => mostra la griglia completa (dopo 0.5s che non trascini)
- * @param currentLevel   livello attivo (si disegnano gli elementi con level <= currentLevel)
- * @param onAddItem      callback per aggiungere un nuovo elemento creato dall’utente
+ * @param showFullGrid    true => mostra la griglia completa (dopo 0.5s che non trascini)
+ * @param currentLevel    livello attivo (si disegnano gli elementi con level <= currentLevel)
+ * @param onAddItem       callback per aggiungere un nuovo elemento creato dall’utente
  */
 @Composable
 fun CanvasStage(
@@ -44,34 +42,37 @@ fun CanvasStage(
     // Primo estremo fissato con tap lungo
     var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
-    // La pagina potrebbe essere null: qui usiamo la densità fornita dal chiamante
     val density = max(1, gridDensity)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(density) {
+                // scope.size è disponibile in questo receiver; lo uso dentro le lambda
+                val w get() = size.width.toFloat()
+                val h get() = size.height.toFloat()
+
                 detectTapGestures(
                     onTap = { ofs ->
-                        val cell = computeCell(ofs, density, this.size.width.toFloat(), this.size.height.toFloat())
+                        val cell = computeCell(ofs, density, w, h)
                         hoverCell = cell
                     },
                     onLongPress = { ofs ->
-                        val cell = computeCell(ofs, density, this.size.width.toFloat(), this.size.height.toFloat())
+                        val cell = computeCell(ofs, density, w, h)
                         if (firstAnchor == null) {
-                            // Fissa il primo quadrato
+                            // 1° quadrato fissato
                             firstAnchor = cell
                         } else {
-                            // Secondo quadrato: crea il rettangolo ai lati esterni
+                            // 2° quadrato: crea rettangolo ai lati esterni
                             val (r0, c0) = firstAnchor!!
                             val (r1, c1) = cell
                             val rect = DrawItem.RectItem(
                                 level = currentLevel,
-                                r0 = min(r0, r1), c0 = min(c0, c1),
-                                r1 = max(r0, r1), c1 = max(c0, c1),
-                                borderColor = Color.Black,
-                                borderWidth = 1.dp,
-                                fillColor = Color.White
+                                row0 = min(r0, r1),
+                                col0 = min(c0, c1),
+                                row1 = max(r0, r1),
+                                col1 = max(c0, c1),
+                                borderColor = 0xFF000000L // nero
                             )
                             onAddItem(rect)
                             firstAnchor = null
@@ -82,54 +83,64 @@ fun CanvasStage(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cols = density
-            // Celle quadrate: uso il lato minore
+            // Celle quadrate: lato = min(w/h per numero colonne)
             val cell = min(size.width / cols, size.height / cols)
             val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
 
-            // 1) Disegno elementi esistenti fino al currentLevel
+            // 1) Disegna elementi fino al currentLevel
             page?.items?.forEach { item ->
                 if (item.level <= currentLevel) {
                     when (item) {
                         is DrawItem.RectItem -> {
-                            val left = min(item.c0, item.c1) * cell
-                            val top = min(item.r0, item.r1) * cell
-                            val w = (abs(item.c1 - item.c0) + 1) * cell
-                            val h = (abs(item.r1 - item.r0) + 1) * cell
-                            // riempimento
+                            val left = min(item.col0, item.col1) * cell
+                            val top = min(item.row0, item.row1) * cell
+                            val w = (abs(item.col1 - item.col0) + 1) * cell
+                            val h = (abs(item.row1 - item.row0) + 1) * cell
+
+                            // Riempimento: bianco di default (come richiesto)
                             drawRect(
-                                color = item.fillColor,
+                                color = Color.White,
                                 topLeft = Offset(left, top),
                                 size = Size(w, h)
                             )
-                            // bordo
+                            // Bordo: usa borderColor (Long) -> Color
+                            val border = Color(item.borderColor.toULong())
                             drawRect(
-                                color = item.borderColor,
+                                color = border,
                                 topLeft = Offset(left, top),
                                 size = Size(w, h),
-                                style = Stroke(width = item.borderWidth.toPx())
+                                style = Stroke(width = 1.dp.toPx())
                             )
                         }
                         is DrawItem.LineItem -> {
-                            // TODO: gestione linee (step successivo)
-                            val x0 = (item.c0 + 0.5f) * cell
-                            val y0 = (item.r0 + 0.5f) * cell
-                            val x1 = (item.c1 + 0.5f) * cell
-                            val y1 = (item.r1 + 0.5f) * cell
-                            drawLine(
-                                color = item.color,
-                                start = Offset(x0, y0),
-                                end = Offset(x1, y1),
-                                strokeWidth = item.width.toPx()
-                            )
+                            // Rendering basilare della linea (orizzontale/verticale) centrata nella cella di (row,col)
+                            val azure = Color(0xFF58A6FF)
+                            if (item.horizontal) {
+                                val y = (item.row + 0.5f) * cell
+                                drawLine(
+                                    color = azure,
+                                    start = Offset(0f, y),
+                                    end = Offset(cols * cell, y),
+                                    strokeWidth = 1.dp.toPx()
+                                )
+                            } else {
+                                val x = (item.col + 0.5f) * cell
+                                drawLine(
+                                    color = azure,
+                                    start = Offset(x, 0f),
+                                    end = Offset(x, rows * cell),
+                                    strokeWidth = 1.dp.toPx()
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // 2) Overlay griglia: preview (solo cella 0,0) o griglia completa
+            // 2) Overlay griglia: preview o griglia intera
             val azure = Color(0xFF58A6FF)
             if (gridPreviewOnly) {
-                // disegna solo il primo quadrato (in alto a sinistra)
+                // solo la prima cella (0,0)
                 if (rows > 0 && cols > 0) {
                     drawRect(
                         color = azure.copy(alpha = 0.20f),
@@ -144,7 +155,7 @@ fun CanvasStage(
                     )
                 }
             } else if (showFullGrid) {
-                // griglia completa
+                // tutte le linee della griglia
                 for (c in 0..cols) {
                     val x = c * cell
                     drawLine(
@@ -182,22 +193,22 @@ fun CanvasStage(
                 }
             }
 
-            // 4) Riga/colonna del primo ancoraggio (dopo primo long-press)
+            // 4) Riga/colonna del primo ancoraggio (dopo 1° long‑press)
             firstAnchor?.let { (rr, cc) ->
                 if (rr in 0 until rows && cc in 0 until cols) {
-                    // colonna
+                    // colonna evidenziata
                     drawRect(
                         color = azure.copy(alpha = 0.10f),
                         topLeft = Offset(cc * cell, 0f),
                         size = Size(cell, rows * cell)
                     )
-                    // riga
+                    // riga evidenziata
                     drawRect(
                         color = azure.copy(alpha = 0.10f),
                         topLeft = Offset(0f, rr * cell),
                         size = Size(cols * cell, cell)
                     )
-                    // cella stessa più marcata
+                    // cella di ancoraggio
                     drawRect(
                         color = azure.copy(alpha = 0.22f),
                         topLeft = Offset(cc * cell, rr * cell),
