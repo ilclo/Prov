@@ -1,6 +1,5 @@
 package com.example.appbuilder.editor
 
-
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -630,8 +629,20 @@ fun EditorMenusOnly(
                     gridPreviewOnly = gridPanelOpen && gridIsDragging,
                     showFullGrid    = gridPanelOpen && showGridLines,
                     currentLevel    = currentLevel,
-                    creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
-                    onAddItem       = { item -> pageState?.items?.add(item) }
+                    creationEnabled = toolMode == ToolMode.Create && canCreateContainer,
+                    toolMode        = toolMode,
+                    onAddItem       = { item -> pageState?.items?.add(item) },
+                    onUpdateItem    = { updated ->
+                        val items = pageState?.items ?: return@CanvasStage
+                        val ix = items.indexOfFirst { it === updated }
+                        if (ix >= 0) items[ix] = updated
+                    },
+                    onRequestEdit = { rect ->
+                        // Apri menù “Contenitore” con i valori del rettangolo selezionato
+                        menuPath = listOf("Contenitore")
+                        // Esempio: pre‑seleziona lo spessore del bordo nel tuo modello
+                        menuSelections["Contenitore / Bordi / Spessore"] = "${rect.borderWidth.value.toInt()}dp"
+                    }
                 )
             }
             var idError by remember { mutableStateOf(false) }
@@ -3035,7 +3046,7 @@ private fun BoxScope.InfoEdgeDeck(
                     }
                 }
 
-                // 4) NUOVO — pulsante "modalità"
+                // 4) NUOVO — pulsante "modalità" + etichetta 2s
                 AnimatedVisibility(
                     visible = show4,
                     enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f),
@@ -3043,25 +3054,63 @@ private fun BoxScope.InfoEdgeDeck(
                 ) {
                     // icona in base alla modalità
                     val modeIcon: ImageVector = when (toolMode) {
-                        com.example.appbuilder.canvas.ToolMode.Create -> Icons.Outlined.AddBox   // ic_createcontainer
-                        com.example.appbuilder.canvas.ToolMode.Point  -> Icons.Outlined.TouchApp// ic_point
-                        com.example.appbuilder.canvas.ToolMode.Grab   -> Icons.Outlined.OpenWith// ic_grab
-                        com.example.appbuilder.canvas.ToolMode.Resize -> Icons.Outlined.Crop    // ic_resize
+                        com.example.appbuilder.canvas.ToolMode.Create -> Icons.Outlined.AddBox
+                        com.example.appbuilder.canvas.ToolMode.Point  -> Icons.Outlined.TouchApp
+                        com.example.appbuilder.canvas.ToolMode.Grab   -> Icons.Outlined.OpenWith
+                        com.example.appbuilder.canvas.ToolMode.Resize -> Icons.Outlined.Crop
                     }
-                    SquareTile(
-                        size = tileSize,
-                        corner = corner,
-                        icon = modeIcon,
-                        tint = if (isContainerContext) WIZ_AZURE else Color(0xFF6B7280),
-                        enabled = isContainerContext,               // cliccabile SOLO in "Contenitore"
-                        border = if (isContainerContext) BorderStroke(2.dp, WIZ_AZURE) else null,
-                        onClick = {
-                            // NON chiudo il menù: alterno le modalità
-                            if (isContainerContext) onCycleMode()
-                        }
-                    )
-                }
 
+                    // testo da mostrare per 2s al cambio modalità
+                    var hintVisible by remember { mutableStateOf(false) }
+                    var hintText by remember { mutableStateOf("") }
+                    LaunchedEffect(toolMode) {
+                        hintText = when (toolMode) {
+                            com.example.appbuilder.canvas.ToolMode.Point  -> "configura contenitore"
+                            com.example.appbuilder.canvas.ToolMode.Resize -> "ridimensiona contenitore"
+                            com.example.appbuilder.canvas.ToolMode.Grab   -> "sposta contenitore"
+                            com.example.appbuilder.canvas.ToolMode.Create -> "crea contenitore"
+                        }
+                        hintVisible = true
+                        kotlinx.coroutines.delay(2000)
+                        hintVisible = false
+                    }
+
+                    Box(contentAlignment = Alignment.Center) {
+                        // etichetta a sinistra, verso il centro dello schermo
+                        AnimatedVisibility(
+                            visible = hintVisible,
+                            enter = fadeIn(tween(200)),
+                            exit  = fadeOut(tween(200))
+                        ) {
+                            Surface(
+                                color = WIZ_AZURE.copy(alpha = 0.15f),
+                                contentColor = WIZ_AZURE,
+                                shape = RoundedCornerShape(10.dp),
+                                tonalElevation = 6.dp,
+                                shadowElevation = 12.dp,
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .offset(x = (-180).dp) // “verso il centro”
+                            ) {
+                                Text(
+                                    text = hintText,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+
+                        SquareTile(
+                            size = tileSize,
+                            corner = corner,
+                            icon = modeIcon,
+                            tint = if (isContainerContext) WIZ_AZURE else Color(0xFF6B7280),
+                            enabled = isContainerContext,
+                            border = if (isContainerContext) BorderStroke(2.dp, WIZ_AZURE) else null,
+                            onClick = { if (isContainerContext) onCycleMode() } // non chiudo il menù
+                        )
+                    }
+                }
                 // 5) ingranaggio (stub)
                 AnimatedVisibility(
                     visible = show5,
