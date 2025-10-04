@@ -48,16 +48,16 @@ fun CanvasStage(
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(density) {
-                // scope.size è disponibile in questo receiver; lo uso dentro le lambda
-                val w get() = size.width.toFloat()
-                val h get() = size.height.toFloat()
-
                 detectTapGestures(
                     onTap = { ofs ->
+                        val w = size.width.toFloat()
+                        val h = size.height.toFloat()
                         val cell = computeCell(ofs, density, w, h)
                         hoverCell = cell
                     },
                     onLongPress = { ofs ->
+                        val w = size.width.toFloat()
+                        val h = size.height.toFloat()
                         val cell = computeCell(ofs, density, w, h)
                         if (firstAnchor == null) {
                             // 1° quadrato fissato
@@ -83,55 +83,53 @@ fun CanvasStage(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cols = density
-            // Celle quadrate: lato = min(w/h per numero colonne)
+            // lato cella: uso il min tra lato orizzontale/verticale
             val cell = min(size.width / cols, size.height / cols)
             val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
 
             // 1) Disegna elementi fino al currentLevel
             page?.items?.forEach { item ->
-                if (item.level <= currentLevel) {
-                    when (item) {
-                        is DrawItem.RectItem -> {
-                            val left = min(item.col0, item.col1) * cell
-                            val top = min(item.row0, item.row1) * cell
-                            val w = (abs(item.col1 - item.col0) + 1) * cell
-                            val h = (abs(item.row1 - item.row0) + 1) * cell
+                when (item) {
+                    is DrawItem.RectItem -> if (item.level <= currentLevel) {
+                        val left = min(item.col0, item.col1) * cell
+                        val top = min(item.row0, item.row1) * cell
+                        val w = (abs(item.col1 - item.col0) + 1) * cell
+                        val h = (abs(item.row1 - item.row0) + 1) * cell
 
-                            // Riempimento: bianco di default (come richiesto)
-                            drawRect(
-                                color = Color.White,
-                                topLeft = Offset(left, top),
-                                size = Size(w, h)
+                        // riempimento: bianco (default richiesto)
+                        drawRect(
+                            color = Color.White,
+                            topLeft = Offset(left, top),
+                            size = Size(w, h)
+                        )
+                        // bordo: converto Long -> Color
+                        val border = Color((item.borderColor and 0xFFFFFFFF).toInt())
+                        drawRect(
+                            color = border,
+                            topLeft = Offset(left, top),
+                            size = Size(w, h),
+                            style = Stroke(width = 1.dp.toPx())
+                        )
+                    }
+
+                    is DrawItem.LineItem -> if (item.level <= currentLevel) {
+                        val azure = Color(0xFF58A6FF)
+                        if (item.horizontal) {
+                            val y = (item.row + 0.5f) * cell
+                            drawLine(
+                                color = azure,
+                                start = Offset(0f, y),
+                                end = Offset(cols * cell, y),
+                                strokeWidth = 1.dp.toPx()
                             )
-                            // Bordo: usa borderColor (Long) -> Color
-                            val border = Color(item.borderColor.toULong())
-                            drawRect(
-                                color = border,
-                                topLeft = Offset(left, top),
-                                size = Size(w, h),
-                                style = Stroke(width = 1.dp.toPx())
+                        } else {
+                            val x = (item.col + 0.5f) * cell
+                            drawLine(
+                                color = azure,
+                                start = Offset(x, 0f),
+                                end = Offset(x, rows * cell),
+                                strokeWidth = 1.dp.toPx()
                             )
-                        }
-                        is DrawItem.LineItem -> {
-                            // Rendering basilare della linea (orizzontale/verticale) centrata nella cella di (row,col)
-                            val azure = Color(0xFF58A6FF)
-                            if (item.horizontal) {
-                                val y = (item.row + 0.5f) * cell
-                                drawLine(
-                                    color = azure,
-                                    start = Offset(0f, y),
-                                    end = Offset(cols * cell, y),
-                                    strokeWidth = 1.dp.toPx()
-                                )
-                            } else {
-                                val x = (item.col + 0.5f) * cell
-                                drawLine(
-                                    color = azure,
-                                    start = Offset(x, 0f),
-                                    end = Offset(x, rows * cell),
-                                    strokeWidth = 1.dp.toPx()
-                                )
-                            }
                         }
                     }
                 }
