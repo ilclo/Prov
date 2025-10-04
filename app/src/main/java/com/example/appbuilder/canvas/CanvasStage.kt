@@ -29,6 +29,8 @@ import kotlin.math.min
  * @param creationEnabled  gate: consente il “modo creazione contenitore” solo quando abilitato
  * @param onAddItem        callback per aggiungere un nuovo elemento creato dall’utente
  */
+
+
 @Composable
 fun CanvasStage(
     page: PageState?,
@@ -39,461 +41,235 @@ fun CanvasStage(
     creationEnabled: Boolean = true,
     onAddItem: (DrawItem) -> Unit
 ) {
-    // ====== Stati interni ======
-    var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }      // evidenziazione singola cella (tap corto)
-    var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }    // primo estremo (long press)
-    // Tool per rettangoli
-    enum class RectTool { Point, Grab, Resize }
-    var activeRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
-    var currentTool by remember { mutableStateOf<RectTool?>(null) }
-    var showRectMenu by remember { mutableStateOf(false) }
-    var showColorPicker by remember { mutableStateOf(false) }
+    // Evidenziazione singola cella (tap)
+    var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Primo estremo selezionato (long press)
+    var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
-    // Decisione linea → dialogo
-    data class LineCtx(
-        val line: DrawItem.LineItem,
-        val overlapped: List<DrawItem.RectItem>,
-        val splitCandidates: List<DrawItem.RectItem>,
-        val maxOverLevel: Int,
-        val horizontal: Boolean
-    )
-    var pendingLineCtx by remember { mutableStateOf<LineCtx?>(null) }
+    val cols = max(1, gridDensity)
 
-    // Colore accento (azzurro già usato)
-    val Azure = Color(0xFF58A6FF)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(cols, creationEnabled) {
+                detectTapGestures(
+                    onTap = { ofs ->
+                        if (!creationEnabled) return@detectTapGestures
+                        val cell = computeCell(
+                            ofs, cols,
+                            this.size.width.toFloat(), this.size.height.toFloat()
+                        )
+                        hoverCell = cell
+                    },
+                    onLongPress = { ofs ->
+                        if (!creationEnabled) return@detectTapGestures
+                        val (r, c) = computeCell(
+                            ofs, cols,
+                            this.size.width.toFloat(), this.size.height.toFloat()
+                        )
 
-    // ====== Layout con misure per overlay (BoxWithConstraints) ======
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val cols = max(1, gridDensity)
-        val cellDp = (min(maxWidth, maxHeight) / cols.toFloat())
-        val density = LocalDensity.current
+                        if (firstAnchor == null) {
+                            firstAnchor = r to c
+                        } else {
+                            val (r0, c0) = firstAnchor!!
+                            val rr0 = min(r0, r)
+                            val rr1 = max(r0, r)
+                            val cc0 = min(c0, c)
+                            val cc1 = max(c0, c)
 
-        // ====== Interazione: Tap / Long‑press ======
-        // Nota: blocco totale creazione quando attivo uno strumento sul rettangolo
-        val creationGate = creationEnabled && (currentTool == null)
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(cols, creationGate, currentTool) {
-                    detectTapGestures(
-                        onTap = { ofs ->
-                            if (!creationGate) return@detectTapGestures
-                            val cell = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-                            hoverCell = cell
-                        },
-                        onLongPress = { ofs ->
-                            val (r, c) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-
-                            // 1) Tool attivi per un rettangolo
-                            activeRect?.let { rect ->
-                                when (currentTool) {
-                                    RectTool.Grab -> {
-                                        // Sposta mantenendo le dimensioni
-                                        val w = abs(rect.c1 - rect.c0)
-                                        val h = abs(rect.r1 - rect.r0)
-                                        val rows = floor(this.size.height.toFloat() / (min(this.size.width, this.size.height).toFloat() / cols)).toInt()
-                                        val newC0 = c.coerceIn(0, (cols - 1 - w).coerceAtLeast(0))
-                                        val newR0 = r.coerceIn(0, (rows - 1 - h).coerceAtLeast(0))
-                                        rect.c0 = newC0; rect.c1 = newC0 + w
-                                        rect.r0 = newR0; rect.r1 = newR0 + h
-
-                                        // Se si sovrappone a pari livello → porta sopra
-                                        val overlapped = page?.items
-                                            ?.filterIsInstance<DrawItem.RectItem>()
-                                            ?.filter { other ->
-                                                other !== rect &&
-                                                other.level == rect.level &&
-                                                !(rect.c1 < min(other.c0, other.c1) || rect.c0 > max(other.c0, other.c1) ||
-                                                  rect.r1 < min(other.r0, other.r1) || rect.r0 > max(other.r0, other.r1))
-                                            }
-                                            .orEmpty()
-                                        if (overlapped.isNotEmpty()) {
-                                            val topLevel = overlapped.maxOf { it.level }
-                                            rect.level = topLevel + 1
-                                        }
-                                        return@detectTapGestures
-                                    }
-                                    RectTool.Resize -> {
-                                        // Ridimensiona: angolo fisso = opposto rispetto al punto premuto
-                                        val midR = (rect.r0 + rect.r1) / 2f
-                                        val midC = (rect.c0 + rect.c1) / 2f
-                                        val anchorR = if (r < midR) max(rect.r0, rect.r1) else min(rect.r0, rect.r1)
-                                        val anchorC = if (c < midC) max(rect.c0, rect.c1) else min(rect.c0, rect.c1)
-                                        rect.r0 = min(anchorR, r); rect.r1 = max(anchorR, r)
-                                        rect.c0 = min(anchorC, c); rect.c1 = max(anchorC, c)
-                                        return@detectTapGestures
-                                    }
-                                    RectTool.Point -> {
-                                        // Point: proprietà (solo colore) → nessuna azione sul long‑press
-                                        return@detectTapGestures
-                                    }
-                                    null -> { /* non attivo tool → proseguo con creazione contenitori/linee */ }
-                                }
-                            }
-
-                            // 2) Creazione contenitori / linee
-                            if (!creationGate) return@detectTapGestures
-
-                            if (firstAnchor == null) {
-                                // Fissa il primo quadrato
-                                firstAnchor = r to c
-                            } else {
-                                val (r0, c0) = firstAnchor!!
-                                val rr0 = min(r0, r)
-                                val rr1 = max(r0, r)
-                                val cc0 = min(c0, c)
-                                val cc1 = max(c0, c)
-
-                                if (r0 == r || c0 == c) {
-                                    // === LINEA ===
-                                    val horizontal = (r0 == r)
-                                    val line = if (horizontal) {
-                                        DrawItem.LineItem(
-                                            level = currentLevel,
-                                            r0 = r0, c0 = cc0, r1 = r0, c1 = cc1,
-                                            color = Azure,
-                                            width = 2.dp
-                                        )
-                                    } else {
-                                        DrawItem.LineItem(
-                                            level = currentLevel,
-                                            r0 = rr0, c0 = c0, r1 = rr1, c1 = c0,
-                                            color = Azure,
-                                            width = 2.dp
-                                        )
-                                    }
-
-                                    // Calcola rettangoli incrociati e split candidates
-                                    val rects = page?.items?.filterIsInstance<DrawItem.RectItem>().orEmpty()
-                                    val overlapped = rects.filter { rect ->
-                                        val R0 = min(rect.r0, rect.r1); val R1 = max(rect.r0, rect.r1)
-                                        val C0 = min(rect.c0, rect.c1); val C1 = max(rect.c0, rect.c1)
-                                        if (horizontal) {
-                                            (line.r0 in R0..R1) && !(line.c1 < C0 || line.c0 > C1)
-                                        } else {
-                                            (line.c0 in C0..C1) && !(line.r1 < R0 || line.r0 > R1)
-                                        }
-                                    }
-                                    val splitCandidates = overlapped.filter { rect ->
-                                        if (horizontal) crossesInsideHoriz(line.r0, min(line.c0, line.c1), max(line.c0, line.c1), rect)
-                                        else            crossesInsideVert(line.c0, min(line.r0, line.r1), max(line.r0, line.r1), rect)
-                                    }
-                                    val maxOverLevel = overlapped.maxOfOrNull { it.level } ?: currentLevel
-
-                                    if (splitCandidates.isEmpty()) {
-                                        // nessuno split → linea sopra a tutto ciò che incrocia
-                                        line.level = maxOverLevel + 1
-                                        onAddItem(line)
-                                    } else {
-                                        // chiedo se splittare
-                                        pendingLineCtx = LineCtx(line, overlapped, splitCandidates, maxOverLevel, horizontal)
-                                    }
-                                } else {
-                                    // === RETTANGOLO ===
-                                    val rect = DrawItem.RectItem(
+                            if (r0 == r || c0 == c) {
+                                // ===== LINEA (stessa riga o stessa colonna) =====
+                                val line = if (r0 == r) {
+                                    // Orizzontale: unisce i lati interni (più vicini al centro)
+                                    DrawItem.LineItem(
                                         level = currentLevel,
-                                        r0 = rr0, c0 = cc0,
-                                        r1 = rr1, c1 = cc1,
-                                        borderColor = Color.Black,
-                                        borderWidth = 1.dp,
-                                        fillColor = Color.White
+                                        r0 = r0, c0 = cc0,
+                                        r1 = r0, c1 = cc1,
+                                        color = Color(0xFF58A6FF),
+                                        width = 2.dp
                                     )
-                                    onAddItem(rect)
+                                } else {
+                                    // Verticale: unisce i lati interni (più vicini al centro)
+                                    DrawItem.LineItem(
+                                        level = currentLevel,
+                                        r0 = rr0, c0 = c0,
+                                        r1 = rr1, c1 = c0,
+                                        color = Color(0xFF58A6FF),
+                                        width = 2.dp
+                                    )
                                 }
-                                firstAnchor = null
-                            }
-                        }
-                    )
-                }
-        ) {
-            // ====== Disegno ======
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                // (1) Fondo pagina bianco se page!=null
-                if (page != null) {
-                    drawRect(color = Color.White, topLeft = Offset.Zero, size = size)
-                }
 
-                val colsN = cols
-                val cell = min(size.width / colsN, size.height / colsN)
-                val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
+                                // Valuta incroci: se non ci sono split → linea sopra a tutto ciò che incrocia
+                                val rects = page?.items?.filterIsInstance<DrawItem.RectItem>().orEmpty()
+                                val overlapped = rects.filter { rect ->
+                                    val R0 = min(rect.r0, rect.r1); val R1 = max(rect.r0, rect.r1)
+                                    val C0 = min(rect.c0, rect.c1); val C1 = max(rect.c0, rect.c1)
+                                    if (r0 == r) {
+                                        (line.r0 in R0..R1) && !(line.c1 < C0 || line.c0 > C1)
+                                    } else {
+                                        (line.c0 in C0..C1) && !(line.r1 < R0 || line.r0 > R1)
+                                    }
+                                }
+                                val splitCandidates = overlapped.filter { rect ->
+                                    if (r0 == r) crossesInsideHoriz(line.r0, min(line.c0,line.c1), max(line.c0,line.c1), rect)
+                                    else         crossesInsideVert(line.c0, min(line.r0,line.r1), max(line.r0,line.r1), rect)
+                                }
+                                val maxOverLevel = overlapped.maxOfOrNull { it.level } ?: currentLevel
 
-                // (2) Elementi esistenti fino al currentLevel
-                page?.items?.forEach { item ->
-                    if (item.level <= currentLevel) {
-                        when (item) {
-                            is DrawItem.RectItem -> {
-                                val left = min(item.c0, item.c1) * cell
-                                val top  = min(item.r0, item.r1) * cell
-                                val w = (abs(item.c1 - item.c0) + 1) * cell
-                                val h = (abs(item.r1 - item.r0) + 1) * cell
-                                // riempimento
-                                drawRect(
-                                    color = item.fillColor,
-                                    topLeft = Offset(left, top),
-                                    size = Size(w, h)
+                                if (splitCandidates.isEmpty()) {
+                                    // Nessuno split → la linea va sopra a ciò che incrocia
+                                    onAddItem(line.copy(level = maxOverLevel + 1))
+                                } else {
+                                    // Semplificazione: chiedere scelta (dialog in EditorKit o in uno step successivo).
+                                    // Per ora: crea split e poi aggiungi la linea sopra.
+                                    splitCandidates.forEach { rect ->
+                                        page?.items?.remove(rect)
+                                        val parts = if (r0 == r) splitRectHoriz(line.r0, rect)
+                                                    else           splitRectVert(line.c0, rect)
+                                        page?.items?.addAll(parts)
+                                    }
+                                    val newLevel = (page?.items?.maxOfOrNull { it.level } ?: currentLevel) + 1
+                                    onAddItem(line.copy(level = newLevel))
+                                }
+                            } else {
+                                // ===== RETTANGOLO =====
+                                val rect = DrawItem.RectItem(
+                                    level = currentLevel,
+                                    r0 = rr0, c0 = cc0,
+                                    r1 = rr1, c1 = cc1,
+                                    borderColor = Color.Black,
+                                    borderWidth = 1.dp,
+                                    fillColor = Color.White
                                 )
-                                // bordo
-                                drawRect(
-                                    color = item.borderColor,
-                                    topLeft = Offset(left, top),
-                                    size = Size(w, h),
-                                    style = Stroke(width = item.borderWidth.toPx())
-                                )
+                                onAddItem(rect)
                             }
-                            is DrawItem.LineItem -> {
-                                val x0 = (item.c0 + 0.5f) * cell
-                                val y0 = (item.r0 + 0.5f) * cell
-                                val x1 = (item.c1 + 0.5f) * cell
-                                val y1 = (item.r1 + 0.5f) * cell
-                                drawLine(
-                                    color = item.color,
-                                    start = Offset(x0, y0),
-                                    end = Offset(x1, y1),
-                                    strokeWidth = item.width.toPx()
-                                )
-                            }
+                            firstAnchor = null
                         }
-                    }
-                }
-
-                // (3) Overlay griglia
-                if (gridPreviewOnly) {
-                    // solo il primo quadretto in alto‑sx
-                    if (rows > 0 && colsN > 0) {
-                        drawRect(
-                            color = Azure.copy(alpha = 0.20f),
-                            topLeft = Offset(0f, 0f),
-                            size = Size(cell, cell)
-                        )
-                        drawRect(
-                            color = Azure,
-                            topLeft = Offset(0f, 0f),
-                            size = Size(cell, cell),
-                            style = Stroke(width = 1.5.dp.toPx())
-                        )
-                    }
-                } else if (showFullGrid) {
-                    for (c in 0..colsN) {
-                        val x = c * cell
-                        drawLine(
-                            color = Azure.copy(alpha = 0.30f),
-                            start = Offset(x, 0f),
-                            end = Offset(x, rows * cell),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                    }
-                    for (r in 0..rows) {
-                        val y = r * cell
-                        drawLine(
-                            color = Azure.copy(alpha = 0.30f),
-                            start = Offset(0f, y),
-                            end = Offset(colsN * cell, y),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                    }
-                }
-
-                // (4) Evidenziazione hover (tap singolo) — solo se non in tool mode
-                if (creationGate) {
-                    hoverCell?.let { (rr, cc) ->
-                        if (rr in 0 until rows && cc in 0 until colsN) {
-                            drawRect(
-                                color = Azure.copy(alpha = 0.18f),
-                                topLeft = Offset(cc * cell, rr * cell),
-                                size = Size(cell, cell)
-                            )
-                            drawRect(
-                                color = Azure,
-                                topLeft = Offset(cc * cell, rr * cell),
-                                size = Size(cell, cell),
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-                        }
-                    }
-                }
-
-                // (5) Riga/colonna del primo ancoraggio (dopo primo long‑press)
-                firstAnchor?.let { (rr, cc) ->
-                    if (rr in 0 until rows && cc in 0 until colsN) {
-                        // colonna
-                        drawRect(
-                            color = Azure.copy(alpha = 0.10f),
-                            topLeft = Offset(cc * cell, 0f),
-                            size = Size(cell, rows * cell)
-                        )
-                        // riga
-                        drawRect(
-                            color = Azure.copy(alpha = 0.10f),
-                            topLeft = Offset(0f, rr * cell),
-                            size = Size(colsN * cell, cell)
-                        )
-                        // cella più marcata
-                        drawRect(
-                            color = Azure.copy(alpha = 0.22f),
-                            topLeft = Offset(cc * cell, rr * cell),
-                            size = Size(cell, cell)
-                        )
-                        drawRect(
-                            color = Azure,
-                            topLeft = Offset(cc * cell, rr * cell),
-                            size = Size(cell, cell),
-                            style = Stroke(width = 1.5.dp.toPx())
-                        )
-                    }
-                }
-            }
-
-            // ====== Dialogo decisione linea (split / solo linea) ======
-            pendingLineCtx?.let { ctx ->
-                AlertDialog(
-                    onDismissRequest = { pendingLineCtx = null },
-                    title = { Text("Linea e contenitori") },
-                    text = {
-                        Text("La linea attraversa uno o più contenitori. Vuoi creare nuovi rettangoli dove li divide?")
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            // Split rettangoli attraversati
-                            ctx.splitCandidates.forEach { rect ->
-                                page?.items?.remove(rect)
-                                val parts = if (ctx.horizontal) splitRectHoriz(ctx.line.r0, rect)
-                                            else                  splitRectVert(ctx.line.c0, rect)
-                                page?.items?.addAll(parts)
-                            }
-                            // Aggiungo la linea sopra (feedback visivo)
-                            ctx.line.level = (page?.items?.maxOfOrNull { it.level } ?: currentLevel) + 1
-                            onAddItem(ctx.line)
-                            pendingLineCtx = null
-                        }) { Text("Sì, crea") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = {
-                            // Solo linea sopra a ciò che incrocia
-                            ctx.line.level = ctx.maxOverLevel + 1
-                            onAddItem(ctx.line)
-                            pendingLineCtx = null
-                        }) { Text("No, solo linea") }
                     }
                 )
             }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val cell = min(size.width / cols, size.height / cols)
+            val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
 
-            // ====== Overlay manina + menu strumenti + picker colore ======
-            page?.items?.filterIsInstance<DrawItem.RectItem>()?.forEach { rect ->
-                val r0 = min(rect.r0, rect.r1)
-                val c0 = min(rect.c0, rect.c1)
-                val wCells = abs(rect.c1 - rect.c0) + 1
-                val hCells = abs(rect.r1 - rect.r0) + 1
+            // (0) Fondo pagina bianco
+            if (page != null) {
+                drawRect(color = Color.White, topLeft = Offset.Zero, size = size)
+            }
 
-                val iconSize = (min(wCells, hCells) * cellDp * 0.25f).coerceIn(16.dp, 28.dp)
-                val x = c0 * cellDp
-                val y = r0 * cellDp
+            // (1) Elementi
+            page?.items?.forEach { item ->
+                if (item.level <= currentLevel) {
+                    when (item) {
+                        is DrawItem.RectItem -> {
+                            val left = min(item.c0, item.c1) * cell
+                            val top  = min(item.r0, item.r1) * cell
+                            val w = (abs(item.c1 - item.c0) + 1) * cell
+                            val h = (abs(item.r1 - item.r0) + 1) * cell
+                            // riempimento
+                            drawRect(color = item.fillColor, topLeft = Offset(left, top), size = Size(w, h))
+                            // bordo
+                            drawRect(
+                                color = item.borderColor,
+                                topLeft = Offset(left, top),
+                                size = Size(w, h),
+                                style = Stroke(width = item.borderWidth.toPx())
+                            )
+                        }
+                        is DrawItem.LineItem -> {
+                            val x0 = (item.c0 + 0.5f) * cell
+                            val y0 = (item.r0 + 0.5f) * cell
+                            val x1 = (item.c1 + 0.5f) * cell
+                            val y1 = (item.r1 + 0.5f) * cell
+                            drawLine(
+                                color = item.color,
+                                start = Offset(x0, y0),
+                                end   = Offset(x1, y1),
+                                strokeWidth = item.width.toPx()
+                            )
+                        }
+                    }
+                }
+            }
 
-                // Manina: tap → colore; long‑press → menu strumenti
-                IconButton(
-                    onClick = {
-                        activeRect = rect
-                        currentTool = RectTool.Point
-                        showColorPicker = true
-                        showRectMenu = false
-                    },
-                    modifier = Modifier
-                        .offset(x, y)
-                        .size(iconSize)
-                        .combinedClickable(
-                            onClick = {
-                                activeRect = rect
-                                currentTool = RectTool.Point
-                                showColorPicker = true
-                                showRectMenu = false
-                            },
-                            onLongClick = {
-                                activeRect = rect
-                                showRectMenu = true
-                                showColorPicker = false
-                            }
-                        )
-                ) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Outlined.TouchApp,
-                        contentDescription = "Modifica contenitore",
-                        tint = Color.White
+            // (2) Griglia
+            if (gridPreviewOnly) {
+                if (rows > 0 && cols > 0) {
+                    drawRect(
+                        color = Color(0xFF58A6FF).copy(alpha = 0.20f),
+                        topLeft = Offset(0f, 0f),
+                        size = Size(cell, cell)
+                    )
+                    drawRect(
+                        color = Color(0xFF58A6FF),
+                        topLeft = Offset(0f, 0f),
+                        size = Size(cell, cell),
+                        style = Stroke(width = 1.5.dp.toPx())
                     )
                 }
-
-                // Mini menu strumenti (Point / Grab / Resize / X)
-                if (showRectMenu && activeRect === rect) {
-                    Surface(
-                        color = Color(0xFF0F141E),
-                        contentColor = Color.White,
-                        tonalElevation = 8.dp,
-                        shadowElevation = 8.dp,
-                        modifier = Modifier
-                            .offset(x + iconSize + 6.dp, y)
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            IconButton(onClick = {
-                                currentTool = RectTool.Point
-                                showColorPicker = true
-                                showRectMenu = false
-                            }) {
-                                Icon(Icons.Outlined.TouchApp, contentDescription = "Proprietà")
-                            }
-                            IconButton(onClick = {
-                                currentTool = RectTool.Grab
-                                showColorPicker = false
-                                showRectMenu = false
-                            }) {
-                                Icon(Icons.Outlined.OpenWith, contentDescription = "Sposta")
-                            }
-                            IconButton(onClick = {
-                                currentTool = RectTool.Resize
-                                showColorPicker = false
-                                showRectMenu = false
-                            }) {
-                                Icon(Icons.Outlined.AspectRatio, contentDescription = "Ridimensiona")
-                            }
-                            IconButton(onClick = {
-                                currentTool = null
-                                activeRect = null
-                                showColorPicker = false
-                                showRectMenu = false
-                            }) {
-                                Icon(Icons.Outlined.Close, contentDescription = "Chiudi")
-                            }
-                        }
-                    }
+            } else if (showFullGrid) {
+                for (c in 0..cols) {
+                    val x = c * cell
+                    drawLine(
+                        color = Color(0xFF58A6FF).copy(alpha = 0.30f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, rows * cell),
+                        strokeWidth = 1.dp.toPx()
+                    )
                 }
+                for (r in 0..rows) {
+                    val y = r * cell
+                    drawLine(
+                        color = Color(0xFF58A6FF).copy(alpha = 0.30f),
+                        start = Offset(0f, y),
+                        end = Offset(cols * cell, y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+            }
 
-                // Mini picker colore (solo bordo)
-                if (showColorPicker && activeRect === rect) {
-                    val swatches = listOf(Color.Black, Azure, Color.Red, Color.Green, Color.White)
-                    Surface(
-                        color = Color(0xFF0F141E),
-                        contentColor = Color.White,
-                        tonalElevation = 8.dp,
-                        shadowElevation = 8.dp,
-                        modifier = Modifier
-                            .offset(x, y + iconSize + 6.dp)
-                    ) {
-                        Row(
-                            Modifier.padding(6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            swatches.forEach { col ->
-                                Box(
-                                    Modifier
-                                        .size(22.dp)
-                                        .background(col, shape = CircleShape)
-                                        .border(1.dp, Color(0x66FFFFFF), CircleShape)
-                                        .combinedClickable(onClick = { rect.borderColor = col })
-                                )
-                            }
-                        }
-                    }
+            // (3) Hover cell
+            hoverCell?.let { (rr, cc) ->
+                if (rr in 0 until rows && cc in 0 until cols) {
+                    drawRect(
+                        color = Color(0xFF58A6FF).copy(alpha = 0.18f),
+                        topLeft = Offset(cc * cell, rr * cell),
+                        size = Size(cell, cell)
+                    )
+                    drawRect(
+                        color = Color(0xFF58A6FF),
+                        topLeft = Offset(cc * cell, rr * cell),
+                        size = Size(cell, cell),
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                }
+            }
+
+            // (4) Riga/colonna del primo ancoraggio
+            firstAnchor?.let { (rr, cc) ->
+                if (rr in 0 until rows && cc in 0 until cols) {
+                    drawRect(
+                        color = Color(0xFF58A6FF).copy(alpha = 0.10f),
+                        topLeft = Offset(cc * cell, 0f),
+                        size = Size(cell, rows * cell)
+                    )
+                    drawRect(
+                        color = Color(0xFF58A6FF).copy(alpha = 0.10f),
+                        topLeft = Offset(0f, rr * cell),
+                        size = Size(cols * cell, cell)
+                    )
+                    drawRect(
+                        color = Color(0xFF58A6FF).copy(alpha = 0.22f),
+                        topLeft = Offset(cc * cell, rr * cell),
+                        size = Size(cell, cell)
+                    )
+                    drawRect(
+                        color = Color(0xFF58A6FF),
+                        topLeft = Offset(cc * cell, rr * cell),
+                        size = Size(cell, cell),
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
                 }
             }
         }
