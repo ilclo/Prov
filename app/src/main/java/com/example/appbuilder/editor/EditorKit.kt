@@ -117,6 +117,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
+import kotlin.math.maxOf
 
 
 // Local per sapere ovunque se l’utente è free (true) o no
@@ -891,23 +892,24 @@ fun EditorMenusOnly(
                 onDismiss = { gridPanelOpen = false }
             )
             
-            // Overlay: Selettore livelli “slot machine”
+            // Deriva il range livelli dagli items e dal livello corrente
+            val minLvl = pageState?.items?.minOfOrNull { it.level } ?: 0
+            val maxFromItems = pageState?.items?.maxOfOrNull { it.level } ?: 0
+            val maxLvl = maxOf(maxFromItems, currentLevel)
+
             LevelPickerOverlay(
                 visible = levelPanelOpen,
                 current = currentLevel,
-                minLevel = pageState?.levels?.minOrNull() ?: 0,
-                maxLevel = pageState?.levels?.maxOrNull() ?: 0,
+                minLevel = minLvl,
+                maxLevel = maxLvl,
                 onPick = { lvl ->
                     currentLevel = lvl
                     levelPanelOpen = false
+                    // PageState è immutabile: usa copy per aggiornare il livello
                     pageState = pageState?.copy(currentLevel = lvl) ?: pageState
-                    pageState?.levels?.add(lvl)   // se non presente
                 },
                 onDismiss = { levelPanelOpen = false }
             )
-            
-            /* ⬆️⬆️ FIN QUI ⬆️⬆️ */
-            
             // 2) Toast informativo (in alto, scompare con fade)
             InfoToastCard(
                 visible = infoCardVisible && infoCard != null,
