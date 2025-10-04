@@ -362,18 +362,7 @@ fun EditorMenusOnly(
                     "Per uscire, riapri il deck a destra e tocca di nuovo '?'."
         }
     }
-    val deckItems = rememberSaveable(
-        saver = Saver(
-            save = { map: MutableMap<DeckRoot, MutableList<String>> ->
-                map.mapKeys { it.key.name }.mapValues { it.value.toList() }
-            },
-            restore = { saved: Map<String, List<String>> ->
-                mutableStateMapOf<DeckRoot, MutableList<String>>().apply {
-                    saved.forEach { (k, v) -> this[DeckRoot.valueOf(k)] = v.toMutableList() }
-                }
-            }
-        )
-    ) {
+    val deckItems = remember {
         mutableStateMapOf(
             DeckRoot.PAGINA        to mutableListOf("pg001"),
             DeckRoot.MENU_LATERALE to mutableListOf("ml001"),
@@ -381,31 +370,6 @@ fun EditorMenusOnly(
             DeckRoot.AVVISO        to mutableListOf("al001")
         )
     }
-
-    // per pageState: salva solo i metadati essenziali
-    var pageState by rememberSaveable(
-        stateSaver = Saver<PageState?, Map<String, Any?>>(
-            save = { p ->
-                if (p == null) emptyMap()
-                else mapOf(
-                    "id" to p.id,
-                    "scroll" to p.scroll,
-                    "grid" to p.gridDensity,
-                    "level" to p.currentLevel
-                    // NB: gli items non li persistiamo in questo step
-                )
-            },
-            restore = { m ->
-                if (m.isEmpty()) null
-                else PageState(
-                    id = m["id"] as String,
-                    scroll = m["scroll"] as String,
-                    gridDensity = m["grid"] as Int,
-                    currentLevel = m["level"] as Int
-                )
-            }
-        )
-    ) { mutableStateOf<PageState?>(null) }
 
     fun openWizardFor(root: DeckRoot) {
         wizardTarget = root
@@ -645,7 +609,7 @@ fun EditorMenusOnly(
                     gridPreviewOnly = gridPanelOpen && gridIsDragging,
                     showFullGrid    = gridPanelOpen && showGridLines,
                     currentLevel    = currentLevel,
-                    creationEnabled = canCreateContainer,   //  ⟵  QUI
+                    creationEnabled = canCreateContainer,   // ⟵ questo evita la “modalità contenitore” quando non sei in root Contenitore
                     onAddItem       = { item -> pageState?.items?.add(item) }
                 )
             }
@@ -688,7 +652,7 @@ fun EditorMenusOnly(
                             openWizard = { root -> wizardTarget = root; wizardVisible = true }
                         ),
 
-                        LocalDeckItems provides deckItems.mapValues { (_, v) -> v.toList() }
+                        LocalDeckItems provides deckItems.mapValues { entry -> entry.value.toList() }
                     ) {
                         MainMenuBar(
                             onLayout = { menuPath = listOf("Layout") },
@@ -906,13 +870,14 @@ fun EditorMenusOnly(
                 infoEnabled = infoMode,
                 onToggleInfo = { infoMode = !infoMode },
                 enabled = menuPath.isEmpty(),
-                // <-- NUOVI: griglia e livelli
+                // nuovi:
                 gridEnabled = gridPanelOpen,
                 onToggleGrid = { gridPanelOpen = !gridPanelOpen },
                 levelEnabled = levelPanelOpen,
                 onToggleLevel = { levelPanelOpen = !levelPanelOpen },
                 currentLevel = currentLevel
             )
+
             /* ⬇️⬇️ INSERISCI QUI ⬇️⬇️ */
             
             // Overlay: Slider densità griglia (valori NON arbitrari)
@@ -935,7 +900,7 @@ fun EditorMenusOnly(
                 onPick = { lvl ->
                     currentLevel = lvl
                     levelPanelOpen = false
-                    pageState?.currentLevel = lvl
+                    pageState = pageState?.copy(currentLevel = lvl) ?: pageState
                     pageState?.levels?.add(lvl)   // se non presente
                 },
                 onDismiss = { levelPanelOpen = false }

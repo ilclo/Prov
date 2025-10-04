@@ -1,36 +1,34 @@
-// CanvasModel.kt
 package com.example.appbuilder.canvas
 
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 data class PageState(
     val id: String,
-    val scroll: String,         // "Nessuna" | "Verticale" | "Orizzontale"
-    var gridDensity: Int = 6,
-    var currentLevel: Int = 0,
-    val items: MutableList<DrawItem> = mutableStateListOf()
+    val scroll: String,          // "Nessuna" | "Verticale" | "Orizzontale"
+    val gridDensity: Int,
+    val currentLevel: Int,
+    val items: SnapshotStateList<DrawItem> = mutableStateListOf()
 )
 
-sealed interface DrawItem {
-    val level: Int
-
+sealed class DrawItem(open val level: Int) {
     data class RectItem(
         override val level: Int,
-        val row0: Int, val col0: Int,
-        val row1: Int, val col1: Int,
-        val borderColor: Long
-    ) : DrawItem
+        val r0: Int, val c0: Int,
+        val r1: Int, val c1: Int,
+        val borderColor: Color,
+        val borderWidth: Dp,
+        val fillColor: Color
+    ) : DrawItem(level)
 
-    /** Linea orizzontale o verticale espressa in coordinate di cella/“edge” interni */
     data class LineItem(
         override val level: Int,
-        val horizontal: Boolean,
-        val row: Int,            // se orizzontale, riga fissa
-        val col: Int,            // se verticale, colonna fissa
-        val x0Edge: Float,       // per orizzontali: da colonna-edge a colonna-edge
-        val x1Edge: Float,
-        val y0Edge: Float,       // per verticali: da riga-edge a riga-edge
-        val y1Edge: Float,
-        val thicknessDp: Float = 1f
-    ) : DrawItem
+        val r0: Int, val c0: Int,
+        val r1: Int, val c1: Int,
+        val color: Color,
+        val width: Dp = 1.dp
+    ) : DrawItem(level)
 }
