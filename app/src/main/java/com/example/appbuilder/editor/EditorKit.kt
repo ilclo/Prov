@@ -2894,7 +2894,9 @@ private fun BoxScope.InfoEdgeDeck(
     // larghezza animata
     val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
     val width by animateDpAsState(targetValue = targetWidth, animationSpec = tween(220), label = "sideWidth")
-
+    // --- all'inizio del Composable InfoEdgeDeck, dopo 'val width by animateDpAsState(...)' ---
+    var modeHintVisible by remember { mutableStateOf(false) }
+    var modeHintText by remember { mutableStateOf("") }    
     // visibilità a cascata
     var show1 by remember(open) { mutableStateOf(false) } // "?"
     var show2 by remember(open) { mutableStateOf(false) } // grid
@@ -3046,37 +3048,30 @@ private fun BoxScope.InfoEdgeDeck(
                     }
                 }
 
-                // --- (dentro la Column dei tile) ---
-                // 4) NUOVO — pulsante "modalità"
                 AnimatedVisibility(
                     visible = show4,
                     enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
-                    // icona in base alla modalità
                     val modeIcon: ImageVector = when (toolMode) {
                         com.example.appbuilder.canvas.ToolMode.Create -> Icons.Outlined.AddBox
                         com.example.appbuilder.canvas.ToolMode.Point  -> Icons.Outlined.TouchApp
                         com.example.appbuilder.canvas.ToolMode.Grab   -> Icons.Outlined.OpenWith
                         com.example.appbuilder.canvas.ToolMode.Resize -> Icons.Outlined.Crop
                     }
-
-                    // testo da mostrare per 2s al cambio modalità
-                    var hintVisible by remember { mutableStateOf(false) }
-                    var hintText by remember { mutableStateOf("") }
+                
                     LaunchedEffect(toolMode) {
-                        hintText = when (toolMode) {
+                        modeHintText = when (toolMode) {
                             com.example.appbuilder.canvas.ToolMode.Point  -> "configura contenitore"
                             com.example.appbuilder.canvas.ToolMode.Resize -> "ridimensiona contenitore"
                             com.example.appbuilder.canvas.ToolMode.Grab   -> "sposta contenitore"
                             com.example.appbuilder.canvas.ToolMode.Create -> "crea contenitore"
                         }
-                        hintVisible = true
+                        modeHintVisible = true
                         kotlinx.coroutines.delay(2000)
-                        hintVisible = false
+                        modeHintVisible = false
                     }
-
-                    // Solo il tile (il banner in alto è fuori dalla Column)
+                
                     SquareTile(
                         size = tileSize,
                         corner = corner,
@@ -3086,13 +3081,11 @@ private fun BoxScope.InfoEdgeDeck(
                         border = if (isContainerContext) BorderStroke(2.dp, WIZ_AZURE) else null,
                         onClick = { if (isContainerContext) onCycleMode() } // non chiudo il menù
                     )
-
-                    // ⬇️⬇️ Banner spostato in alto (fuori dalla Column, stesso Composable) ⬇️⬇️
                 }
-
-                // --- (ancora dentro InfoEdgeDeck, ma FUORI dalla Column dei tile) ---
+                
+                // --- FUORI dalla Column, ma dentro Box di InfoEdgeDeck ---
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = hintVisible,   // è lo stesso state definito sopra
+                    visible = modeHintVisible,
                     enter = fadeIn(tween(200)),
                     exit  = fadeOut(tween(200)),
                     modifier = Modifier
@@ -3107,7 +3100,7 @@ private fun BoxScope.InfoEdgeDeck(
                         shadowElevation = 12.dp
                     ) {
                         Text(
-                            text = hintText,
+                            text = modeHintText,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             fontSize = 12.sp
                         )
