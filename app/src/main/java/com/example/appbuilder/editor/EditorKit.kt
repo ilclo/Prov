@@ -1,5 +1,6 @@
 package com.example.appbuilder.editor
 
+import androidx.compose.runtime.derivedStateOf 
 import com.example.appbuilder.overlay.GridSliderOverlay
 import com.example.appbuilder.overlay.LevelPickerOverlay
 import androidx.compose.animation.AnimatedVisibility
@@ -330,7 +331,19 @@ fun EditorMenusOnly(
             showGridLines = false
         }
     }
-
+    val canCreateContainer by remember(
+        classicEditing, editingClass, menuPath,
+        infoMode, wizardVisible, gridPanelOpen, levelPanelOpen
+    ) {
+        derivedStateOf {
+            classicEditing &&
+            editingClass == DeckRoot.PAGINA &&
+            menuPath.size == 1 &&
+            menuPath.firstOrNull() == "Contenitore" &&
+            !infoMode && !wizardVisible &&
+            !gridPanelOpen && !levelPanelOpen
+        }
+    }
 // Auto-hide del pannello descrittivo (5s)
     LaunchedEffect(infoCard) {
         if (infoCard != null) {
@@ -349,14 +362,50 @@ fun EditorMenusOnly(
                     "Per uscire, riapri il deck a destra e tocca di nuovo '?'."
         }
     }
-    val deckItems = remember {
+    val deckItems = rememberSaveable(
+        saver = Saver(
+            save = { map: MutableMap<DeckRoot, MutableList<String>> ->
+                map.mapKeys { it.key.name }.mapValues { it.value.toList() }
+            },
+            restore = { saved: Map<String, List<String>> ->
+                mutableStateMapOf<DeckRoot, MutableList<String>>().apply {
+                    saved.forEach { (k, v) -> this[DeckRoot.valueOf(k)] = v.toMutableList() }
+                }
+            }
+        )
+    ) {
         mutableStateMapOf(
-            DeckRoot.PAGINA        to mutableStateListOf("pg001"),
-            DeckRoot.MENU_LATERALE to mutableStateListOf("ml001"),
-            DeckRoot.MENU_CENTRALE to mutableStateListOf("mc001"),
-            DeckRoot.AVVISO        to mutableStateListOf("al001")
+            DeckRoot.PAGINA        to mutableListOf("pg001"),
+            DeckRoot.MENU_LATERALE to mutableListOf("ml001"),
+            DeckRoot.MENU_CENTRALE to mutableListOf("mc001"),
+            DeckRoot.AVVISO        to mutableListOf("al001")
         )
     }
+
+    // per pageState: salva solo i metadati essenziali
+    var pageState by rememberSaveable(
+        stateSaver = Saver<PageState?, Map<String, Any?>>(
+            save = { p ->
+                if (p == null) emptyMap()
+                else mapOf(
+                    "id" to p.id,
+                    "scroll" to p.scroll,
+                    "grid" to p.gridDensity,
+                    "level" to p.currentLevel
+                    // NB: gli items non li persistiamo in questo step
+                )
+            },
+            restore = { m ->
+                if (m.isEmpty()) null
+                else PageState(
+                    id = m["id"] as String,
+                    scroll = m["scroll"] as String,
+                    gridDensity = m["grid"] as Int,
+                    currentLevel = m["level"] as Int
+                )
+            }
+        )
+    ) { mutableStateOf<PageState?>(null) }
 
     fun openWizardFor(root: DeckRoot) {
         wizardTarget = root
@@ -593,12 +642,11 @@ fun EditorMenusOnly(
                 CanvasStage(
                     page            = pageState,
                     gridDensity     = pageState?.gridDensity ?: 6,
-                    gridPreviewOnly = gridPanelOpen && gridIsDragging,  // anteprima 1° quadretto
-                    showFullGrid    = gridPanelOpen && showGridLines,   // griglia completa dopo 0.5s
+                    gridPreviewOnly = gridPanelOpen && gridIsDragging,
+                    showFullGrid    = gridPanelOpen && showGridLines,
                     currentLevel    = currentLevel,
-                    onAddItem = { item ->
-                        pageState?.items?.add(item)
-                    }
+                    creationEnabled = canCreateContainer,   //  ⟵  QUI
+                    onAddItem       = { item -> pageState?.items?.add(item) }
                 )
             }
             var idError by remember { mutableStateOf(false) }
