@@ -362,6 +362,12 @@ fun EditorMenusOnly(
     val rectFillStyles = remember { 
         mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FillStyle>() 
     }
+    // Stili aggiuntivi per RectItem
+    val rectVariants = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.Variant>() }
+    val rectShapes   = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ShapeKind>() }
+    val rectCorners  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.CornerRadii>() }
+    val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FxKind>() }
+
 
     // overlay palette colore
     var colorPickerVisible by remember { mutableStateOf(false) }
@@ -393,46 +399,63 @@ fun EditorMenusOnly(
     var colorPickInitial by remember { mutableStateOf(Color.Black) }    
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
-    fun dpToKey(dp: androidx.compose.ui.unit.Dp): String {
-        val v = dp.value.toInt() // 0,1,2,3…
-        return "${v}dp"
-    }
+    fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
     fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
         val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 1f
         return n.dp
     }
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
-        // spessore bordo (già funzionante)
-        menuSelections[(listOf("Contenitore") + "b_thick").joinToString(" / ")] =
-            dpToKey(rect.borderWidth)
+        // spessore (già esistente)
+        menuSelections[(listOf("Contenitore") + "b_thick").joinToString(" / ")] = dpToKey(rect.borderWidth)
 
-        // colore bordo — usa un’unica chiave coerente
-        val bHex = colorToHex(rect.borderColor)
-        menuSelections[(listOf("Contenitore", "Bordi") + "Colore").joinToString(" / ")] = bHex
+        // variant
+        val v = when (rectVariants[rect] ?: com.example.appbuilder.canvas.Variant.Full) {
+            com.example.appbuilder.canvas.Variant.Full      -> "Full"
+            com.example.appbuilder.canvas.Variant.Outlined  -> "Outlined"
+            com.example.appbuilder.canvas.Variant.Text      -> "Text"
+            com.example.appbuilder.canvas.Variant.TopBottom -> "TopBottom"
+        }
+        menuSelections[(listOf("Contenitore") + "variant").joinToString(" / ")] = v
 
-        // colore principale (col1)
+        // shape
+        val s = when (rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect) {
+            com.example.appbuilder.canvas.ShapeKind.Rect    -> "Rettangolo"
+            com.example.appbuilder.canvas.ShapeKind.Circle  -> "Cerchio"
+            com.example.appbuilder.canvas.ShapeKind.Pill    -> "Pillola"
+            com.example.appbuilder.canvas.ShapeKind.Diamond -> "Diamante"
+        }
+        menuSelections[(listOf("Contenitore") + "shape").joinToString(" / ")] = s
+
+        // angoli
+        val c = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
+        menuSelections[(listOf("Contenitore") + "ic_as").joinToString(" / ")] = dpToKey(c.asTL)
+        menuSelections[(listOf("Contenitore") + "ic_ad").joinToString(" / ")] = dpToKey(c.adTR)
+        menuSelections[(listOf("Contenitore") + "ic_bs").joinToString(" / ")] = dpToKey(c.bsBL)
+        menuSelections[(listOf("Contenitore") + "ic_bd").joinToString(" / ")] = dpToKey(c.bdBR)
+
+        // colore corpo (col1) / col2 / grad (rimasti come nelle tue versioni)
         val col1 = rectFillStyles[rect]?.col1 ?: rect.fillColor
-        menuSelections[(listOf("Contenitore", "Colore") + "col1").joinToString(" / ")] =
-            colorToHex(col1)
-
-        // secondo colore e gradiente (solo se esistono)
-        rectFillStyles[rect]?.let { fs ->
-            fs.col2?.let { c2 ->
-                menuSelections[(listOf("Contenitore", "Colore") + "col2").joinToString(" / ")] =
-                    colorToHex(c2)
-            }
-            val gLabel = when (fs.dir) {
+        menuSelections[(listOf("Contenitore","Colore") + "col1").joinToString(" / ")] = colorToHex(col1)
+        rectFillStyles[rect]?.col2?.let { c2 ->
+            menuSelections[(listOf("Contenitore","Colore") + "col2").joinToString(" / ")] = colorToHex(c2)
+        }
+        menuSelections[(listOf("Contenitore","Colore") + "grad").joinToString(" / ")] =
+            when (rectFillStyles[rect]?.dir ?: com.example.appbuilder.canvas.GradientDir.Monocolore) {
                 com.example.appbuilder.canvas.GradientDir.Monocolore -> "Monocolore"
                 com.example.appbuilder.canvas.GradientDir.Orizzontale -> "Orizzontale"
                 com.example.appbuilder.canvas.GradientDir.Verticale   -> "Verticale"
                 com.example.appbuilder.canvas.GradientDir.DiagTL_BR   -> "Diag TL→BR"
                 com.example.appbuilder.canvas.GradientDir.DiagTR_BL   -> "Diag TR→BL"
             }
-            menuSelections[(listOf("Contenitore", "Colore") + "grad").joinToString(" / ")] = gLabel
-        } ?: run {
-            // fallback per contenitori senza gradienti
-            menuSelections[(listOf("Contenitore", "Colore") + "grad").joinToString(" / ")] = "Monocolore"
+
+        // FX
+        val fx = when (rectFx[rect] ?: com.example.appbuilder.canvas.FxKind.None) {
+            com.example.appbuilder.canvas.FxKind.None       -> "Nessuno"
+            com.example.appbuilder.canvas.FxKind.Vignette   -> "Vignettatura"
+            com.example.appbuilder.canvas.FxKind.Noise      -> "Noise"
+            com.example.appbuilder.canvas.FxKind.Stripes    -> "Strisce"
         }
+        menuSelections[(listOf("Contenitore","Colore") + "fx").joinToString(" / ")] = fx
     }
 
 
@@ -463,8 +486,7 @@ fun EditorMenusOnly(
         derivedStateOf {
             classicEditing &&
             editingClass == DeckRoot.PAGINA &&
-            menuPath.size == 1 &&
-            menuPath.firstOrNull() == "Contenitore" &&
+            menuPath.firstOrNull() == "Contenitore" &&   // ← basta essere “dentro Contenitore”
             !infoMode && !wizardVisible &&
             !gridPanelOpen && !levelPanelOpen
         }
@@ -473,7 +495,7 @@ fun EditorMenusOnly(
         derivedStateOf {
             classicEditing &&
             editingClass == DeckRoot.PAGINA &&
-            menuPath.firstOrNull() == "Contenitore"   //  ← profondità qualsiasi
+            menuPath.firstOrNull() == "Contenitore"
         }
     }
 
@@ -616,6 +638,10 @@ fun EditorMenusOnly(
                 k("Contenitore","Aggiungi album","fit") to "Cover",
                 k("Contenitore","Aggiungi album","anim") to "Slide",
                 k("Contenitore","Aggiungi album","speed") to "Media",
+                k("Contenitore","ic_as") to "0dp",
+                k("Contenitore","ic_ad") to "0dp",
+                k("Contenitore","ic_bs") to "0dp",
+                k("Contenitore","ic_bd") to "0dp",
             )
             "Layout" -> listOf(
                 k("Layout","Colore","col1") to "Bianco",
@@ -780,6 +806,11 @@ fun EditorMenusOnly(
                     toolMode        = toolMode,
                     selected        = selectedRect,
                     onAddItem       = { item -> pageState?.items?.add(item) },
+                    fillStyles = rectFillStyles,
+                    variants   = rectVariants,
+                    shapes     = rectShapes,
+                    corners    = rectCorners,
+                    fx         = rectFx,                    
                     onRequestEdit   = { rect -> 
                         selectedRect = rect
                         if (rect != null) {
@@ -790,6 +821,10 @@ fun EditorMenusOnly(
                     onUpdateItem = { old, updated ->
                         val items = pageState?.items ?: return@CanvasStage
                         val ix = items.indexOf(old)
+                        rectVariants[updated] = rectVariants.remove(old) ?: rectVariants[updated] ?: com.example.appbuilder.canvas.Variant.Full
+                        rectShapes[updated]   = rectShapes.remove(old)   ?: rectShapes[updated]   ?: com.example.appbuilder.canvas.ShapeKind.Rect
+                        rectCorners[updated]  = rectCorners.remove(old)  ?: rectCorners[updated]  ?: com.example.appbuilder.canvas.CornerRadii()
+                        rectFx[updated]       = rectFx.remove(old)       ?: rectFx[updated]       ?: com.example.appbuilder.canvas.FxKind.None
                         if (ix >= 0) {
                             items[ix] = updated
                             // trasferisci lo stile senza interrompere l'aggiornamento della selezione
@@ -1017,34 +1052,71 @@ fun EditorMenusOnly(
                             menuSelections[fullKey] = value
                             lastChanged = "$label: $value"
                             dirty = true
-                            // Se sto modificando un Contenitore → applica sul selezionato
-                            if ((menuPath.firstOrNull() ?: "") == "Contenitore" && label == "b_thick") {
+
+                            // Aggiornamenti mirati sui container
+                            if ((menuPath.firstOrNull() ?: "") == "Contenitore") {
                                 val rect = selectedRect
-                                if (rect != null) {
-                                    val newWidth = keyToDp(value)
-                                    pageState?.let { ps ->
-                                        val idx = ps.items.indexOf(rect)
-                                        if (idx >= 0) {
-                                            val updated = rect.copy(borderWidth = newWidth)
-                                            ps.items[idx] = updated
-                                            selectedRect = updated
+
+                                when (label) {
+                                    // Variant
+                                    "variant" -> {
+                                        rect?.let {
+                                            val v = when ((value as? String)?.lowercase()?.trim()) {
+                                                "full"       -> com.example.appbuilder.canvas.Variant.Full
+                                                "outlined"   -> com.example.appbuilder.canvas.Variant.Outlined
+                                                "text"       -> com.example.appbuilder.canvas.Variant.Text
+                                                "topbottom"  -> com.example.appbuilder.canvas.Variant.TopBottom
+                                                else         -> com.example.appbuilder.canvas.Variant.Full
+                                            }
+                                            rectVariants[it] = v
                                         }
                                     }
-                                }
-                            }
-                            if ((menuPath.firstOrNull() ?: "") == "Contenitore" && menuPath.getOrNull(1) == "Colore") {
-                                val rect = selectedRect
-                                if (rect != null && label == "grad") {
-                                    val dir = when ((value as? String)?.lowercase()?.trim()) {
-                                        "monocolore" -> com.example.appbuilder.canvas.GradientDir.Monocolore
-                                        "orizzontale" -> com.example.appbuilder.canvas.GradientDir.Orizzontale
-                                        "verticale"   -> com.example.appbuilder.canvas.GradientDir.Verticale
-                                        "diag tl→br", "diagonale alto-sx→basso-dx" -> com.example.appbuilder.canvas.GradientDir.DiagTL_BR
-                                        "diag tr→bl", "diagonale alto-dx→basso-sx" -> com.example.appbuilder.canvas.GradientDir.DiagTR_BL
-                                        else -> com.example.appbuilder.canvas.GradientDir.Monocolore
+
+                                    // Shape (blocco "cerchio" se non è quadrato)
+                                    "shape" -> {
+                                        rect?.let {
+                                            val rows = kotlin.math.abs(it.r1 - it.r0) + 1
+                                            val cols = kotlin.math.abs(it.c1 - it.c0) + 1
+                                            val isSquare = rows == cols
+                                            val s = when ((value as? String)?.lowercase()?.trim()) {
+                                                "cerchio"   -> if (isSquare) com.example.appbuilder.canvas.ShapeKind.Circle
+                                                            else { infoCard = "Forma non disponibile" to "Cerchio è selezionabile solo per contenitori quadrati."; com.example.appbuilder.canvas.ShapeKind.Rect }
+                                                "pillola"   -> com.example.appbuilder.canvas.ShapeKind.Pill
+                                                "diamante"  -> com.example.appbuilder.canvas.ShapeKind.Diamond
+                                                else        -> com.example.appbuilder.canvas.ShapeKind.Rect
+                                            }
+                                            rectShapes[it] = s
+                                        }
                                     }
-                                    val fs0 = rectFillStyles[rect] ?: com.example.appbuilder.canvas.FillStyle(col1 = rect.fillColor)
-                                    rectFillStyles[rect] = fs0.copy(dir = dir)
+
+                                    // Angoli singoli
+                                    "ic_as", "ic_ad", "ic_bs", "ic_bd" -> {
+                                        rect?.let {
+                                            val cur = rectCorners[it] ?: com.example.appbuilder.canvas.CornerRadii()
+                                            fun String.toDpSafe() = keyToDp(this)
+                                            val updated = when (label) {
+                                                "ic_as" -> cur.copy(asTL = (value as String).toDpSafe())
+                                                "ic_ad" -> cur.copy(adTR = (value as String).toDpSafe())
+                                                "ic_bs" -> cur.copy(bsBL = (value as String).toDpSafe())
+                                                else    -> cur.copy(bdBR = (value as String).toDpSafe())
+                                            }
+                                            rectCorners[it] = updated
+                                        }
+                                    }
+
+                                    // FX
+                                    "fx" -> {
+                                        rect?.let {
+                                            val f = when ((value as? String)?.lowercase()?.trim()) {
+                                                "vignettatura" -> com.example.appbuilder.canvas.FxKind.Vignette
+                                                "noise"        -> com.example.appbuilder.canvas.FxKind.Noise
+                                                "strisce"      -> com.example.appbuilder.canvas.FxKind.Stripes
+                                                "nessuno", "", null -> com.example.appbuilder.canvas.FxKind.None
+                                                else -> com.example.appbuilder.canvas.FxKind.None
+                                            }
+                                            rectFx[it] = f
+                                        }
+                                    }
                                 }
                             }
 
