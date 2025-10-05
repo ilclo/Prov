@@ -1,6 +1,5 @@
 package com.example.appbuilder.editor
 
-import com.example.appbuilder.canvas.DrawItem
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -630,38 +629,19 @@ fun EditorMenusOnly(
                     gridPreviewOnly = gridPanelOpen && gridIsDragging,
                     showFullGrid    = gridPanelOpen && showGridLines,
                     currentLevel    = currentLevel,
-                    creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
-
-                    // se la tua CanvasStage prevede anche toolMode, lascialo:
+                    creationEnabled = toolMode == ToolMode.Create && canCreateContainer,
                     toolMode        = toolMode,
-
-                    onAddItem = { item ->
-                        pageState?.items?.add(item)
-                    },
-
-                    // ⚠️ firma a 2 parametri: (old, updated)
-                    onUpdateItem = { old: DrawItem.RectItem, updated: DrawItem.RectItem ->
+                    onAddItem       = { item -> pageState?.items?.add(item) },
+                    onUpdateItem    = { updated ->
                         val items = pageState?.items ?: return@CanvasStage
-                        val ix = items.indexOf(old)
+                        val ix = items.indexOfFirst { it === updated }
                         if (ix >= 0) items[ix] = updated
                     },
-
-                    // ⚠️ firma nullable: (RectItem?)
-                    onRequestEdit = { rect: DrawItem.RectItem? ->
-                        // niente da fare se non c'è una selezione valida
-                        rect ?: return@CanvasStage
-
-                        // Apri il menù “Contenitore”
+                    onRequestEdit = { rect ->
+                        // Apri menù “Contenitore” con i valori del rettangolo selezionato
                         menuPath = listOf("Contenitore")
-
-                        // Allinea il selettore dello spessore bordo al valore del contenitore
-                        val value = "${rect.borderWidth.value.toInt()}dp"
-
-                        // Chiave “ufficiale” coerente con le tue keys: Contenitore / b_thick
-                        menuSelections[key(listOf("Contenitore"), "b_thick")] = value
-
-                        // Se nel livello usi anche l’etichetta “b_tick”, la tengo in sync
-                        menuSelections[key(listOf("Contenitore"), "b_tick")] = value
+                        // Esempio: pre‑seleziona lo spessore del bordo nel tuo modello
+                        menuSelections["Contenitore / Bordi / Spessore"] = "${rect.borderWidth.value.toInt()}dp"
                     }
                 )
             }

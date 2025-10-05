@@ -37,21 +37,7 @@ fun CanvasStage(
     // Stato "Create" (lasciato invariato)
     var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    // Stato per modalità "Resize"
-    var resizeTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
-    var resizeFixedCorner by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
-    // Uscendo da Create o disabilitando la creazione: pulisco highlight e qualsiasi resize pendente
-    LaunchedEffect(creationEnabled, toolMode) {
-        if (!creationEnabled || toolMode != ToolMode.Create) {
-            hoverCell = null
-            firstAnchor = null
-        }
-        if (toolMode != ToolMode.Resize) {
-            resizeTarget = null
-            resizeFixedCorner = null
-        }
-    }
     // Stato anteprima per Grab/Resize
     var movingRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }   // preview movimento
     var resizingRect by remember { mutableStateOf<DrawItem.RectItem?>(null) } // preview resize
@@ -134,31 +120,37 @@ fun CanvasStage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(cols, toolMode, creationEnabled) {
+
+            // --- TAP / LONG‑PRESS: Create (immutata) e Point ---
+            .pointerInput(cols, creationEnabled, toolMode) {
                 detectTapGestures(
                     onTap = { ofs ->
                         when (toolMode) {
                             ToolMode.Create -> {
-                                if (!creationEnabled) return@detectTapGestures
-                                hoverCell = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
+                                if (creationEnabled) {
+                                    hoverCell = computeCell(
+                                        ofs, cols,
+                                        this.size.width.toFloat(), this.size.height.toFloat()
+                                    )
+                                }
                             }
-                            // Nelle altre modalità non mostriamo i quadretti di hover
-                            ToolMode.Point, ToolMode.Grab, ToolMode.Resize -> Unit
+                            ToolMode.Point -> {
+                                val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
+                                onRequestEdit(topRectAtCell(rr, cc))
+                            }
+                            else -> Unit
                         }
                     },
                     onLongPress = { ofs ->
-                        val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-
                         when (toolMode) {
                             ToolMode.Create -> {
                                 if (!creationEnabled) return@detectTapGestures
+                                val cell = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
                                 if (firstAnchor == null) {
-                                    // 1° ancoraggio
-                                    firstAnchor = rr to cc
+                                    firstAnchor = cell
                                 } else {
-                                    // 2° ancoraggio → rettangolo o linea come già fai
                                     val (r0, c0) = firstAnchor!!
-                                    val r1 = rr; val c1 = cc
+                                    val (r1, c1) = cell
                                     firstAnchor = null
                                     if (r0 == r1 && c0 == c1) return@detectTapGestures
 
@@ -166,103 +158,78 @@ fun CanvasStage(
                                     val sameCol = (c0 == c1)
 
                                     if (sameRow || sameCol) {
-                                        // split solo se i due punti sono "da lato a lato" dello STESSO contenitore
+                                        val rr = r0.coerceAtLeast(0)
+                                        val cc = c0.coerceAtLeast(0)
                                         val rectA = topRectAtCell(r0, c0)
                                         val rectB = topRectAtCell(r1, c1)
                                         val rect = if (rectA != null && rectA == rectB) rectA else null
                                         if (rect != null) {
                                             val (R0, R1, C0, C1) = rectBounds(rect)
                                             if (sameRow) {
-                                                val ccMin = min(c0, c1); val ccMax = max(c0, c1)
-                                                val fullSpan = (ccMin == C0 && ccMax == C1 && r0 in R0..R1)
+                                                val ccMin = min(c0, c1)
+                                                val ccMax = max(c0, c1)
+                                                val fullSpan = (ccMin == C0 && ccMax == C1 && rr in R0..R1)
                                                 if (fullSpan) {
-                                                    val b = chooseBoundaryRow(rect, r0) ?: return@detectTapGestures
+                                                    val b = chooseBoundaryRow(rect, rr) ?: return@detectTapGestures
                                                     page?.items?.remove(rect)
                                                     splitHoriz(rect, b).forEach { onAddItem(it) }
-                                                    onAddItem(
-                                                        DrawItem.LineItem(
-                                                            level = rect.level + 1,
-                                                            r0 = b, c0 = C0 - 1, r1 = b, c1 = C1 + 1,
-                                                            color = Color.Black, width = 2.dp
-                                                        )
+                                                    val line = DrawItem.LineItem(
+                                                        level = rect.level + 1,
+                                                        r0 = b, c0 = C0 - 1,
+                                                        r1 = b, c1 = C1 + 1,
+                                                        color = lineBlack,
+                                                        width = 2.dp
                                                     )
+                                                    onAddItem(line)
                                                     return@detectTapGestures
                                                 }
-                                            } else {
-                                                val rrMin = min(r0, r1); val rrMax = max(r0, r1)
-                                                val fullSpan = (rrMin == R0 && rrMax == R1 && c0 in C0..C1)
+                                            } else if (sameCol) {
+                                                val rrMin = min(r0, r1)
+                                                val rrMax = max(r0, r1)
+                                                val fullSpan = (rrMin == R0 && rrMax == R1 && cc in C0..C1)
                                                 if (fullSpan) {
-                                                    val b = chooseBoundaryCol(rect, c0) ?: return@detectTapGestures
+                                                    val b = chooseBoundaryCol(rect, cc) ?: return@detectTapGestures
                                                     page?.items?.remove(rect)
                                                     splitVert(rect, b).forEach { onAddItem(it) }
-                                                    onAddItem(
-                                                        DrawItem.LineItem(
-                                                            level = rect.level + 1,
-                                                            r0 = R0 - 1, c0 = b, r1 = R1 + 1, c1 = b,
-                                                            color = Color.Black, width = 2.dp
-                                                        )
+                                                    val line = DrawItem.LineItem(
+                                                        level = rect.level + 1,
+                                                        r0 = R0 - 1, c0 = b,
+                                                        r1 = R1 + 1, c1 = b,
+                                                        color = lineBlack,
+                                                        width = 2.dp
                                                     )
+                                                    onAddItem(line)
                                                     return@detectTapGestures
                                                 }
                                             }
                                         }
-                                        // non stesso rect o non da-lato-a-lato → no-op
-                                        return@detectTapGestures
+                                        return@detectTapGestures // non soddisfa le condizioni → no‑op
                                     }
 
-                                    // Non allineati → crea rettangolo (come prima)
+                                    // NON allineati: rettangolo standard (Create invariata)
                                     val rr0 = min(r0, r1); val rr1 = max(r0, r1)
                                     val cc0 = min(c0, c1); val cc1 = max(c0, c1)
-                                    onAddItem(
-                                        DrawItem.RectItem(
-                                            level = currentLevel,
-                                            r0 = rr0, c0 = cc0, r1 = rr1, c1 = cc1,
-                                            borderColor = Color.Black, borderWidth = 1.dp, fillColor = Color.White
-                                        )
+                                    val rect = DrawItem.RectItem(
+                                        level = currentLevel,
+                                        r0 = rr0, c0 = cc0,
+                                        r1 = rr1, c1 = cc1,
+                                        borderColor = Color.Black,
+                                        borderWidth = 1.dp,
+                                        fillColor = Color.White
                                     )
+                                    onAddItem(rect)
                                 }
                             }
-
-                            ToolMode.Resize -> {
-                                // 1° long‑press: devi prendere un angolo di un rettangolo esistente
-                                if (resizeTarget == null) {
-                                    val rect = topRectAtCell(rr, cc) ?: return@detectTapGestures
-                                    val (R0, R1, C0, C1) = rectBounds(rect)
-                                    val isCorner = (rr == R0 || rr == R1) && (cc == C0 || cc == C1)
-                                    if (!isCorner) return@detectTapGestures
-
-                                    // L'angolo premuto è quello "mobile"; il fisso è l'opposto
-                                    val fixed = when {
-                                        rr == R0 && cc == C0 -> R1 to C1
-                                        rr == R0 && cc == C1 -> R1 to C0
-                                        rr == R1 && cc == C0 -> R0 to C1
-                                        else                 -> R0 to C0
-                                    }
-                                    resizeTarget = rect
-                                    resizeFixedCorner = fixed
-                                } else {
-                                    // 2° long‑press: nuova posizione dell'angolo mobile
-                                    val rect = resizeTarget ?: return@detectTapGestures
-                                    val (fr, fc) = resizeFixedCorner ?: return@detectTapGestures
-
-                                    val newR0 = min(fr, rr); val newR1 = max(fr, rr)
-                                    val newC0 = min(fc, cc); val newC1 = max(fc, cc)
-
-                                    // Rimpiazzo "in place": rimuovo il vecchio, aggiungo la copia con nuovi bounds
-                                    page?.items?.remove(rect)
-                                    onAddItem(rect.copy(r0 = newR0, r1 = newR1, c0 = newC0, c1 = newC1))
-
-                                    resizeTarget = null
-                                    resizeFixedCorner = null
-                                }
+                            ToolMode.Point -> {
+                                val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
+                                onRequestEdit(topRectAtCell(rr, cc))
                             }
-
-                            // Point/Grab non gestite qui
-                            ToolMode.Point, ToolMode.Grab -> Unit
+                            else -> Unit
                         }
                     }
                 )
             }
+
             // --- DRAG dopo LONG‑PRESS: Grab / Resize ---
             .pointerInput(cols, page?.items, toolMode) {
                 if (toolMode == ToolMode.Grab || toolMode == ToolMode.Resize) {
