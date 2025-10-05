@@ -469,7 +469,7 @@ fun CanvasStage(
     }
 }
 
-// Stato locale d’appoggio per Resize (angoli)
+// Stato locale d’appoggio per Resize (angoli).
 private var resizeFixedCorner: Pair<Int, Int>? by mutableStateOf(null)
 private var resizeMovingCornerStart: Pair<Int, Int>? by mutableStateOf(null)
 
