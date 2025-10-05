@@ -25,6 +25,18 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.Dp
+import android.net.Uri
+import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalContext
+
+
 
 // Variante di rendering del contenitore
 enum class Variant { Full, Outlined, Text, TopBottom }
@@ -32,12 +44,22 @@ enum class Variant { Full, Outlined, Text, TopBottom }
 // Forme supportate (rettangolo con raggi, cerchio, pillola/stadium, diamante)
 enum class ShapeKind { Rect, Circle, Pill, Diamond }
 
-// Raggi per angolo: as=alto-sx, ad=alto-dx, bd=basso-dx, bs=basso-sx
+enum class ImageFit { Cover, Contain, Stretch }
+enum class ImageFilter { None, Mono, Sepia }
+
+data class ImageStyle(
+    val uri: Uri,
+    val fit: ImageFit = ImageFit.Cover,
+    val filter: ImageFilter = ImageFilter.None,
+    // crop base: l’immagine viene “ritagliata” all’interno della forma del contenitore
+    val cropToShape: Boolean = true
+)
+
 data class CornerRadii(
-    val asTL: Dp = 0.dp,  // top-left
-    val adTR: Dp = 0.dp,  // top-right
-    val bdBR: Dp = 0.dp,  // bottom-right
-    val bsBL: Dp = 0.dp   // bottom-left
+    val tl: Dp = 0.dp,
+    val tr: Dp = 0.dp,
+    val br: Dp = 0.dp,
+    val bl: Dp = 0.dp
 )
 
 // Effetti grafici opzionali
@@ -62,27 +84,53 @@ fun CanvasStage(
     showFullGrid: Boolean,
     currentLevel: Int,
     creationEnabled: Boolean = true,
-
-    // ⬇️ NUOVI parametri (non rompono le call esistenti grazie ai default)
     toolMode: ToolMode = ToolMode.Create,
     selected: DrawItem.RectItem? = null,
     onAddItem: (DrawItem) -> Unit,
     onRequestEdit: (DrawItem.RectItem?) -> Unit = {},
     onUpdateItem: (DrawItem.RectItem, DrawItem.RectItem) -> Unit = { _, _ -> },
-    // opzionale: brush per lo sfondo pagina
-    pageBackgroundColor: Color = Color.White,
 
-    pageBackgroundBrush: Brush? = null,
-
-    // opzionale: mappa "rettangolo → stile riempimento"
+    // già presente nella tua “attuale”:
     fillStyles: Map<DrawItem.RectItem, FillStyle> = emptyMap(),
-    // opzionale: mappa "rettangolo → variante / forma / raggi / fx"
-    variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
-    shapes:   Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
-    corners:  Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
-    fx:       Map<DrawItem.RectItem, FxKind> = emptyMap()
 
+    // NUOVO – tutti con default per non toccare EditorMenusOnly:
+    variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
+    shapes  : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
+    corners : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
+    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap()
 ) {
+    val context = LocalContext.current
+
+    @Composable
+    fun rememberBitmap(uri: Uri?): ImageBitmap? {
+        return remember(uri) {
+            if (uri == null) return@remember null
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                }
+            } catch (_: Throwable) { null }
+        }
+    }
+
+    fun colorFilterFor(filter: ImageFilter): ColorFilter? = when (filter) {
+        ImageFilter.Mono -> {
+            val m = ColorMatrix()
+            m.setToSaturation(0f)
+            ColorFilter.colorMatrix(m)
+        }
+        ImageFilter.Sepia -> {
+            // matrice seppia semplice
+            ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
+                0.393f, 0.769f, 0.189f, 0f, 0f,
+                0.349f, 0.686f, 0.168f, 0f, 0f,
+                0.272f, 0.534f, 0.131f, 0f, 0f,
+                0f,     0f,     0f,     1f, 0f
+            )))
+        }
+        else -> null
+    }
+
     // Stato "Create" (lasciato invariato)
     var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
@@ -447,42 +495,36 @@ fun CanvasStage(
                             val w = (abs(item.c1 - item.c0) + 1).toFloat() * cell
                             val h = (abs(item.r1 - item.r0) + 1).toFloat() * cell
 
-                            val kind = shapes[item] ?: ShapeKind.Rect
-                            val rad  = corners[item] ?: CornerRadii()
-                            val varnt = variants[item] ?: Variant.Full
-                            val fxKind = fx[item] ?: FxKind.None
-                            val style = fillStyles[item]
+                            // look-up con default che riproducono il comportamento attuale
+                            val kind   = shapes[item]   ?: ShapeKind.Rect
+                            val varnt  = variants[item] ?: Variant.Full
+                            val fxKind = fx[item]       ?: FxKind.None
+                            val rad    = corners[item]  ?: CornerRadii()
+                            val style  = fillStyles[item]  // può essere null (=> tinta piena)
 
-                            // Costruisco il path della forma
-                            fun buildPath(): Path {
+                            // path della forma (rettangolo arrotondato, cerchio, pillola, rombo)
+                            val path: Path = run {
                                 val p = Path()
                                 when (kind) {
                                     ShapeKind.Rect -> {
-                                        val all0 = rad.asTL.value == 0f && rad.adTR.value == 0f &&
-                                                rad.bdBR.value == 0f && rad.bsBL.value == 0f
-                                        if (all0) {
-                                            p.addRect(Rect(left, top, left + w, top + h))
-                                        } else {
-                                            val rr = RoundRect(
-                                                rect = Rect(left, top, left + w, top + h),
-                                                topLeft     = CornerRadius(rad.asTL.toPx(), rad.asTL.toPx()),
-                                                topRight    = CornerRadius(rad.adTR.toPx(), rad.adTR.toPx()),
-                                                bottomRight = CornerRadius(rad.bdBR.toPx(), rad.bdBR.toPx()),
-                                                bottomLeft  = CornerRadius(rad.bsBL.toPx(), rad.bsBL.toPx())
-                                            )
-                                            p.addRoundRect(rr)
-                                        }
+                                        val rr = RoundRect(
+                                            rect = Rect(left, top, left + w, top + h),
+                                            topLeft     = CornerRadius(rad.tl.toPx(), rad.tl.toPx()),
+                                            topRight    = CornerRadius(rad.tr.toPx(), rad.tr.toPx()),
+                                            bottomRight = CornerRadius(rad.br.toPx(), rad.br.toPx()),
+                                            bottomLeft  = CornerRadius(rad.bl.toPx(), rad.bl.toPx())
+                                        )
+                                        p.addRoundRect(rr)
                                     }
                                     ShapeKind.Circle -> {
-                                        val r = kotlin.math.min(w, h) / 2f
+                                        val r  = kotlin.math.min(w, h) / 2f
                                         val cx = left + w / 2f
                                         val cy = top  + h / 2f
                                         p.addOval(Rect(cx - r, cy - r, cx + r, cy + r))
                                     }
                                     ShapeKind.Pill -> {
-                                        val r = kotlin.math.min(w, h) / 2f // stadium
-                                        val rr = RoundRect(Rect(left, top, left + w, top + h), CornerRadius(r, r))
-                                        p.addRoundRect(rr)
+                                        val r = kotlin.math.min(w, h) / 2f
+                                        p.addRoundRect(RoundRect(Rect(left, top, left + w, top + h), CornerRadius(r, r)))
                                     }
                                     ShapeKind.Diamond -> {
                                         p.moveTo(left + w/2f, top)
@@ -492,22 +534,20 @@ fun CanvasStage(
                                         p.close()
                                     }
                                 }
-                                return p
+                                p
                             }
-
-                            val path = buildPath()
 
                             // 1) FILL (solo se non "Text")
                             if (varnt != Variant.Text) {
                                 if (varnt == Variant.Full) {
-                                    // gradiente se presente
+                                    // gradiente se definito, altrimenti tinta piena
                                     if (style != null && style.dir != GradientDir.Monocolore && style.col2 != null) {
                                         val (start, end) = when (style.dir) {
                                             GradientDir.Orizzontale -> Offset(left, top + h/2f)    to Offset(left + w, top + h/2f)
                                             GradientDir.Verticale   -> Offset(left + w/2f, top)    to Offset(left + w/2f, top + h)
                                             GradientDir.DiagTL_BR   -> Offset(left, top)           to Offset(left + w, top + h)
                                             GradientDir.DiagTR_BL   -> Offset(left + w, top)       to Offset(left, top + h)
-                                            else -> Offset.Zero to Offset.Zero
+                                            else -> Offset(left, top) to Offset(left, top)
                                         }
                                         clipPath(path) {
                                             drawRect(
@@ -520,7 +560,6 @@ fun CanvasStage(
                                         drawPath(path = path, color = item.fillColor, style = Fill)
                                     }
                                 }
-
                                 // 2) FX opzionali (clip alla forma)
                                 if (fxKind != FxKind.None) {
                                     clipPath(path) {
@@ -570,11 +609,11 @@ fun CanvasStage(
                                 }
                             }
 
-                            // 3) STROKE (bordi) in base a variant
+                            // 3) BORDI in base a variant
                             when (varnt) {
                                 Variant.Text -> Unit // niente bordi, niente fill
                                 Variant.TopBottom -> {
-                                    // Implementato per forme rettangolari; per altre forme fallback Outlined
+                                    // per forme non rettangolari → bordo completo
                                     if (kind == ShapeKind.Rect) {
                                         drawLine(
                                             color = item.borderColor,
@@ -593,11 +632,12 @@ fun CanvasStage(
                                     }
                                 }
                                 else -> {
-                                    // Full + Outlined → bordi interi
+                                    // Full + Outlined → bordi completi
                                     drawPath(path = path, color = item.borderColor, style = Stroke(width = item.borderWidth.toPx()))
                                 }
                             }
                         }
+
                         is DrawItem.LineItem -> {
                             if (item.r0 == item.r1) {
                                 val row = item.r0

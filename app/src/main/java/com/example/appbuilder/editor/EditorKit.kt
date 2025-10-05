@@ -130,7 +130,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
 import kotlin.math.cos
 import kotlin.math.sin
-
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 
 // Local per sapere ovunque se l’utente è free (true) o no
 private val LocalIsFree = staticCompositionLocalOf { true }
@@ -367,7 +370,21 @@ fun EditorMenusOnly(
     val rectShapes   = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ShapeKind>() }
     val rectCorners  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.CornerRadii>() }
     val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FxKind>() }
+    // immagini per rettangolo (foto come sfondo)
+    val rectImages  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ImageStyle>() }
+    // angoli del contenitore
+    val rectCorners = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.CornerRadii>() }
 
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        val rect = selectedRect ?: return@rememberLauncherForActivityResult
+        if (uri != null) {
+            rectImages[rect] = com.example.appbuilder.canvas.ImageStyle(uri = uri)
+            lastChanged = "Immagine: selezionata"
+            dirty = true
+        }
+    }
 
     // overlay palette colore
     var colorPickerVisible by remember { mutableStateOf(false) }
@@ -427,11 +444,11 @@ fun EditorMenusOnly(
         menuSelections[(listOf("Contenitore") + "shape").joinToString(" / ")] = s
 
         // angoli
-        val c = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
-        menuSelections[(listOf("Contenitore") + "ic_as").joinToString(" / ")] = dpToKey(c.asTL)
-        menuSelections[(listOf("Contenitore") + "ic_ad").joinToString(" / ")] = dpToKey(c.adTR)
-        menuSelections[(listOf("Contenitore") + "ic_bs").joinToString(" / ")] = dpToKey(c.bsBL)
-        menuSelections[(listOf("Contenitore") + "ic_bd").joinToString(" / ")] = dpToKey(c.bdBR)
+        val cr = rectCorners[rect]
+        menuSelections[(listOf("Contenitore") + "ic_as").joinToString(" / ")] = dpToKey(cr?.tl ?: 0.dp)
+        menuSelections[(listOf("Contenitore") + "ic_ad").joinToString(" / ")] = dpToKey(cr?.tr ?: 0.dp)
+        menuSelections[(listOf("Contenitore") + "ic_bd").joinToString(" / ")] = dpToKey(cr?.br ?: 0.dp)
+        menuSelections[(listOf("Contenitore") + "ic_bs").joinToString(" / ")] = dpToKey(cr?.bl ?: 0.dp)
 
         // colore corpo (col1) / col2 / grad (rimasti come nelle tue versioni)
         val col1 = rectFillStyles[rect]?.col1 ?: rect.fillColor
@@ -806,11 +823,7 @@ fun EditorMenusOnly(
                     toolMode        = toolMode,
                     selected        = selectedRect,
                     onAddItem       = { item -> pageState?.items?.add(item) },
-                    fillStyles = rectFillStyles,
-                    variants   = rectVariants,
-                    shapes     = rectShapes,
-                    corners    = rectCorners,
-                    fx         = rectFx,                    
+
                     onRequestEdit   = { rect -> 
                         selectedRect = rect
                         if (rect != null) {
@@ -818,23 +831,28 @@ fun EditorMenusOnly(
                             applyContainerMenuFromRect(rect)
                         }
                     },
-                    onUpdateItem = { old, updated ->
+                    onUpdateItem    = { old, updated ->
                         val items = pageState?.items ?: return@CanvasStage
                         val ix = items.indexOf(old)
-                        rectVariants[updated] = rectVariants.remove(old) ?: rectVariants[updated] ?: com.example.appbuilder.canvas.Variant.Full
-                        rectShapes[updated]   = rectShapes.remove(old)   ?: rectShapes[updated]   ?: com.example.appbuilder.canvas.ShapeKind.Rect
-                        rectCorners[updated]  = rectCorners.remove(old)  ?: rectCorners[updated]  ?: com.example.appbuilder.canvas.CornerRadii()
-                        rectFx[updated]       = rectFx.remove(old)       ?: rectFx[updated]       ?: com.example.appbuilder.canvas.FxKind.None
                         if (ix >= 0) {
                             items[ix] = updated
-                            // trasferisci lo stile senza interrompere l'aggiornamento della selezione
-                            rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
+                            // trasferisci le “decorazioni”
+                            rectFillStyles[updated] = rectFillStyles.remove(old) ?: rectFillStyles[updated] ?: return@CanvasStage
+                            rectImages[updated]     = rectImages.remove(old)     ?: rectImages[updated]     ?: return@CanvasStage
+                            rectCorners[updated]    = rectCorners.remove(old)    ?: rectCorners[updated]    ?: return@CanvasStage
                             if (selectedRect == old) {
                                 selectedRect = updated
                                 applyContainerMenuFromRect(updated)
                             }
                         }
-                    }
+                    },
+
+                    // già passavi fillStyles nella versione attuale:
+                    fillStyles = rectFillStyles,
+
+                    // ⬇️ nuovi
+                    imageStyles = rectImages,
+                    corners     = rectCorners
                 )
             }
             var idError by remember { mutableStateOf(false) }
@@ -960,6 +978,12 @@ fun EditorMenusOnly(
                             lastChanged = null
                             // === Apertura palette se entri su un nodo "Colore" ===
                             val fullPath = (menuPath + label).joinToString(" / ")
+
+                            // Apri picker quando entri in "Contenitore / Aggiungi foto" 
+                            if (fullPath.endsWith("Contenitore / Aggiungi foto")) {
+                                pickImageLauncher.launch("image/*")
+                            }
+
                             when {
                                 // Bordi -> Colore
                                 fullPath.endsWith("Contenitore / Bordi / Colore") -> {
@@ -1049,6 +1073,51 @@ fun EditorMenusOnly(
                             lastChanged = "$label: $value"
                             dirty = true
 
+                            // --- ANGOLO per rettangoli ---
+                            if ((menuPath.firstOrNull() ?: "") == "Contenitore" && label in setOf("ic_as","ic_ad","ic_bd","ic_bs")) {
+                                val rect = selectedRect
+                                if (rect != null) {
+                                    val dpVal = keyToDp(value)
+                                    val cur = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
+                                    val upd = when (label) {
+                                        "ic_as" -> cur.copy(tl = dpVal)
+                                        "ic_ad" -> cur.copy(tr = dpVal)
+                                        "ic_bd" -> cur.copy(br = dpVal)
+                                        else    -> cur.copy(bl = dpVal) // "ic_bs"
+                                    }
+                                    rectCorners[rect] = upd
+                                }
+                            }
+
+                            // --- IMMAGINE: adatta + filtro (cluster "Aggiungi foto") ---
+                            if ((menuPath.firstOrNull() ?: "") == "Contenitore" && menuPath.contains("Aggiungi foto")) {
+                                val rect = selectedRect ?: return@SubMenuBar
+                                val st = rectImages[rect] ?: com.example.appbuilder.canvas.ImageStyle(uri = (rectImages[rect]?.uri ?: return@SubMenuBar))
+                                when (label) {
+                                    "fitCont" -> {
+                                        val fit = when ((value as? String)?.trim()?.lowercase()) {
+                                            "cover"      -> com.example.appbuilder.canvas.ImageFit.Cover
+                                            "contain"    -> com.example.appbuilder.canvas.ImageFit.Contain
+                                            "stretch", "riempi" -> com.example.appbuilder.canvas.ImageFit.Stretch
+                                            else -> com.example.appbuilder.canvas.ImageFit.Cover
+                                        }
+                                        rectImages[rect] = st.copy(fit = fit)
+                                    }
+                                    "filtro" -> {
+                                        val f = when ((value as? String)?.trim()?.lowercase()) {
+                                            "bianco e nero", "mono", "b&w" -> com.example.appbuilder.canvas.ImageFilter.Mono
+                                            "seppia", "sepia"              -> com.example.appbuilder.canvas.ImageFilter.Sepia
+                                            else -> com.example.appbuilder.canvas.ImageFilter.None
+                                        }
+                                        rectImages[rect] = st.copy(filter = f)
+                                    }
+                                    // "crop" nel tuo set attuale è un pick; interpretiamo "Nessuno"=false, il resto=true
+                                    "crop" -> {
+                                        val on = !((value as? String).orEmpty().equals("Nessuno", ignoreCase = true))
+                                        rectImages[rect] = st.copy(cropToShape = on)
+                                    }
+                                }
+                            }
                             // Aggiornamenti mirati sui container
                             if ((menuPath.firstOrNull() ?: "") == "Contenitore") {
                                 val rect = selectedRect
