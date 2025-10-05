@@ -26,28 +26,32 @@ fun CanvasStage(
     showFullGrid: Boolean,
     currentLevel: Int,
     creationEnabled: Boolean = true,
-
-    // ⬇️ NUOVI parametri (non rompono le call esistenti grazie ai default)
-    toolMode: ToolMode = ToolMode.Create,
-    selected: DrawItem.RectItem? = null,
-    onAddItem: (DrawItem) -> Unit,
-    onRequestEdit: (DrawItem.RectItem?) -> Unit = {},
-    onUpdateItem: (DrawItem.RectItem, DrawItem.RectItem) -> Unit = { _, _ -> }
+    toolMode: ToolMode = ToolMode.Create,         // ⬅️ nuovo (default = Create, così non rompi call-site)
+    containerEditingActive: Boolean = true,       // ⬅️ nuovo: true solo quando sei nel menù "Contenitore"
+    onAddItem: (DrawItem) -> Unit
 ) {
-    // Stato "Create" (lasciato invariato)
-    var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // === Stato locale ===
+    var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }          // solo Create
+    var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }        // solo Create
 
-    // Stato anteprima per Grab/Resize
-    var movingRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }   // preview movimento
-    var resizingRect by remember { mutableStateOf<DrawItem.RectItem?>(null) } // preview resize
-    var activeRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }   // rettangolo coinvolto (grab/resize)
+    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }    // Point/Resize/Grab
+    var resizeFixedCorner by remember { mutableStateOf<Pair<Int, Int>?>(null) }  // Resize: corner ancorato
 
     val cols = max(1, gridDensity)
     val azure = Color(0xFF58A6FF)
     val lineBlack = Color.Black
 
-    // --- Helpers come nel file originale (più collisioni/intersezioni) ---
+    // Uscendo dal menù "Contenitore" puliamo selezione/evidenze
+    LaunchedEffect(containerEditingActive) {
+        if (!containerEditingActive) {
+            selectedRect = null
+            resizeFixedCorner = null
+            hoverCell = null
+            firstAnchor = null
+        }
+    }
+
+    // ----------------- Helper interni -----------------
     fun rectBounds(r: DrawItem.RectItem): IntArray {
         val r0 = min(r.r0, r.r1); val r1 = max(r.r0, r.r1)
         val c0 = min(r.c0, r.c1); val c1 = max(r.c0, r.c1)
@@ -62,20 +66,10 @@ fun CanvasStage(
             ?.filter { containsCell(it, row, col) }
             ?.maxByOrNull { it.level }
 
-    fun intersects(a: DrawItem.RectItem, b: DrawItem.RectItem): Boolean {
-        val (ar0, ar1, ac0, ac1) = rectBounds(a)
-        val (br0, br1, bc0, bc1) = rectBounds(b)
-        return (ar0 <= br1 && br0 <= ar1 && ac0 <= bc1 && bc0 <= ac1)
-    }
-    fun collides(candidate: DrawItem.RectItem, except: DrawItem.RectItem?): Boolean {
-        val others = page?.items?.filterIsInstance<DrawItem.RectItem>().orEmpty()
-        return others.any { it !== except && intersects(candidate, it) }
-    }
-
     fun splitHoriz(rect: DrawItem.RectItem, b: Int): List<DrawItem.RectItem> {
         val (r0, r1, c0, c1) = rectBounds(rect)
         if (b !in r0 until r1) return listOf(rect)
-        val top = rect.copy(r0 = r0, r1 = b,    c0 = c0, c1 = c1)
+        val top = rect.copy(r0 = r0, r1 = b,     c0 = c0, c1 = c1)
         val bot = rect.copy(r0 = b + 1, r1 = r1, c0 = c0, c1 = c1)
         return listOf(top, bot)
     }
@@ -108,231 +102,158 @@ fun CanvasStage(
         val mid = (c0 + c1) / 2.0
         return candidates.minByOrNull { kotlin.math.abs((it + 0.5) - mid) }
     }
-
-    // Pulizia overlay Create quando cambio modalità
-    LaunchedEffect(toolMode, creationEnabled) {
-        if (toolMode != ToolMode.Create || !creationEnabled) {
-            hoverCell = null
-            firstAnchor = null
-        }
+    // corner del rect più vicino alla cella (per fissare l'ancora in Resize)
+    fun nearestCorner(rect: DrawItem.RectItem, rr: Int, cc: Int): Pair<Int, Int> {
+        val (r0, r1, c0, c1) = rectBounds(rect)
+        val rf = if (kotlin.math.abs(rr - r0) <= kotlin.math.abs(rr - r1)) r0 else r1
+        val cf = if (kotlin.math.abs(cc - c0) <= kotlin.math.abs(cc - c1)) c0 else c1
+        return rf to cf
     }
+    // --------------------------------------------------
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-
-            // --- TAP / LONG‑PRESS: Create (immutata) e Point ---
-            .pointerInput(cols, creationEnabled, toolMode) {
+            .pointerInput(cols, creationEnabled, toolMode, containerEditingActive) {
                 detectTapGestures(
                     onTap = { ofs ->
-                        when (toolMode) {
-                            ToolMode.Create -> {
-                                if (creationEnabled) {
-                                    hoverCell = computeCell(
-                                        ofs, cols,
-                                        this.size.width.toFloat(), this.size.height.toFloat()
-                                    )
-                                }
-                            }
-                            ToolMode.Point -> {
-                                val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-                                onRequestEdit(topRectAtCell(rr, cc))
-                            }
-                            else -> Unit
-                        }
-                    },
-                    onLongPress = { ofs ->
+                        val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
                         when (toolMode) {
                             ToolMode.Create -> {
                                 if (!creationEnabled) return@detectTapGestures
-                                val cell = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
+                                hoverCell = rr to cc
+                            }
+                            ToolMode.Point -> {
+                                if (!containerEditingActive) return@detectTapGestures
+                                selectedRect = topRectAtCell(rr, cc)
+                            }
+                            ToolMode.Resize -> {
+                                if (!containerEditingActive) return@detectTapGestures
+                                // Se ho già fissato l'ancora, il tap sceglie il nuovo corner opposto e ridimensiona
+                                if (resizeFixedCorner != null && selectedRect != null) {
+                                    val (fr, fc) = resizeFixedCorner!!
+                                    val nr0 = min(fr, rr); val nr1 = max(fr, rr)
+                                    val nc0 = min(fc, cc); val nc1 = max(fc, cc)
+                                    val old = selectedRect!!
+                                    val newRect = old.copy(r0 = nr0, r1 = nr1, c0 = nc0, c1 = nc1)
+                                    page?.items?.remove(old)
+                                    page?.items?.add(newRect)
+                                    selectedRect = newRect
+                                    // L'ancora resta: puoi fare più resize consecutivi (“tap‑tap”)
+                                }
+                            }
+                            ToolMode.Grab -> {
+                                if (!containerEditingActive) return@detectTapGestures
+                                // Selezione (drag a scatti lo aggiungeremo separatamente)
+                                selectedRect = topRectAtCell(rr, cc)
+                            }
+                        }
+                    },
+                    onLongPress = { ofs ->
+                        val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
+                        when (toolMode) {
+                            ToolMode.Create -> {
+                                if (!creationEnabled) return@detectTapGestures
                                 if (firstAnchor == null) {
-                                    firstAnchor = cell
+                                    firstAnchor = rr to cc
                                 } else {
                                     val (r0, c0) = firstAnchor!!
-                                    val (r1, c1) = cell
+                                    val r1 = rr; val c1 = cc
                                     firstAnchor = null
                                     if (r0 == r1 && c0 == c1) return@detectTapGestures
 
                                     val sameRow = (r0 == r1)
                                     val sameCol = (c0 == c1)
 
+                                    // Split di UN contenitore "da lato a lato"
                                     if (sameRow || sameCol) {
-                                        val rr = r0.coerceAtLeast(0)
-                                        val cc = c0.coerceAtLeast(0)
                                         val rectA = topRectAtCell(r0, c0)
                                         val rectB = topRectAtCell(r1, c1)
                                         val rect = if (rectA != null && rectA == rectB) rectA else null
                                         if (rect != null) {
                                             val (R0, R1, C0, C1) = rectBounds(rect)
                                             if (sameRow) {
-                                                val ccMin = min(c0, c1)
-                                                val ccMax = max(c0, c1)
-                                                val fullSpan = (ccMin == C0 && ccMax == C1 && rr in R0..R1)
+                                                val ccMin = min(c0, c1); val ccMax = max(c0, c1)
+                                                val fullSpan = (ccMin == C0 && ccMax == C1 && r0 in R0..R1)
                                                 if (fullSpan) {
                                                     val b = chooseBoundaryRow(rect, rr) ?: return@detectTapGestures
                                                     page?.items?.remove(rect)
                                                     splitHoriz(rect, b).forEach { onAddItem(it) }
-                                                    val line = DrawItem.LineItem(
-                                                        level = rect.level + 1,
-                                                        r0 = b, c0 = C0 - 1,
-                                                        r1 = b, c1 = C1 + 1,
-                                                        color = lineBlack,
-                                                        width = 2.dp
+                                                    onAddItem(
+                                                        DrawItem.LineItem(
+                                                            level = rect.level + 1,
+                                                            r0 = b, c0 = C0 - 1, r1 = b, c1 = C1 + 1,
+                                                            color = lineBlack, width = 2.dp
+                                                        )
                                                     )
-                                                    onAddItem(line)
                                                     return@detectTapGestures
                                                 }
-                                            } else if (sameCol) {
-                                                val rrMin = min(r0, r1)
-                                                val rrMax = max(r0, r1)
-                                                val fullSpan = (rrMin == R0 && rrMax == R1 && cc in C0..C1)
+                                            } else { // sameCol
+                                                val rrMin = min(r0, r1); val rrMax = max(r0, r1)
+                                                val fullSpan = (rrMin == R0 && rrMax == R1 && c0 in C0..C1)
                                                 if (fullSpan) {
                                                     val b = chooseBoundaryCol(rect, cc) ?: return@detectTapGestures
                                                     page?.items?.remove(rect)
                                                     splitVert(rect, b).forEach { onAddItem(it) }
-                                                    val line = DrawItem.LineItem(
-                                                        level = rect.level + 1,
-                                                        r0 = R0 - 1, c0 = b,
-                                                        r1 = R1 + 1, c1 = b,
-                                                        color = lineBlack,
-                                                        width = 2.dp
+                                                    onAddItem(
+                                                        DrawItem.LineItem(
+                                                            level = rect.level + 1,
+                                                            r0 = R0 - 1, c0 = b, r1 = R1 + 1, c1 = b,
+                                                            color = lineBlack, width = 2.dp
+                                                        )
                                                     )
-                                                    onAddItem(line)
                                                     return@detectTapGestures
                                                 }
                                             }
+                                            return@detectTapGestures // no-op se non “da lato a lato”
                                         }
-                                        return@detectTapGestures // non soddisfa le condizioni → no‑op
                                     }
 
-                                    // NON allineati: rettangolo standard (Create invariata)
+                                    // Non allineati → rettangolo standard
                                     val rr0 = min(r0, r1); val rr1 = max(r0, r1)
                                     val cc0 = min(c0, c1); val cc1 = max(c0, c1)
-                                    val rect = DrawItem.RectItem(
-                                        level = currentLevel,
-                                        r0 = rr0, c0 = cc0,
-                                        r1 = rr1, c1 = cc1,
-                                        borderColor = Color.Black,
-                                        borderWidth = 1.dp,
-                                        fillColor = Color.White
+                                    onAddItem(
+                                        DrawItem.RectItem(
+                                            level = currentLevel,
+                                            r0 = rr0, c0 = cc0, r1 = rr1, c1 = cc1,
+                                            borderColor = Color.Black,
+                                            borderWidth = 1.dp,
+                                            fillColor = Color.White
+                                        )
                                     )
-                                    onAddItem(rect)
                                 }
                             }
                             ToolMode.Point -> {
-                                val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-                                onRequestEdit(topRectAtCell(rr, cc))
+                                if (!containerEditingActive) return@detectTapGestures
+                                selectedRect = topRectAtCell(rr, cc)
                             }
-                            else -> Unit
+                            ToolMode.Resize -> {
+                                if (!containerEditingActive) return@detectTapGestures
+                                val rect = topRectAtCell(rr, cc) ?: return@detectTapGestures
+                                selectedRect = rect
+                                // Fissa il corner più vicino al long‑press (ancora): resterà fermo
+                                resizeFixedCorner = nearestCorner(rect, rr, cc)
+                            }
+                            ToolMode.Grab -> {
+                                if (!containerEditingActive) return@detectTapGestures
+                                selectedRect = topRectAtCell(rr, cc)
+                                // Il drag a scatti lo tratteremo con detectDragGestures in un pass successivo
+                            }
                         }
                     }
                 )
-            }
-
-            // --- DRAG dopo LONG‑PRESS: Grab / Resize ---
-            .pointerInput(cols, page?.items, toolMode) {
-                if (toolMode == ToolMode.Grab || toolMode == ToolMode.Resize) {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = { ofs ->
-                            val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-                            val rect = topRectAtCell(rr, cc) ?: return@detectDragGesturesAfterLongPress
-                            activeRect = rect
-                            onRequestEdit(rect) // seleziona in menù
-
-                            if (toolMode == ToolMode.Grab) {
-                                movingRect = rect // anteprima parte da qui
-                            } else {
-                                // scegli angolo più vicino come “mobile”
-                                val (r0, r1, c0, c1) = rectBounds(rect)
-                                val corners = listOf(r0 to c0, r0 to c1, r1 to c0, r1 to c1)
-                                val nearest = corners.minByOrNull { (cr, cc2) -> abs(cr - rr) + abs(cc2 - cc) }!!
-                                val fixed = when (nearest) {
-                                    r0 to c0 -> r1 to c1
-                                    r0 to c1 -> r1 to c0
-                                    r1 to c0 -> r0 to c1
-                                    else     -> r0 to c0
-                                }
-                                // salvo come rettangolo “preview”: userò fixed + cursore per ridisegnare
-                                resizingRect = rect.copy() // preview = rettangolo corrente
-                                // memorizzo i corner in state locali
-                                resizeFixedCorner = fixed
-                                resizeMovingCornerStart = nearest
-                            }
-                        },
-                        onDrag = { change, _ ->
-                            val cellSize = min(this.size.width.toFloat() / cols, this.size.height.toFloat() / cols)
-                            val rows = if (cellSize > 0f) floor(this.size.height / cellSize).toInt() else 0
-                            val (cr, cc) = computeCell(change.position, cols, this.size.width.toFloat(), this.size.height.toFloat())
-                            val base = activeRect ?: return@detectDragGesturesAfterLongPress
-
-                            if (toolMode == ToolMode.Grab) {
-                                val (br0, br1, bc0, bc1) = rectBounds(base)
-                                val height = br1 - br0
-                                val width  = bc1 - bc0
-                                val startCenter = Pair((br0 + br1) / 2, (bc0 + bc1) / 2)
-                                val currCenter  = Pair(cr, cc)
-                                val dy = currCenter.first - startCenter.first
-                                val dx = currCenter.second - startCenter.second
-                                var nr0 = (br0 + dy).coerceIn(0, (rows - 1 - height).coerceAtLeast(0))
-                                var nc0 = (bc0 + dx).coerceIn(0, (cols - 1 - width).coerceAtLeast(0))
-                                var candidate = base.copy(r0 = nr0, r1 = nr0 + height, c0 = nc0, c1 = nc0 + width)
-
-                                // collisioni: se collide, non aggiorno (effetto stop contro i lati)
-                                if (!collides(candidate, except = base)) {
-                                    movingRect = candidate
-                                }
-                            } else if (toolMode == ToolMode.Resize) {
-                                val fixed = resizeFixedCorner ?: return@detectDragGesturesAfterLongPress
-                                var r0 = min(fixed.first, cr).coerceAtLeast(0)
-                                var r1 = max(fixed.first, cr).coerceAtMost(rows - 1)
-                                var c0 = min(fixed.second, cc).coerceAtLeast(0)
-                                var c1 = max(fixed.second, cc).coerceAtMost(cols - 1)
-                                // garantisci almeno 1 cella
-                                if (r1 < r0) r1 = r0
-                                if (c1 < c0) c1 = c0
-
-                                val candidate = base.copy(r0 = r0, r1 = r1, c0 = c0, c1 = c1)
-                                if (!collides(candidate, except = base)) {
-                                    resizingRect = candidate
-                                }
-                            }
-                        },
-                        onDragEnd = {
-                            val base = activeRect
-                            if (toolMode == ToolMode.Grab) {
-                                movingRect?.let { preview ->
-                                    if (base != null && preview != base) onUpdateItem(base, preview)
-                                }
-                                movingRect = null
-                            } else if (toolMode == ToolMode.Resize) {
-                                resizingRect?.let { preview ->
-                                    if (base != null && preview != base) onUpdateItem(base, preview)
-                                }
-                                resizingRect = null
-                            }
-                            activeRect = null
-                            resizeFixedCorner = null
-                            resizeMovingCornerStart = null
-                        },
-                        onDragCancel = {
-                            movingRect = null; resizingRect = null; activeRect = null
-                            resizeFixedCorner = null; resizeMovingCornerStart = null
-                        }
-                    )
-                }
             }
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cell = min(size.width / cols, size.height / cols)
             val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
 
-            // Fondo pagina bianco se esiste page (come volevi)
+            // Fondo pagina bianco quando c'è una Page
             if (page != null) {
                 drawRect(color = Color.White, topLeft = Offset.Zero, size = size)
             }
 
-            // Disegno elementi fino al livello corrente
+            // Disegno elementi (rettangoli + linee) fino al livello corrente
             page?.items?.forEach { item ->
                 if (item.level <= currentLevel) {
                     when (item) {
@@ -341,20 +262,13 @@ fun CanvasStage(
                             val top  = min(item.r0, item.r1).toFloat() * cell
                             val w = (abs(item.c1 - item.c0) + 1).toFloat() * cell
                             val h = (abs(item.r1 - item.r0) + 1).toFloat() * cell
-                            drawRect(
-                                color = item.fillColor,
-                                topLeft = Offset(left, top),
-                                size = Size(w, h)
-                            )
-                            drawRect(
-                                color = item.borderColor,
-                                topLeft = Offset(left, top),
-                                size = Size(w, h),
-                                style = Stroke(width = item.borderWidth.toPx())
-                            )
+                            drawRect(color = item.fillColor, topLeft = Offset(left, top), size = Size(w, h))
+                            drawRect(color = item.borderColor, topLeft = Offset(left, top), size = Size(w, h),
+                                     style = Stroke(width = item.borderWidth.toPx()))
                         }
                         is DrawItem.LineItem -> {
                             if (item.r0 == item.r1) {
+                                // Orizzontale (estendo ai bordi interni del contenitore)
                                 val row = item.r0
                                 val cMin = min(item.c0, item.c1)
                                 val cMax = max(item.c0, item.c1)
@@ -362,14 +276,11 @@ fun CanvasStage(
                                 val xStart = (cMin + 1).toFloat() * cell
                                 val xEnd   = (cMax).toFloat() * cell
                                 if (xEnd > xStart) {
-                                    drawLine(
-                                        color = item.color,
-                                        start = Offset(xStart, y),
-                                        end   = Offset(xEnd,   y),
-                                        strokeWidth = item.width.toPx()
-                                    )
+                                    drawLine(item.color, start = Offset(xStart, y), end = Offset(xEnd, y),
+                                             strokeWidth = item.width.toPx())
                                 }
                             } else if (item.c0 == item.c1) {
+                                // Verticale
                                 val col = item.c0
                                 val rMin = min(item.r0, item.r1)
                                 val rMax = max(item.r0, item.r1)
@@ -377,12 +288,8 @@ fun CanvasStage(
                                 val yStart = (rMin + 1).toFloat() * cell
                                 val yEnd   = (rMax).toFloat() * cell
                                 if (yEnd > yStart) {
-                                    drawLine(
-                                        color = item.color,
-                                        start = Offset(x, yStart),
-                                        end   = Offset(x, yEnd),
-                                        strokeWidth = item.width.toPx()
-                                    )
+                                    drawLine(item.color, start = Offset(x, yStart), end = Offset(x, yEnd),
+                                             strokeWidth = item.width.toPx())
                                 }
                             }
                         }
@@ -390,84 +297,67 @@ fun CanvasStage(
                 }
             }
 
-            // Evidenzia contenitore selezionato (se presente)
-            selected?.let { sel ->
-                val left = min(sel.c0, sel.c1).toFloat() * cell
-                val top  = min(sel.r0, sel.r1).toFloat() * cell
-                val w = (abs(sel.c1 - sel.c0) + 1).toFloat() * cell
-                val h = (abs(sel.r1 - sel.r0) + 1).toFloat() * cell
-                drawRect(
-                    color = azure,
-                    topLeft = Offset(left, top),
-                    size = Size(w, h),
-                    style = Stroke(width = 2.dp.toPx())
-                )
-            }
-
-            // Overlay anteprima Grab/Resize
-            (movingRect ?: resizingRect)?.let { prev ->
-                val left = min(prev.c0, prev.c1).toFloat() * cell
-                val top  = min(prev.r0, prev.r1).toFloat() * cell
-                val w = (abs(prev.c1 - prev.c0) + 1).toFloat() * cell
-                val h = (abs(prev.r1 - prev.r0) + 1).toFloat() * cell
-                drawRect(
-                    color = azure.copy(alpha = 0.12f),
-                    topLeft = Offset(left, top),
-                    size = Size(w, h)
-                )
-                drawRect(
-                    color = azure,
-                    topLeft = Offset(left, top),
-                    size = Size(w, h),
-                    style = Stroke(width = 2.dp.toPx())
-                )
-            }
-
-            // Griglia (identica al tuo file)
+            // Griglia: preview o completa (come prima)
             if (gridPreviewOnly) {
                 if (rows > 0 && cols > 0) {
-                    drawRect(color = azure.copy(alpha = 0.20f), topLeft = Offset(0f, 0f), size = Size(cell, cell))
-                    drawRect(color = azure, topLeft = Offset(0f, 0f), size = Size(cell, cell), style = Stroke(width = 1.5.dp.toPx()))
+                    drawRect(azure.copy(alpha = 0.20f), topLeft = Offset(0f, 0f), size = Size(cell, cell))
+                    drawRect(azure, topLeft = Offset(0f, 0f), size = Size(cell, cell),
+                             style = Stroke(width = 1.5.dp.toPx()))
                 }
             } else if (showFullGrid) {
                 for (c in 0..cols) {
                     val x = c.toFloat() * cell
-                    drawLine(
-                        color = azure.copy(alpha = 0.30f),
-                        start = Offset(x, 0f),
-                        end = Offset(x, rows.toFloat() * cell),
-                        strokeWidth = 1.dp.toPx()
-                    )
+                    drawLine(azure.copy(alpha = 0.30f), start = Offset(x, 0f), end = Offset(x, rows.toFloat() * cell),
+                             strokeWidth = 1.dp.toPx())
                 }
                 for (r in 0..rows) {
                     val y = r.toFloat() * cell
-                    drawLine(
-                        color = azure.copy(alpha = 0.30f),
-                        start = Offset(0f, y),
-                        end = Offset(cols.toFloat() * cell, y),
-                        strokeWidth = 1.dp.toPx()
-                    )
+                    drawLine(azure.copy(alpha = 0.30f), start = Offset(0f, y), end = Offset(cols.toFloat() * cell, y),
+                             strokeWidth = 1.dp.toPx())
                 }
             }
 
-            // Overlay Create (cella/righe/colonne) — invariato
-            hoverCell?.let { (rr, cc) ->
-                if (toolMode == ToolMode.Create && rr in 0 until rows && cc in 0 until cols) {
-                    drawRect(color = azure.copy(alpha = 0.18f), topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell), size = Size(cell, cell))
-                    drawRect(color = azure, topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell), size = Size(cell, cell), style = Stroke(width = 1.dp.toPx()))
+            // Hover (solo Create)
+            if (toolMode == ToolMode.Create) {
+                hoverCell?.let { (rr, cc) ->
+                    if (rr in 0 until rows && cc in 0 until cols) {
+                        drawRect(azure.copy(alpha = 0.18f), topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell),
+                                 size = Size(cell, cell))
+                        drawRect(azure, topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell),
+                                 size = Size(cell, cell), style = Stroke(width = 1.dp.toPx()))
+                    }
                 }
             }
-            firstAnchor?.let { (rr, cc) ->
-                if (toolMode == ToolMode.Create && rr >= 0 && cc >= 0) {
-                    drawRect(color = azure.copy(alpha = 0.10f), topLeft = Offset(cc.toFloat() * cell, 0f), size = Size(cell, rows.toFloat() * cell))
-                    drawRect(color = azure.copy(alpha = 0.10f), topLeft = Offset(0f, rr.toFloat() * cell), size = Size(cols.toFloat() * cell, cell))
-                    drawRect(color = azure.copy(alpha = 0.22f), topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell), size = Size(cell, cell))
-                    drawRect(color = azure, topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell), size = Size(cell, cell), style = Stroke(width = 1.5.dp.toPx()))
+
+            // Evidenza container selezionato (solo nel menù "Contenitore")
+            if (containerEditingActive) {
+                selectedRect?.let { sel ->
+                    val left = min(sel.c0, sel.c1).toFloat() * cell
+                    val top  = min(sel.r0, sel.r1).toFloat() * cell
+                    val w = (abs(sel.c1 - sel.c0) + 1).toFloat() * cell
+                    val h = (abs(sel.r1 - sel.r0) + 1).toFloat() * cell
+                    drawRect(color = Color.Transparent, topLeft = Offset(left, top), size = Size(w, h),
+                             style = Stroke(width = 2.dp.toPx(), miter = 1f),)
+                }
+            }
+
+            // Riga/colonna del primo anchor (Create) — invariato
+            if (toolMode == ToolMode.Create) {
+                firstAnchor?.let { (rr, cc) ->
+                    drawRect(azure.copy(alpha = 0.10f), topLeft = Offset(cc.toFloat() * cell, 0f),
+                             size = Size(cell, rows.toFloat() * cell))
+                    drawRect(azure.copy(alpha = 0.10f), topLeft = Offset(0f, rr.toFloat() * cell),
+                             size = Size(cols.toFloat() * cell, cell))
+                    drawRect(azure.copy(alpha = 0.22f), topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell),
+                             size = Size(cell, cell))
+                    drawRect(azure, topLeft = Offset(cc.toFloat() * cell, rr.toFloat() * cell),
+                             size = Size(cell, cell), style = Stroke(width = 1.5.dp.toPx()))
                 }
             }
         }
     }
 }
+
 
 // Stato locale d’appoggio per Resize (angoli)
 private var resizeFixedCorner: Pair<Int, Int>? by mutableStateOf(null)

@@ -648,6 +648,7 @@ fun EditorMenusOnly(
                     // ⬇️ NUOVI parametri
                     toolMode        = toolMode,
                     selected        = selectedRect,
+                    containerEditingActive = isContainerContext,
                     onAddItem       = { item -> pageState?.items?.add(item) },
 
                     onRequestEdit   = { rect ->
