@@ -195,14 +195,24 @@ private fun colorToHex(c: Color): String {
 private fun hexToColor(s: String?): Color? {
     if (s == null) return null
     val t = s.trim().removePrefix("#")
-    val v = t.toLongOrNull(16)?.toULong() ?: return null
+    val v = t.toLongOrNull(16) ?: return null
     return when (t.length) {
-        6  -> Color(0xFF000000u or v) // #RRGGBB -> ARGB
-        8  -> Color(v)                // AARRGGBB
+        6 -> {
+            val r = ((v shr 16) and 0xFF).toInt() / 255f
+            val g = ((v shr 8)  and 0xFF).toInt() / 255f
+            val b = ( v         and 0xFF).toInt() / 255f
+            Color(r, g, b, 1f)
+        }
+        8 -> {
+            val a = ((v shr 24) and 0xFF).toInt() / 255f
+            val r = ((v shr 16) and 0xFF).toInt() / 255f
+            val g = ((v shr 8)  and 0xFF).toInt() / 255f
+            val b = ( v         and 0xFF).toInt() / 255f
+            Color(r, g, b, a)
+        }
         else -> null
     }
 }
-
 
 // mapping basilare dei nomi già usati nei default
 private fun tokenToColor(token: String?): Color? = when(token?.lowercase()?.trim()) {
@@ -466,7 +476,6 @@ fun EditorMenusOnly(
             menuPath.firstOrNull() == "Contenitore"   //  ← profondità qualsiasi
         }
     }
-
 
 // Auto-hide del pannello descrittivo (5s)
     LaunchedEffect(infoCard) {
