@@ -17,6 +17,17 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import androidx.compose.ui.graphics.Brush
+
+// — Direzione gradiente minimale (se vorrai aggiungere altre diagonali è banale estendere)
+enum class GradientDir { Monocolore, Orizzontale, Verticale, DiagTL_BR, DiagTR_BL }
+
+// — Stile riempimento per un rettangolo (usato senza toccare RectItem)
+data class FillStyle(
+    val col1: Color,
+    val col2: Color? = null,
+    val dir: GradientDir = GradientDir.Monocolore
+)
 
 @Composable
 fun CanvasStage(
@@ -33,6 +44,12 @@ fun CanvasStage(
     onAddItem: (DrawItem) -> Unit,
     onRequestEdit: (DrawItem.RectItem?) -> Unit = {},
     onUpdateItem: (DrawItem.RectItem, DrawItem.RectItem) -> Unit = { _, _ -> }
+        // opzionale: brush per lo sfondo pagina (estensione futura)
+    pageBackgroundColor: Color = Color.White,
+    pageBackgroundBrush: Brush? = null,
+
+    // opzionale: mappa "rettangolo → stile riempimento"
+    fillStyles: Map<DrawItem.RectItem, FillStyle> = emptyMap()
 ) {
     // Stato "Create" (lasciato invariato)
     var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
@@ -371,10 +388,12 @@ fun CanvasStage(
             val cell = min(size.width / cols, size.height / cols)
             val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
 
-            // Fondo pagina bianco se esiste page (come volevi)
             if (page != null) {
-                drawRect(color = Color.White, topLeft = Offset.Zero, size = size)
+                pageBackgroundBrush?.let {
+                    drawRect(brush = it, topLeft = Offset.Zero, size = size)
+                } ?: drawRect(color = pageBackgroundColor, topLeft = Offset.Zero, size = size)
             }
+
 
             // Disegno elementi fino al livello corrente
             page?.items?.forEach { item ->
@@ -385,11 +404,29 @@ fun CanvasStage(
                             val top  = min(item.r0, item.r1).toFloat() * cell
                             val w = (abs(item.c1 - item.c0) + 1).toFloat() * cell
                             val h = (abs(item.r1 - item.r0) + 1).toFloat() * cell
-                            drawRect(
-                                color = item.fillColor,
-                                topLeft = Offset(left, top),
-                                size = Size(w, h)
-                            )
+                            // PRIMA: sempre colore pieno
+                            val style = fillStyles[item]
+                            if (style != null && style.dir != GradientDir.Monocolore && style.col2 != null) {
+                                val startEnd = when (style.dir) {
+                                    GradientDir.Orizzontale -> Offset(left, top + h / 2f) to Offset(left + w, top + h / 2f)
+                                    GradientDir.Verticale   -> Offset(left + w / 2f, top) to Offset(left + w / 2f, top + h)
+                                    GradientDir.DiagTL_BR   -> Offset(left, top)          to Offset(left + w, top + h)
+                                    GradientDir.DiagTR_BL   -> Offset(left + w, top)      to Offset(left, top + h)
+                                    else                    -> Offset.Zero                to Offset.Zero
+                                }
+                                drawRect(
+                                    brush   = Brush.linearGradient(listOf(style.col1, style.col2), start = startEnd.first, end = startEnd.second),
+                                    topLeft = Offset(left, top),
+                                    size    = Size(w, h)
+                                )
+                            } else {
+                                drawRect(
+                                    color   = item.fillColor,
+                                    topLeft = Offset(left, top),
+                                    size    = Size(w, h)
+                                )
+                            }
+
                             drawRect(
                                 color = item.borderColor,
                                 topLeft = Offset(left, top),
