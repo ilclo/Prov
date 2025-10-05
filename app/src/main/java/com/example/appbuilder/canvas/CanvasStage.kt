@@ -74,7 +74,7 @@ fun CanvasStage(
     pageBackgroundBrush: Brush? = null,
 
     // opzionale: mappa "rettangolo → stile riempimento"
-    fillStyles: Map<DrawItem.RectItem, FillStyle> = emptyMap()
+    fillStyles: Map<DrawItem.RectItem, FillStyle> = emptyMap(),
     // opzionale: mappa "rettangolo → variante / forma / raggi / fx"
     variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
     shapes:   Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
