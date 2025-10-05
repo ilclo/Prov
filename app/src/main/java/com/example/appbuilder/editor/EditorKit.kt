@@ -1,5 +1,6 @@
 package com.example.appbuilder.editor
 
+import com.example.appbuilder.canvas.DrawItem
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -313,8 +314,21 @@ fun EditorMenusOnly(
     var infoMode by remember { mutableStateOf(false) }          // flag modalità  info
     var infoCard by remember { mutableStateOf<Pair<String, String>?>(null) } // (titolo, testo)
     var infoCardVisible by remember { mutableStateOf(false) }
+    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
+    fun dpToKey(dp: androidx.compose.ui.unit.Dp): String {
+        val v = dp.value.toInt() // 0,1,2,3…
+        return "${v}dp"
+    }
+    fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
+        val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 1f
+        return n.dp
+    }
+    fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
+        // per ora popoliamo solo lo spessore bordo come richiesto
+        menuSelections[(listOf("Contenitore") + "b_thick").joinToString(" / ")] = dpToKey(rect.borderWidth)
+    }
     
     // Griglia
     var gridPanelOpen by remember { mutableStateOf(false) }
@@ -629,19 +643,30 @@ fun EditorMenusOnly(
                     gridPreviewOnly = gridPanelOpen && gridIsDragging,
                     showFullGrid    = gridPanelOpen && showGridLines,
                     currentLevel    = currentLevel,
-                    creationEnabled = toolMode == ToolMode.Create && canCreateContainer,
+                    creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
+
+                    // ⬇️ NUOVI parametri
                     toolMode        = toolMode,
+                    selected        = selectedRect,
                     onAddItem       = { item -> pageState?.items?.add(item) },
-                    onUpdateItem    = { updated ->
-                        val items = pageState?.items ?: return@CanvasStage
-                        val ix = items.indexOfFirst { it === updated }
-                        if (ix >= 0) items[ix] = updated
+
+                    onRequestEdit   = { rect ->
+                        selectedRect = rect
+                        if (rect != null) {
+                            if (menuPath.firstOrNull() != "Contenitore") menuPath = listOf("Contenitore")
+                            applyContainerMenuFromRect(rect)
+                        }
                     },
-                    onRequestEdit = { rect ->
-                        // Apri menù “Contenitore” con i valori del rettangolo selezionato
-                        menuPath = listOf("Contenitore")
-                        // Esempio: pre‑seleziona lo spessore del bordo nel tuo modello
-                        menuSelections["Contenitore / Bordi / Spessore"] = "${rect.borderWidth.value.toInt()}dp"
+                    onUpdateItem    = { old, updated ->
+                        val items = pageState?.items ?: return@CanvasStage
+                        val idx = items.indexOf(old)
+                        if (idx >= 0) {
+                            items[idx] = updated
+                            if (selectedRect == old) {
+                                selectedRect = updated
+                                applyContainerMenuFromRect(updated)
+                            }
+                        }
                     }
                 )
             }
@@ -785,6 +810,21 @@ fun EditorMenusOnly(
                             menuSelections[fullKey] = value
                             lastChanged = "$label: $value"
                             dirty = true
+                            // Se sto modificando un Contenitore → applica sul selezionato
+                            if ((menuPath.firstOrNull() ?: "") == "Contenitore" && label == "b_thick") {
+                                val rect = selectedRect
+                                if (rect != null) {
+                                    val newWidth = keyToDp(value)
+                                    pageState?.let { ps ->
+                                        val idx = ps.items.indexOf(rect)
+                                        if (idx >= 0) {
+                                            val updated = rect.copy(borderWidth = newWidth)
+                                            ps.items[idx] = updated
+                                            selectedRect = updated
+                                        }
+                                    }
+                                }
+                            }
 
                             when (label) {
                                 "default" -> {
@@ -2894,9 +2934,7 @@ private fun BoxScope.InfoEdgeDeck(
     // larghezza animata
     val targetWidth = if (open) (tileSize + spacing + peekWidth) else peekWidth
     val width by animateDpAsState(targetValue = targetWidth, animationSpec = tween(220), label = "sideWidth")
-    // --- all'inizio del Composable InfoEdgeDeck, dopo 'val width by animateDpAsState(...)' ---
-    var modeHintVisible by remember { mutableStateOf(false) }
-    var modeHintText by remember { mutableStateOf("") }    
+
     // visibilità a cascata
     var show1 by remember(open) { mutableStateOf(false) } // "?"
     var show2 by remember(open) { mutableStateOf(false) } // grid
@@ -3048,38 +3086,30 @@ private fun BoxScope.InfoEdgeDeck(
                     }
                 }
 
+                // 4) NUOVO — pulsante "modalità"
                 AnimatedVisibility(
                     visible = show4,
                     enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f),
                     exit  = fadeOut(tween(120)) + scaleOut(tween(120))
                 ) {
+                    // icona in base alla modalità
                     val modeIcon: ImageVector = when (toolMode) {
-                        com.example.appbuilder.canvas.ToolMode.Create -> Icons.Outlined.AddBox
-                        com.example.appbuilder.canvas.ToolMode.Point  -> Icons.Outlined.TouchApp
-                        com.example.appbuilder.canvas.ToolMode.Grab   -> Icons.Outlined.OpenWith
-                        com.example.appbuilder.canvas.ToolMode.Resize -> Icons.Outlined.Crop
+                        com.example.appbuilder.canvas.ToolMode.Create -> Icons.Outlined.AddBox   // ic_createcontainer
+                        com.example.appbuilder.canvas.ToolMode.Point  -> Icons.Outlined.TouchApp// ic_point
+                        com.example.appbuilder.canvas.ToolMode.Grab   -> Icons.Outlined.OpenWith// ic_grab
+                        com.example.appbuilder.canvas.ToolMode.Resize -> Icons.Outlined.Crop    // ic_resize
                     }
-                
-                    LaunchedEffect(toolMode) {
-                        modeHintText = when (toolMode) {
-                            com.example.appbuilder.canvas.ToolMode.Point  -> "configura contenitore"
-                            com.example.appbuilder.canvas.ToolMode.Resize -> "ridimensiona contenitore"
-                            com.example.appbuilder.canvas.ToolMode.Grab   -> "sposta contenitore"
-                            com.example.appbuilder.canvas.ToolMode.Create -> "crea contenitore"
-                        }
-                        modeHintVisible = true
-                        kotlinx.coroutines.delay(2000)
-                        modeHintVisible = false
-                    }
-                
                     SquareTile(
                         size = tileSize,
                         corner = corner,
                         icon = modeIcon,
                         tint = if (isContainerContext) WIZ_AZURE else Color(0xFF6B7280),
-                        enabled = isContainerContext,
+                        enabled = isContainerContext,               // cliccabile SOLO in "Contenitore"
                         border = if (isContainerContext) BorderStroke(2.dp, WIZ_AZURE) else null,
-                        onClick = { if (isContainerContext) onCycleMode() } // non chiudo il menù
+                        onClick = {
+                            // NON chiudo il menù: alterno le modalità
+                            if (isContainerContext) onCycleMode()
+                        }
                     )
                 }
 
@@ -3100,38 +3130,11 @@ private fun BoxScope.InfoEdgeDeck(
                             onToggleOpen()
                         }
                     )
-                }    
-
-            }
-
-            // ⬇️⬇️ BANNER FUORI DALLA COLUMN, MA DENTRO AL BOX ⬇️⬇️
-            androidx.compose.animation.AnimatedVisibility(
-                visible = modeHintVisible,
-                enter = fadeIn(tween(200)),
-                exit  = fadeOut(tween(200)),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)   // ora funziona: siamo nel BoxScope
-                    .padding(top = 12.dp)
-            ) {
-                Surface(
-                    color = WIZ_AZURE.copy(alpha = 0.15f),
-                    contentColor = WIZ_AZURE,
-                    shape = RoundedCornerShape(10.dp),
-                    tonalElevation = 6.dp,
-                    shadowElevation = 12.dp
-                ) {
-                    Text(
-                        text = modeHintText,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        fontSize = 12.sp
-                    )
                 }
             }
-            // ⬆️⬆️ FINE BANNER ⬆️⬆️
         }
     }
 }
-
 
 @Composable
 private fun SquareTile(
