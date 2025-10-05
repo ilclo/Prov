@@ -159,9 +159,19 @@ fun CanvasStage(
                         when (toolMode) {
                             ToolMode.Create -> {
                                 if (!creationEnabled) return@detectTapGestures
-                                hoverCell = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
+                                hoverCell = computeCell(
+                                    ofs, cols,
+                                    this.size.width.toFloat(), this.size.height.toFloat()
+                                )
                             }
-                            else -> Unit // Point/Grab/Resize: nessuna azione sul tap
+                            ToolMode.Point -> {
+                                val (rr, cc) = computeCell(
+                                    ofs, cols,
+                                    this.size.width.toFloat(), this.size.height.toFloat()
+                                )
+                                onRequestEdit(topRectAtCell(rr, cc))
+                            }
+                            else -> Unit
                         }
                     },
                     onLongPress = { ofs ->

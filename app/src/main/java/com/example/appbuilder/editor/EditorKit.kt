@@ -459,15 +459,15 @@ fun EditorMenusOnly(
             !gridPanelOpen && !levelPanelOpen
         }
     }
-    // Sei nel menù Contenitore (icona madre, non sottoschede)
     val isContainerContext by remember(classicEditing, editingClass, menuPath) {
         derivedStateOf {
             classicEditing &&
             editingClass == DeckRoot.PAGINA &&
-            menuPath.size == 1 &&
-            menuPath.firstOrNull() == "Contenitore"
+            menuPath.firstOrNull() == "Contenitore"   //  ← profondità qualsiasi
         }
     }
+
+
 // Auto-hide del pannello descrittivo (5s)
     LaunchedEffect(infoCard) {
         if (infoCard != null) {
@@ -778,19 +778,20 @@ fun EditorMenusOnly(
                             applyContainerMenuFromRect(rect)
                         }
                     },
-                    onUpdateItem    = { old, updated ->
+                    onUpdateItem = { old, updated ->
                         val items = pageState?.items ?: return@CanvasStage
                         val ix = items.indexOf(old)
                         if (ix >= 0) {
                             items[ix] = updated
-                            // trasferisco eventuale stile
-                            rectFillStyles[updated] = rectFillStyles.remove(old) ?: rectFillStyles[updated] ?: return@CanvasStage
+                            // trasferisci lo stile senza interrompere l'aggiornamento della selezione
+                            rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
                             if (selectedRect == old) {
                                 selectedRect = updated
                                 applyContainerMenuFromRect(updated)
                             }
                         }
                     },
+
                     // — nuovi parametri (sfondo li lasciamo di default)
                     fillStyles = rectFillStyles
                 )
@@ -971,7 +972,37 @@ fun EditorMenusOnly(
                                 menuSelections[styleKey] = "Nessuno"
                             }
                         },
-                        onPick = { label, value ->
+                        onPick = pick@{ label, value ->
+                            // --- Intercetta e apre la palette flottante al posto del dropdown ---
+                            run {
+                                val isBordiColore = menuPath.size >= 2 &&
+                                    menuPath[0] == "Contenitore" && menuPath[1] == "Bordi" && label == "Colore"
+                                val isContCol1 = menuPath.size >= 2 &&
+                                    menuPath[0] == "Contenitore" && menuPath[1] == "Colore" && label == "col1"
+                                val isContCol2 = menuPath.size >= 2 &&
+                                    menuPath[0] == "Contenitore" && menuPath[1] == "Colore" && label == "col2"
+
+                                if (isBordiColore) {
+                                    colorPickTarget = ColorTarget.Border
+                                    colorPickInitial = selectedRect?.borderColor ?: Color.Black
+                                    showColorPicker = true
+                                    return@pick
+                                }
+                                if (isContCol1) {
+                                    colorPickTarget = ColorTarget.ContainerFill(1)
+                                    colorPickInitial = selectedRect?.fillColor ?: Color.White
+                                    showColorPicker = true
+                                    return@pick
+                                }
+                                if (isContCol2) {
+                                    colorPickTarget = ColorTarget.ContainerFill(2)
+                                    colorPickInitial = Color.Gray
+                                    showColorPicker = true
+                                    return@pick
+                                }
+                            }
+
+                            // --- qui lascia invariata la tua logica esistente di onPick ---
                             val root = menuPath.firstOrNull() ?: "Contenitore"
                             val fullKey = key(menuPath, label)
                             menuSelections[fullKey] = value
@@ -1123,7 +1154,7 @@ fun EditorMenusOnly(
                 onToggleOpen = { infoDeckOpen = !infoDeckOpen },
                 infoEnabled = infoMode,
                 onToggleInfo = { infoMode = !infoMode },
-                enabled = menuPath.isEmpty(),
+                enabled = (menuPath.isEmpty() || menuPath.firstOrNull() == "Contenitore"),
 
                 gridEnabled = gridPanelOpen,
                 onToggleGrid = { gridPanelOpen = !gridPanelOpen },
