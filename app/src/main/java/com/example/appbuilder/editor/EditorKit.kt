@@ -127,6 +127,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.border
 import kotlin.math.cos
 import kotlin.math.sin
 
