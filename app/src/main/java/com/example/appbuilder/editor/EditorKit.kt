@@ -834,12 +834,8 @@ fun EditorMenusOnly(
                                 applyContainerMenuFromRect(updated)
                             }
                         }
-                    },
-
-                    // — nuovi parametri (sfondo li lasciamo di default)
-                    fillStyles = rectFillStyles
+                    }
                 )
-
             }
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {

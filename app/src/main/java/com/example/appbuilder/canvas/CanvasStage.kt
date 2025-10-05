@@ -24,6 +24,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.unit.Dp
 
 // Variante di rendering del contenitore
 enum class Variant { Full, Outlined, Text, TopBottom }
