@@ -126,6 +126,9 @@ import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.gestures.detectTapGestures
+import kotlin.math.cos
+import kotlin.math.sin
 
 
 // Local per sapere ovunque se l’utente è free (true) o no
@@ -193,11 +196,23 @@ private fun hexToColor(s: String?): Color? {
     val t = s.trim().removePrefix("#")
     val v = t.toLongOrNull(16) ?: return null
     return when (t.length) {
-        6  -> Color(0xFF000000 or v.toInt())
-        8  -> Color(v.toInt())
+        6 -> {
+            val r = ((v shr 16) and 0xFF).toInt() / 255f
+            val g = ((v shr 8)  and 0xFF).toInt() / 255f
+            val b = ( v         and 0xFF).toInt() / 255f
+            Color(r, g, b, 1f)
+        }
+        8 -> {
+            val a = ((v shr 24) and 0xFF).toInt() / 255f
+            val r = ((v shr 16) and 0xFF).toInt() / 255f
+            val g = ((v shr 8)  and 0xFF).toInt() / 255f
+            val b = ( v         and 0xFF).toInt() / 255f
+            Color(r, g, b, a)
+        }
         else -> null
     }
 }
+
 // mapping basilare dei nomi già usati nei default
 private fun tokenToColor(token: String?): Color? = when(token?.lowercase()?.trim()) {
     "#fff", "#ffffff", "bianco" -> Color.White
@@ -349,12 +364,6 @@ fun EditorMenusOnly(
 
     // overlay palette colore
     var colorPickerVisible by remember { mutableStateOf(false) }
-    sealed class ColorTarget {
-        object Border : ColorTarget()
-        data class ContainerFill(val slot: Int) : ColorTarget() // 1 o 2
-        data class LayoutFill(val slot: Int) : ColorTarget()
-        object Text : ColorTarget()
-    }
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
     var pickerOffset by remember { mutableStateOf(IntOffset(0, 0)) }
 
@@ -1312,8 +1321,9 @@ fun FloatingColorPickerOverlay(
 
                     ring.forEachIndexed { i, c ->
                         val ang = Math.toRadians((i * step - 90f).toDouble()) // parte da alto
-                        val dx = (cos(ang) * r.value).dp
-                        val dy = (sin(ang) * r.value).dp
+                        val dx = ((cos(ang) * r.value).toFloat()).dp
+                        val dy = ((sin(ang) * r.value).toFloat()).dp
+
                         Box(
                             Modifier
                                 .size(chip)

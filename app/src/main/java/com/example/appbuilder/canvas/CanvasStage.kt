@@ -43,9 +43,10 @@ fun CanvasStage(
     selected: DrawItem.RectItem? = null,
     onAddItem: (DrawItem) -> Unit,
     onRequestEdit: (DrawItem.RectItem?) -> Unit = {},
-    onUpdateItem: (DrawItem.RectItem, DrawItem.RectItem) -> Unit = { _, _ -> }
-        // opzionale: brush per lo sfondo pagina (estensione futura)
+    onUpdateItem: (DrawItem.RectItem, DrawItem.RectItem) -> Unit = { _, _ -> },
+    // opzionale: brush per lo sfondo pagina
     pageBackgroundColor: Color = Color.White,
+
     pageBackgroundBrush: Brush? = null,
 
     // opzionale: mappa "rettangolo → stile riempimento"
