@@ -37,6 +37,17 @@ fun CanvasStage(
     // Stato "Create" (lasciato invariato)
     var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Stato locale per RESIZE
+
+    // Quando esci dal menù Contenitore (creationEnabled=false) azzera ogni evidenziazione
+    LaunchedEffect(creationEnabled) {
+        if (!creationEnabled) {
+            hoverCell = null
+            firstAnchor = null
+            resizeTarget = null
+            resizeFixed = null
+        }
+    }
 
     // Stato anteprima per Grab/Resize
     var movingRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }   // preview movimento
@@ -127,18 +138,10 @@ fun CanvasStage(
                     onTap = { ofs ->
                         when (toolMode) {
                             ToolMode.Create -> {
-                                if (creationEnabled) {
-                                    hoverCell = computeCell(
-                                        ofs, cols,
-                                        this.size.width.toFloat(), this.size.height.toFloat()
-                                    )
-                                }
+                                if (!creationEnabled) return@detectTapGestures
+                                hoverCell = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
                             }
-                            ToolMode.Point -> {
-                                val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-                                onRequestEdit(topRectAtCell(rr, cc))
-                            }
-                            else -> Unit
+                            else -> Unit // Point/Grab/Resize: nessuna azione sul tap
                         }
                     },
                     onLongPress = { ofs ->
@@ -152,14 +155,13 @@ fun CanvasStage(
                                     val (r0, c0) = firstAnchor!!
                                     val (r1, c1) = cell
                                     firstAnchor = null
-                                    if (r0 == r1 && c0 == c1) return@detectTapGestures
 
+                                    if (r0 == r1 && c0 == c1) return@detectTapGestures
                                     val sameRow = (r0 == r1)
                                     val sameCol = (c0 == c1)
 
                                     if (sameRow || sameCol) {
                                         val rr = r0.coerceAtLeast(0)
-                                        val cc = c0.coerceAtLeast(0)
                                         val rectA = topRectAtCell(r0, c0)
                                         val rectB = topRectAtCell(r1, c1)
                                         val rect = if (rectA != null && rectA == rectB) rectA else null
@@ -175,15 +177,14 @@ fun CanvasStage(
                                                     splitHoriz(rect, b).forEach { onAddItem(it) }
                                                     val line = DrawItem.LineItem(
                                                         level = rect.level + 1,
-                                                        r0 = b, c0 = C0 - 1,
-                                                        r1 = b, c1 = C1 + 1,
-                                                        color = lineBlack,
-                                                        width = 2.dp
+                                                        r0 = b, c0 = C0 - 1, r1 = b, c1 = C1 + 1,
+                                                        color = Color.Black, width = 2.dp
                                                     )
                                                     onAddItem(line)
                                                     return@detectTapGestures
                                                 }
-                                            } else if (sameCol) {
+                                            } else { // sameCol
+                                                val cc = c0.coerceAtLeast(0)
                                                 val rrMin = min(r0, r1)
                                                 val rrMax = max(r0, r1)
                                                 val fullSpan = (rrMin == R0 && rrMax == R1 && cc in C0..C1)
@@ -193,46 +194,87 @@ fun CanvasStage(
                                                     splitVert(rect, b).forEach { onAddItem(it) }
                                                     val line = DrawItem.LineItem(
                                                         level = rect.level + 1,
-                                                        r0 = R0 - 1, c0 = b,
-                                                        r1 = R1 + 1, c1 = b,
-                                                        color = lineBlack,
-                                                        width = 2.dp
+                                                        r0 = R0 - 1, c0 = b, r1 = R1 + 1, c1 = b,
+                                                        color = Color.Black, width = 2.dp
                                                     )
                                                     onAddItem(line)
                                                     return@detectTapGestures
                                                 }
                                             }
                                         }
-                                        return@detectTapGestures // non soddisfa le condizioni → no‑op
+                                        return@detectTapGestures // non satisfy le condizioni -> no-op
                                     }
 
-                                    // NON allineati: rettangolo standard (Create invariata)
+                                    // non allineati -> rettangolo nuovo (comportamento esistente)
                                     val rr0 = min(r0, r1); val rr1 = max(r0, r1)
                                     val cc0 = min(c0, c1); val cc1 = max(c0, c1)
                                     val rect = DrawItem.RectItem(
                                         level = currentLevel,
-                                        r0 = rr0, c0 = cc0,
-                                        r1 = rr1, c1 = cc1,
-                                        borderColor = Color.Black,
-                                        borderWidth = 1.dp,
-                                        fillColor = Color.White
+                                        r0 = rr0, c0 = cc0, r1 = rr1, c1 = cc1,
+                                        borderColor = Color.Black, borderWidth = 1.dp, fillColor = Color.White
                                     )
                                     onAddItem(rect)
                                 }
                             }
-                            ToolMode.Point -> {
+
+                            ToolMode.Resize -> {
+                                // 1) converto il tocco in cella
                                 val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
-                                onRequestEdit(topRectAtCell(rr, cc))
+
+                                // 2) se non sto già ridimensionando: devo iniziare da un ANGOLO del rettangolo
+                                if (resizeTarget == null) {
+                                    val rect = topRectAtCell(rr, cc) ?: return@detectTapGestures
+                                    val (r0, r1, c0, c1) = rectBounds(rect)
+                                    val tl = r0 to c0
+                                    val tr = r0 to c1
+                                    val bl = r1 to c0
+                                    val br = r1 to c1
+                                    val pressed = listOf(tl, tr, bl, br).firstOrNull { it.first == rr && it.second == cc }
+                                        ?: return@detectTapGestures // deve essere proprio un angolo
+
+                                    val opposite = when (pressed) {
+                                        tl -> br
+                                        tr -> bl
+                                        bl -> tr
+                                        else -> tl // br
+                                    }
+                                    resizeTarget = rect
+                                    resizeFixed = opposite
+                                    return@detectTapGestures
+                                }
+
+                                // 3) già in corso: il secondo long‑press definisce il nuovo angolo mobile
+                                val target = resizeTarget ?: return@detectTapGestures
+                                val (fr, fc) = resizeFixed ?: return@detectTapGestures
+                                val newR0 = min(fr, rr); val newR1 = max(fr, rr)
+                                val newC0 = min(fc, cc); val newC1 = max(fc, cc)
+
+                                val updated = target.copy(r0 = newR0, r1 = newR1, c0 = newC0, c1 = newC1)
+
+                                // Sostituisco il rect in lista (senza callback aggiuntivi, per restare minimale)
+                                page?.items?.let { lst ->
+                                    val ix = lst.indexOf(target)
+                                    if (ix >= 0) lst[ix] = updated else lst.add(updated)
+                                } ?: run {
+                                    // in assenza di page, lo aggiungo
+                                    onAddItem(updated)
+                                }
+
+                                // reset stato resize
+                                resizeTarget = null
+                                resizeFixed  = null
                             }
-                            else -> Unit
+
+                            else -> Unit // Point/Grab: gestite altrove; qui non tocco nulla
                         }
                     }
                 )
             }
 
+
             // --- DRAG dopo LONG‑PRESS: Grab / Resize ---
             .pointerInput(cols, page?.items, toolMode) {
-                if (toolMode == ToolMode.Grab || toolMode == ToolMode.Resize) {
+                if (toolMode == ToolMode.Grab) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { ofs ->
                             val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
@@ -256,8 +298,8 @@ fun CanvasStage(
                                 // salvo come rettangolo “preview”: userò fixed + cursore per ridisegnare
                                 resizingRect = rect.copy() // preview = rettangolo corrente
                                 // memorizzo i corner in state locali
-                                resizeFixedCorner = fixed
-                                resizeMovingCornerStart = nearest
+                                resizeFixed = fixed
+
                             }
                         },
                         onDrag = { change, _ ->
@@ -283,7 +325,7 @@ fun CanvasStage(
                                     movingRect = candidate
                                 }
                             } else if (toolMode == ToolMode.Resize) {
-                                val fixed = resizeFixedCorner ?: return@detectDragGesturesAfterLongPress
+                                val fixed = resizeFixed ?: return@detectDragGesturesAfterLongPress
                                 var r0 = min(fixed.first, cr).coerceAtLeast(0)
                                 var r1 = max(fixed.first, cr).coerceAtMost(rows - 1)
                                 var c0 = min(fixed.second, cc).coerceAtLeast(0)
@@ -312,8 +354,8 @@ fun CanvasStage(
                                 resizingRect = null
                             }
                             activeRect = null
-                            resizeFixedCorner = null
-                            resizeMovingCornerStart = null
+                            resizeFixed = null
+
                         },
                         onDragCancel = {
                             movingRect = null; resizingRect = null; activeRect = null
