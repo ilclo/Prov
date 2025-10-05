@@ -1,5 +1,6 @@
 package com.example.appbuilder.editor
 
+import com.example.appbuilder.canvas.DrawItem
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -629,19 +630,35 @@ fun EditorMenusOnly(
                     gridPreviewOnly = gridPanelOpen && gridIsDragging,
                     showFullGrid    = gridPanelOpen && showGridLines,
                     currentLevel    = currentLevel,
-                    creationEnabled = toolMode == ToolMode.Create && canCreateContainer,
+                    creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
+
+                    // se la tua CanvasStage prevede anche toolMode, lascialo:
                     toolMode        = toolMode,
-                    onAddItem       = { item -> pageState?.items?.add(item) },
-                    onUpdateItem    = { updated ->
+
+                    onAddItem = { item ->
+                        pageState?.items?.add(item)
+                    },
+
+                    // ⚠️ firma a 2 parametri: (old, updated)
+                    onUpdateItem = { old: DrawItem.RectItem, updated: DrawItem.RectItem ->
                         val items = pageState?.items ?: return@CanvasStage
-                        val ix = items.indexOfFirst { it === updated }
+                        val ix = items.indexOf(old)
                         if (ix >= 0) items[ix] = updated
                     },
-                    onRequestEdit = { rect ->
-                        // Apri menù “Contenitore” con i valori del rettangolo selezionato
+
+                    // ⚠️ param NON‑nullable + chiavi allineate al tuo menù
+                    onRequestEdit = { rect: DrawItem.RectItem ->
+                        // apri il menù Contenitore
                         menuPath = listOf("Contenitore")
-                        // Esempio: pre‑seleziona lo spessore del bordo nel tuo modello
-                        menuSelections["Contenitore / Bordi / Spessore"] = "${rect.borderWidth.value.toInt()}dp"
+
+                        // sincronizza lo "spessore bordo" con il valore del rect selezionato
+                        val value = "${rect.borderWidth.value.toInt()}dp"
+
+                        // chiave "ufficiale" usata in keysForRoot("Contenitore"): b_thick
+                        menuSelections[key(listOf("Contenitore"), "b_thick")] = value
+
+                        // in ContainerLevel hai un label "b_tick": aggiorno anche questa chiave
+                        menuSelections[key(listOf("Contenitore"), "b_tick")] = value
                     }
                 )
             }
