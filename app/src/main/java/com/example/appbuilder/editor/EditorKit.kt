@@ -646,18 +646,21 @@ fun EditorMenusOnly(
                         if (ix >= 0) items[ix] = updated
                     },
 
-                    // ⚠️ param NON‑nullable + chiavi allineate al tuo menù
-                    onRequestEdit = { rect: DrawItem.RectItem ->
-                        // apri il menù Contenitore
+                    // ⚠️ firma nullable: (RectItem?)
+                    onRequestEdit = { rect: DrawItem.RectItem? ->
+                        // niente da fare se non c'è una selezione valida
+                        rect ?: return@CanvasStage
+
+                        // Apri il menù “Contenitore”
                         menuPath = listOf("Contenitore")
 
-                        // sincronizza lo "spessore bordo" con il valore del rect selezionato
+                        // Allinea il selettore dello spessore bordo al valore del contenitore
                         val value = "${rect.borderWidth.value.toInt()}dp"
 
-                        // chiave "ufficiale" usata in keysForRoot("Contenitore"): b_thick
+                        // Chiave “ufficiale” coerente con le tue keys: Contenitore / b_thick
                         menuSelections[key(listOf("Contenitore"), "b_thick")] = value
 
-                        // in ContainerLevel hai un label "b_tick": aggiorno anche questa chiave
+                        // Se nel livello usi anche l’etichetta “b_tick”, la tengo in sync
                         menuSelections[key(listOf("Contenitore"), "b_tick")] = value
                     }
                 )
