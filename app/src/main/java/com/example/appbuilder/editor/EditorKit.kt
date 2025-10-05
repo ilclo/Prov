@@ -124,7 +124,8 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.width
 import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.toArgb
-
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.zIndex
 
 
 // Local per sapere ovunque se l’utente è free (true) o no
@@ -148,6 +149,20 @@ private val LocalInfoMode = staticCompositionLocalOf { InfoModeEnv(false) { _, _
 /* =========================================================================================
 *  MODELLO MINIMO DI STATO (solo per navigazione menù)
 * ========================================================================================= */
+// === Color picking infra (TOP-LEVEL, fuori da composable) ===
+sealed class ColorTarget {
+    object Border : ColorTarget()
+    data class ContainerFill(val slot: Int) : ColorTarget() // 1 o 2
+    data class LayoutFill(val slot: Int) : ColorTarget()     // 1 o 2
+    object Text : ColorTarget()
+}
+
+private fun androidx.compose.ui.graphics.Color.toHex(): String {
+    val r = (red   * 255).toInt().coerceIn(0,255)
+    val g = (green * 255).toInt().coerceIn(0,255)
+    val b = (blue  * 255).toInt().coerceIn(0,255)
+    return "#%02X%02X%02X".format(r, g, b)
+}
 
 data class EditorShellState(
     val isEditor: Boolean = true
@@ -362,6 +377,10 @@ fun EditorMenusOnly(
     var infoCard by remember { mutableStateOf<Pair<String, String>?>(null) } // (titolo, testo)
     var infoCardVisible by remember { mutableStateOf(false) }
     var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+    // === Stato palette colori flottante ===
+    var showColorPicker by remember { mutableStateOf(false) }
+    var colorPickTarget by remember { mutableStateOf<ColorTarget?>(null) }
+    var colorPickInitial by remember { mutableStateOf(Color.Black) }    
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
     fun dpToKey(dp: androidx.compose.ui.unit.Dp): String {
@@ -373,21 +392,24 @@ fun EditorMenusOnly(
         return n.dp
     }
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
-        // spessore (già presente)
-        menuSelections[(listOf("Contenitore") + "b_thick").joinToString(" / ")] = dpToKey(rect.borderWidth)
-        // colore bordo (targhetta = esadecimale)
-        val bHex = colorToHex(rect.borderColor)
-        menuSelections[(listOf("Contenitore","Bordi") + "Colore").joinToString(" / ")] = bHex
-        // fallback chiave piatta se la tua SubMenuBar la usa:
-        menuSelections[(listOf("Contenitore") + "b_color").joinToString(" / ")] = bHex
+        // spessore bordo (già funzionante)
+        menuSelections[(listOf("Contenitore") + "b_thick").joinToString(" / ")] =
+            dpToKey(rect.borderWidth)
 
-        // colore corpo (col1). Se non hai mai impostato uno stile: uso fillColor attuale
+        // colore bordo — usa un’unica chiave coerente
+        val bHex = colorToHex(rect.borderColor)
+        menuSelections[(listOf("Contenitore", "Bordi") + "Colore").joinToString(" / ")] = bHex
+
+        // colore principale (col1)
         val col1 = rectFillStyles[rect]?.col1 ?: rect.fillColor
-        menuSelections[(listOf("Contenitore","Colore") + "col1").joinToString(" / ")] = colorToHex(col1)
-        // gradiente e col2 (solo se già impostati)
+        menuSelections[(listOf("Contenitore", "Colore") + "col1").joinToString(" / ")] =
+            colorToHex(col1)
+
+        // secondo colore e gradiente (solo se esistono)
         rectFillStyles[rect]?.let { fs ->
             fs.col2?.let { c2 ->
-                menuSelections[(listOf("Contenitore","Colore") + "col2").joinToString(" / ")] = colorToHex(c2)
+                menuSelections[(listOf("Contenitore", "Colore") + "col2").joinToString(" / ")] =
+                    colorToHex(c2)
             }
             val gLabel = when (fs.dir) {
                 com.example.appbuilder.canvas.GradientDir.Monocolore -> "Monocolore"
@@ -396,11 +418,13 @@ fun EditorMenusOnly(
                 com.example.appbuilder.canvas.GradientDir.DiagTL_BR   -> "Diag TL→BR"
                 com.example.appbuilder.canvas.GradientDir.DiagTR_BL   -> "Diag TR→BL"
             }
-            menuSelections[(listOf("Contenitore","Colore") + "grad").joinToString(" / ")] = gLabel
+            menuSelections[(listOf("Contenitore", "Colore") + "grad").joinToString(" / ")] = gLabel
         } ?: run {
-            menuSelections[(listOf("Contenitore","Colore") + "grad").joinToString(" / ")] = "Monocolore"
+            // fallback per contenitori senza gradienti
+            menuSelections[(listOf("Contenitore", "Colore") + "grad").joinToString(" / ")] = "Monocolore"
         }
     }
+
 
     
     // Griglia
@@ -464,11 +488,14 @@ fun EditorMenusOnly(
     }
     LaunchedEffect(isContainerContext) {
         if (isContainerContext) {
-            // appena entro in "Contenitore" apro il menù laterale e riparto da "Create"
             infoDeckOpen = true
             toolMode = ToolMode.Create
+        } else {
+            // appena esci dal menù "Contenitore" nessun selezionato resta evidenziato
+            selectedRect = null
         }
     }
+
     LaunchedEffect(menuPath, selectedRect) {
         if (selectedRect == null) return@LaunchedEffect
         // Bordi → Colore (bordo singolo colore)
@@ -568,7 +595,7 @@ fun EditorMenusOnly(
                 k("Contenitore","tipo") to "Normale",
                 k("Contenitore","Colore","col1") to "Bianco",
                 k("Contenitore","Colore","col2") to "Grigio chiaro",
-                k("Contenitore","Colore","grad") to "Orizzontale",
+                k("Contenitore","Colore","grad") to "Monocolore",
                 k("Contenitore","Colore","fx") to "Vignettatura",
                 k("Contenitore","Aggiungi foto","crop") to "Nessuno",
                 k("Contenitore","Aggiungi foto","frame") to "Sottile",
@@ -584,7 +611,7 @@ fun EditorMenusOnly(
             "Layout" -> listOf(
                 k("Layout","Colore","col1") to "Bianco",
                 k("Layout","Colore","col2") to "Grigio chiaro",
-                k("Layout","Colore","grad") to "Orizzontale",
+                k("Layout","Colore","grad") to "Monocolore",
                 k("Layout","Colore","fx") to "Vignettatura",
                 k("Layout","Aggiungi foto","crop") to "Nessuno",
                 k("Layout","Aggiungi foto","frame") to "Sottile",
@@ -890,6 +917,47 @@ fun EditorMenusOnly(
                                 else -> menuPath + label
                             }
                             lastChanged = null
+                            // === Apertura palette se entri su un nodo "Colore" ===
+                            val fullPath = (menuPath + label).joinToString(" / ")
+                            when {
+                                // Bordi -> Colore
+                                fullPath.endsWith("Contenitore / Bordi / Colore") -> {
+                                    colorPickTarget = ColorTarget.Border
+                                    colorPickInitial = selectedRect?.borderColor ?: Color.Black
+                                    showColorPicker = true
+                                }
+                                // Contenitore -> Colore -> col1
+                                fullPath.endsWith("Contenitore / Colore / col1") -> {
+                                    colorPickTarget = ColorTarget.ContainerFill(1)
+                                    colorPickInitial = selectedRect?.fillColor ?: Color.White
+                                    showColorPicker = true
+                                }
+                                // Contenitore -> Colore -> col2 (gating pro rimane gestito dal tuo SubMenuBar)
+                                fullPath.endsWith("Contenitore / Colore / col2") -> {
+                                    colorPickTarget = ColorTarget.ContainerFill(2)
+                                    colorPickInitial = Color.Gray
+                                    showColorPicker = true
+                                }
+                                // Testo -> Colore
+                                fullPath.endsWith("Testo / Colore") -> {
+                                    colorPickTarget = ColorTarget.Text
+                                    colorPickInitial = Color.White
+                                    showColorPicker = true
+                                }
+                                // Layout -> Colore -> col1/col2
+                                fullPath.endsWith("Layout / Colore / col1") -> {
+                                    colorPickTarget = ColorTarget.LayoutFill(1)
+                                    colorPickInitial = Color.White
+                                    showColorPicker = true
+                                }
+                                fullPath.endsWith("Layout / Colore / col2") -> {
+                                    colorPickTarget = ColorTarget.LayoutFill(2)
+                                    colorPickInitial = Color.Gray
+                                    showColorPicker = true
+                                }
+                            }
+
+
                         },
                         onToggle = { label, value ->
                             val root = menuPath.firstOrNull() ?: "Contenitore"
@@ -1075,56 +1143,65 @@ fun EditorMenusOnly(
                 }
             )
             FloatingColorPickerOverlay(
-                visible = colorPickerVisible,
-                initial = when (val t = colorTarget) {
-                    is ColorTarget.Border -> selectedRect?.borderColor ?: Color.Black
-                    is ColorTarget.ContainerFill -> {
-                        val fs = rectFillStyles[selectedRect ?: return@FloatingColorPickerOverlay]
-                        if (t.slot == 2) fs?.col2 ?: Color(0xFFAAAAAA) else fs?.col1 ?: selectedRect!!.fillColor
-                    }
-                    is ColorTarget.LayoutFill -> Color.White // (estensione futura)
-                    is ColorTarget.Text -> Color.White       // (estensione futura)
-                    null -> Color.White
-                },
+                visible = showColorPicker,
+                initialColor = colorPickInitial,
+                onDismiss = { showColorPicker = false },
                 onPick = { picked ->
-                    val rect = selectedRect ?: return@FloatingColorPickerOverlay
-                    when (val t = colorTarget) {
-                        is ColorTarget.Border -> {
-                            val updated = rect.copy(borderColor = picked)
-                            // aggiorno la label esadecimale del bordo
-                            val hex = colorToHex(picked)
-                            menuSelections[(listOf("Contenitore","Bordi") + "Colore").joinToString(" / ")] = hex
+                    val hex = picked.toHex()
+                    when (val tgt = colorPickTarget) {
+                        ColorTarget.Border -> {
+                            // aggiorna modello
+                            selectedRect?.let { rect ->
+                                pageState?.let { ps ->
+                                    val i = ps.items.indexOf(rect)
+                                    if (i >= 0) {
+                                        val updated = rect.copy(borderColor = picked)
+                                        ps.items[i] = updated
+                                        selectedRect = updated
+                                    }
+                                }
+                            }
+                            // aggiorna menù (targhetta HEX sotto icona)
                             menuSelections[(listOf("Contenitore") + "b_color").joinToString(" / ")] = hex
-                            // sostituisco l'item
-                            val items = pageState?.items ?: return@FloatingColorPickerOverlay
-                            val ix = items.indexOf(rect); if (ix>=0) items[ix] = updated
-                            selectedRect = updated
                         }
                         is ColorTarget.ContainerFill -> {
-                            val prev = rectFillStyles[rect]
-                            if (t.slot == 1) {
-                                // col1 → aggiorno anche il fillColor (monocolore visibile subito)
-                                val updated = rect.copy(fillColor = picked)
-                                val items = pageState?.items ?: return@FloatingColorPickerOverlay
-                                val ix = items.indexOf(rect); if (ix>=0) items[ix] = updated
-                                selectedRect = updated
-                                rectFillStyles[updated] = (prev?.copy(col1 = picked)) ?: com.example.appbuilder.canvas.FillStyle(col1 = picked)
-                                rectFillStyles.remove(rect)
-                                menuSelections[(listOf("Contenitore","Colore") + "col1").joinToString(" / ")] = colorToHex(picked)
-                            } else {
-                                // col2 → solo nello stile (gradiente), niente cambio del fillColor
-                                val fs = (prev ?: com.example.appbuilder.canvas.FillStyle(col1 = rect.fillColor))
-                                rectFillStyles[rect] = fs.copy(col2 = picked)
-                                menuSelections[(listOf("Contenitore","Colore") + "col2").joinToString(" / ")] = colorToHex(picked)
+                            // per ora: monocolore → fillColor
+                            selectedRect?.let { rect ->
+                                if (tgt.slot == 1) {
+                                    pageState?.let { ps ->
+                                        val i = ps.items.indexOf(rect)
+                                        if (i >= 0) {
+                                            val updated = rect.copy(fillColor = picked)
+                                            ps.items[i] = updated
+                                            selectedRect = updated
+                                        }
+                                    }
+                                    // menù
+                                    menuSelections[(listOf("Contenitore","Colore") + "col1").joinToString(" / ")] = hex
+                                } else {
+                                    // col2: aggiorno solo il menù (il gating PRO resta nel tuo SubMenuBar)
+                                    menuSelections[(listOf("Contenitore","Colore") + "col2").joinToString(" / ")] = hex
+                                }
+                            } ?: run {
+                                // se non c'è un rettangolo selezionato, aggiorno solo il menù
+                                val key = (listOf("Contenitore","Colore") + if (tgt.slot==1) "col1" else "col2").joinToString(" / ")
+                                menuSelections[key] = hex
                             }
                         }
-                        else -> Unit // Layout/Text: estensioni future
+                        is ColorTarget.LayoutFill -> {
+                            val key = (listOf("Layout","Colore") + if (tgt.slot==1) "col1" else "col2").joinToString(" / ")
+                            menuSelections[key] = hex
+                        }
+                        ColorTarget.Text -> {
+                            val key = (listOf("Testo") + "Colore").joinToString(" / ")
+                            menuSelections[key] = hex
+                        }
+                        null -> Unit
                     }
-                },
-                onClose = { colorPickerVisible = false },
-                offset = pickerOffset,
-                onOffsetChange = { pickerOffset = it }
+                    showColorPicker = false
+                }
             )
+
 
             // Overlay: Slider densità griglia (valori NON arbitrari)
             GridSliderOverlay(
@@ -1173,104 +1250,124 @@ fun EditorMenusOnly(
 @Composable
 fun FloatingColorPickerOverlay(
     visible: Boolean,
-    initial: Color,
-    onPick: (Color) -> Unit,
-    onClose: () -> Unit,
-    offset: IntOffset,
-    onOffsetChange: (IntOffset) -> Unit
+    initialColor: Color,
+    onDismiss: () -> Unit,
+    onPick: (Color) -> Unit
 ) {
     if (!visible) return
+
+    // palette: 24 tinte "ruota" + alcuni neutri al centro
+    val ring = remember {
+        listOf(
+            0xFFFF3B30, 0xFFFF9500, 0xFFFFCC00, 0xFF34C759, 0xFF30B0C7, 0xFF007AFF,
+            0xFF5856D6, 0xFFAF52DE, 0xFFFF2D55, 0xFFFF6B81, 0xFFFFD166, 0xFFA7E34B,
+            0xFF64D2FF, 0xFF74A7FF, 0xFF8E8AFF, 0xFFCDA7FF, 0xFFFF8FA3, 0xFFFFB86C,
+            0xFFEDE56A, 0xFF72E7A9, 0xFF80E8FF, 0xFFB0CCFF, 0xFFD0B0FF, 0xFFFFA7C2
+        ).map { Color(it) }
+    }
+    val neutrals = listOf(Color.Black, Color.DarkGray, Color.Gray, Color.LightGray, Color.White)
+
+    var drag by remember { mutableStateOf(IntOffset.Zero) }
+
     Box(Modifier.fillMaxSize().zIndex(1000f)) {
+        // scrim e tap-chiusura
+        Box(
+            Modifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f))
+                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) }
+        )
+
         // pannello trascinabile
-        Surface(
-            color = Color(0xEE0F141E),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 12.dp,
-            shadowElevation = 12.dp,
-            modifier = Modifier
+        Box(
+            Modifier
                 .align(Alignment.Center)
-                .offset { offset }
+                .offset { drag }
                 .pointerInput(Unit) {
-                    detectDragGestures { change, drag ->
-                        onOffsetChange(offset + IntOffset(drag.x.toInt(), drag.y.toInt()))
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        drag = drag.copy(
+                            x = drag.x + dragAmount.x.toInt(),
+                            y = drag.y + dragAmount.y.toInt()
+                        )
                     }
                 }
         ) {
-            Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Palette colori", fontSize = 14.sp)
-                Spacer(Modifier.height(8.dp))
+            // "ruota" + preview
+            Box(
+                Modifier
+                    .size(260.dp)
+                    .background(Color(0xFF10151F), shape = RoundedCornerShape(16.dp))
+                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+            ) {
+                // anello di chip circolari
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val n = ring.size
+                    val radius = 88.dp
+                    val chip = 32.dp
+                    val centerX = maxWidth / 2
+                    val centerY = maxHeight / 2
+                    val r = radius
+                    val step = 360f / n
 
-                // anello di tinte (12)
-                val hues = listOf(
-                    Color(0xFFFF3B30), Color(0xFFFF9500), Color(0xFFFFD60A),
-                    Color(0xFF34C759), Color(0xFF00C7BE), Color(0xFF32ADE6),
-                    Color(0xFF007AFF), Color(0xFF5856D6), Color(0xFFAF52DE),
-                    Color(0xFFFF2D55), Color(0xFFFF6B81), Color(0xFFFF9F0A)
-                )
-                val radius = 96.dp
-                val sw = 28.dp
-                Box(Modifier.size(radius * 2), contentAlignment = Alignment.Center) {
-                    val n = hues.size
-                    hues.forEachIndexed { i, c ->
-                        val angle = (Math.PI * 2 * i / n) - Math.PI / 2
-                        val rPx = with(LocalDensity.current) { (radius - 10.dp).toPx() }
-                        val x = (kotlin.math.cos(angle) * rPx).toFloat()
-                        val y = (kotlin.math.sin(angle) * rPx).toFloat()
+                    ring.forEachIndexed { i, c ->
+                        val ang = Math.toRadians((i * step - 90f).toDouble()) // parte da alto
+                        val dx = (cos(ang) * r.value).dp
+                        val dy = (sin(ang) * r.value).dp
                         Box(
                             Modifier
-                                .offset { IntOffset(x.toInt(), y.toInt()) }
-                                .size(sw)
+                                .size(chip)
+                                .offset(x = dx, y = dy)
+                                .align(Alignment.Center)
                                 .clip(CircleShape)
                                 .background(c)
-                                .border(2.dp, Color.Black.copy(alpha = 0.25f), CircleShape)
-                                .pointerInput(Unit) { detectTapGestures { onPick(c) } }
-                        )
-                    }
-                    // anello interno: varianti chiaroscuro della tinta iniziale
-                    val base = initial
-                    val shades = listOf(
-                        base.copy(alpha = 1f),
-                        base.copy(alpha = 0.85f),
-                        base.copy(alpha = 0.7f),
-                        base.copy(alpha = 0.55f),
-                        base.copy(alpha = 0.4f),
-                        Color.White
-                    )
-                    val r2 = radius - 40.dp
-                    shades.forEachIndexed { i, c ->
-                        val ang = (Math.PI * 2 * i / shades.size) - Math.PI / 2
-                        val rPx = with(LocalDensity.current) { (r2 - 8.dp).toPx() }
-                        val x = (kotlin.math.cos(ang) * rPx).toFloat()
-                        val y = (kotlin.math.sin(ang) * rPx).toFloat()
-                        Box(
-                            Modifier
-                                .offset { IntOffset(x.toInt(), y.toInt()) }
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(c)
-                                .border(2.dp, Color.Black.copy(alpha = 0.2f), CircleShape)
-                                .pointerInput(Unit) { detectTapGestures { onPick(c) } }
+                                .border(2.dp, Color.White.copy(alpha = 0.70f), CircleShape)
+                                .pointerInput(c) {
+                                    detectTapGestures(onTap = { onPick(c) })
+                                }
                         )
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
-
-                // esadecimale selezionato (colorato)
-                val hex = colorToHex(initial)
-                Surface(
-                    color = initial.copy(alpha = 0.15f),
-                    contentColor = initial,
-                    shape = RoundedCornerShape(8.dp)
-                ) { Text(hex, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), fontSize = 12.sp) }
-
-                Spacer(Modifier.height(12.dp))
-                TextButton(onClick = onClose) { Text("Chiudi") }
+                // neutri centrali + HEX
+                Column(
+                    Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        neutrals.forEach { c ->
+                            Box(
+                                Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                    .pointerInput(c) {
+                                        detectTapGestures(onTap = { onPick(c) })
+                                    }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        color = initialColor.copy(alpha = 0.15f),
+                        contentColor = initialColor,
+                        shape = RoundedCornerShape(10.dp),
+                        tonalElevation = 2.dp,
+                        shadowElevation = 6.dp
+                    ) {
+                        Text(
+                            text = initialColor.toHex(),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
         }
     }
 }
+
 
 /* =========================================================================================
 *  BARRA PRINCIPALE (icone stile GitHub, scura, sempre visibile in HOME)
