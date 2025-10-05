@@ -2425,16 +2425,6 @@ private fun LayoutLevel(
                         options = listOf("Nessuna", "Sottile", "Marcata"),
                         onSelected = { onPick("frame", it) }
                     )
-                    IconDropdown(EditorIcons.Layout, "Filtri",
-                        current = get("filtro") ?: "Nessuno",
-                        options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
-                        onSelected = { onPick("filtro", it) }
-                    )
-                    IconDropdown(EditorIcons.Layout, "Adattamento",
-                        current = get("fit") ?: "Cover",
-                        options = listOf("Cover", "Contain", "Fill"),
-                        onSelected = { onPick("fit", it) }
-                    )
                 }
                 "Aggiungi album" -> {
                     IconDropdown(EditorIcons.Crop, "Crop",
