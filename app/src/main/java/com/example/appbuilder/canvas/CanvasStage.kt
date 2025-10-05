@@ -38,6 +38,8 @@ fun CanvasStage(
     var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var firstAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     // Stato locale per RESIZE
+    var resizeTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+    var resizeFixed  by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     // Quando esci dal menù Contenitore (creationEnabled=false) azzera ogni evidenziazione
     LaunchedEffect(creationEnabled) {
@@ -132,7 +134,7 @@ fun CanvasStage(
         modifier = Modifier
             .fillMaxSize()
 
-            // --- TAP / LONG‑PRESS: Create (immutata) e Point ---
+                // --- TAP / LONG‑PRESS: Create (immutata) e Point ---
             .pointerInput(cols, creationEnabled, toolMode) {
                 detectTapGestures(
                     onTap = { ofs ->
@@ -274,7 +276,7 @@ fun CanvasStage(
 
             // --- DRAG dopo LONG‑PRESS: Grab / Resize ---
             .pointerInput(cols, page?.items, toolMode) {
-                if (toolMode == ToolMode.Grab) {
+                if (toolMode == ToolMode.Grab || toolMode == ToolMode.Resize) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { ofs ->
                             val (rr, cc) = computeCell(ofs, cols, this.size.width.toFloat(), this.size.height.toFloat())
@@ -298,8 +300,8 @@ fun CanvasStage(
                                 // salvo come rettangolo “preview”: userò fixed + cursore per ridisegnare
                                 resizingRect = rect.copy() // preview = rettangolo corrente
                                 // memorizzo i corner in state locali
-                                resizeFixed = fixed
-
+                                resizeFixedCorner = fixed
+                                resizeMovingCornerStart = nearest
                             }
                         },
                         onDrag = { change, _ ->
@@ -325,7 +327,7 @@ fun CanvasStage(
                                     movingRect = candidate
                                 }
                             } else if (toolMode == ToolMode.Resize) {
-                                val fixed = resizeFixed ?: return@detectDragGesturesAfterLongPress
+                                val fixed = resizeFixedCorner ?: return@detectDragGesturesAfterLongPress
                                 var r0 = min(fixed.first, cr).coerceAtLeast(0)
                                 var r1 = max(fixed.first, cr).coerceAtMost(rows - 1)
                                 var c0 = min(fixed.second, cc).coerceAtLeast(0)
@@ -354,8 +356,8 @@ fun CanvasStage(
                                 resizingRect = null
                             }
                             activeRect = null
-                            resizeFixed = null
-
+                            resizeFixedCorner = null
+                            resizeMovingCornerStart = null
                         },
                         onDragCancel = {
                             movingRect = null; resizingRect = null; activeRect = null
