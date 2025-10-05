@@ -444,11 +444,11 @@ fun EditorMenusOnly(
         menuSelections[(listOf("Contenitore") + "shape").joinToString(" / ")] = s
 
         // angoli
-        val cr = rectCorners[rect]
-        menuSelections[(listOf("Contenitore") + "ic_as").joinToString(" / ")] = dpToKey(cr?.tl ?: 0.dp)
-        menuSelections[(listOf("Contenitore") + "ic_ad").joinToString(" / ")] = dpToKey(cr?.tr ?: 0.dp)
-        menuSelections[(listOf("Contenitore") + "ic_bd").joinToString(" / ")] = dpToKey(cr?.br ?: 0.dp)
-        menuSelections[(listOf("Contenitore") + "ic_bs").joinToString(" / ")] = dpToKey(cr?.bl ?: 0.dp)
+        val cr = rectCorners[rect] ?: CornerRadii()
+        menuSelections["Contenitore / ic_as"] = dpToKey(cr.tl)
+        menuSelections["Contenitore / ic_ad"] = dpToKey(cr.tr)
+        menuSelections["Contenitore / ic_bs"] = dpToKey(cr.bl)
+        menuSelections["Contenitore / ic_bd"] = dpToKey(cr.br)
 
         // colore corpo (col1) / col2 / grad (rimasti come nelle tue versioni)
         val col1 = rectFillStyles[rect]?.col1 ?: rect.fillColor
@@ -655,10 +655,10 @@ fun EditorMenusOnly(
                 k("Contenitore","Aggiungi album","fit") to "Cover",
                 k("Contenitore","Aggiungi album","anim") to "Slide",
                 k("Contenitore","Aggiungi album","speed") to "Media",
-                k("Contenitore","ic_as") to "0dp",
-                k("Contenitore","ic_ad") to "0dp",
-                k("Contenitore","ic_bs") to "0dp",
-                k("Contenitore","ic_bd") to "0dp",
+                k("Contenitore","ic_as") to "0dp",  // angolo alto-sinistra
+                k("Contenitore","ic_ad") to "0dp",  // angolo alto-destra
+                k("Contenitore","ic_bs") to "0dp",  // angolo basso-sinistra
+                k("Contenitore","ic_bd") to "0dp",  // angolo basso-destra
             )
             "Layout" -> listOf(
                 k("Layout","Colore","col1") to "Bianco",
@@ -849,9 +849,6 @@ fun EditorMenusOnly(
 
                     // già passavi fillStyles nella versione attuale:
                     fillStyles = rectFillStyles,
-
-                    // ⬇️ nuovi
-                    imageStyles = rectImages,
                     corners     = rectCorners
                 )
             }
@@ -1154,21 +1151,19 @@ fun EditorMenusOnly(
                                         }
                                     }
 
-                                    // Angoli singoli
                                     "ic_as", "ic_ad", "ic_bs", "ic_bd" -> {
-                                        rect?.let {
-                                            val cur = rectCorners[it] ?: com.example.appbuilder.canvas.CornerRadii()
-                                            fun String.toDpSafe() = keyToDp(this)
-                                            val updated = when (label) {
-                                                "ic_as" -> cur.copy(asTL = (value as String).toDpSafe())
-                                                "ic_ad" -> cur.copy(adTR = (value as String).toDpSafe())
-                                                "ic_bs" -> cur.copy(bsBL = (value as String).toDpSafe())
-                                                else    -> cur.copy(bdBR = (value as String).toDpSafe())
+                                        val rect = selectedRect
+                                        if (rect != null) {
+                                            val dp = keyToDp(value)
+                                            val current = rectCorners[rect] ?: CornerRadii()
+                                            rectCorners[rect] = when (label) {
+                                                "ic_as" -> current.copy(tl = dp)
+                                                "ic_ad" -> current.copy(tr = dp)
+                                                "ic_bs" -> current.copy(bl = dp)
+                                                else    -> current.copy(br = dp)
                                             }
-                                            rectCorners[it] = updated
                                         }
                                     }
-
                                     // FX
                                     "fx" -> {
                                         rect?.let {
@@ -2400,10 +2395,30 @@ private fun LayoutLevel(
                     ) { onEnter("Aggiungi album") }
                 }
                 "Aggiungi foto" -> {
-                    IconDropdown(EditorIcons.Crop, "Crop",
+                    IconDropdown(
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
+                        contentDescription = "Ritaglia",
                         current = get("crop") ?: "Nessuno",
                         options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
                         onSelected = { onPick("crop", it) }
+                    )
+
+                    // ADATTA (ic_adapt) — usa la tua chiave "fitCont"
+                    IconDropdown(
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_adapt),
+                        contentDescription = "Adatta",
+                        current = get("fitCont") ?: "Cover",
+                        options = listOf("Cover", "Contain", "Fill", "FitWidth", "FitHeight"),
+                        onSelected = { onPick("fitCont", it) }
+                    )
+
+                    // FILTRO (ic_filter)
+                    IconDropdown(
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
+                        contentDescription = "Filtro",
+                        current = get("filtro") ?: "Nessuno",
+                        options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
+                        onSelected = { onPick("filtro", it) }
                     )
                     IconDropdown(EditorIcons.Layout, "Cornice",
                         current = get("frame") ?: "Sottile",

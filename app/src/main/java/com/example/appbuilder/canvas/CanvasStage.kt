@@ -98,6 +98,8 @@ fun CanvasStage(
     shapes  : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
     corners : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
     fx      : Map<DrawItem.RectItem, FxKind> = emptyMap()
+    pageBackgroundColor: Color = Color.White,
+    pageBackgroundBrush: Brush? = null    
 ) {
     val context = LocalContext.current
 
@@ -479,11 +481,14 @@ fun CanvasStage(
             val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
 
             if (page != null) {
-                pageBackgroundBrush?.let {
-                    drawRect(brush = it, topLeft = Offset.Zero, size = size)
-                } ?: drawRect(color = pageBackgroundColor, topLeft = Offset.Zero, size = size)
+                pageBackgroundBrush?.let { brush ->
+                    drawRect(brush = brush, topLeft = Offset.Zero, size = size)
+                } ?: drawRect(
+                    color = pageBackgroundColor,
+                    topLeft = Offset.Zero,
+                    size = size
+                )
             }
-
 
             // Disegno elementi fino al livello corrente
             page?.items?.forEach { item ->
