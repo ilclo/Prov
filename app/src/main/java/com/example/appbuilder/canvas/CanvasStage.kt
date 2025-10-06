@@ -97,7 +97,8 @@ fun CanvasStage(
     variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
     shapes  : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
     corners : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
-    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap()
+    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),
+    imageStyles: Map<DrawItem.RectItem, ImageStyle> = emptyMap(),
     pageBackgroundColor: Color = Color.White,
     pageBackgroundBrush: Brush? = null    
 ) {
@@ -545,24 +546,68 @@ fun CanvasStage(
                             // 1) FILL (solo se non "Text")
                             if (varnt != Variant.Text) {
                                 if (varnt == Variant.Full) {
-                                    // gradiente se definito, altrimenti tinta piena
-                                    if (style != null && style.dir != GradientDir.Monocolore && style.col2 != null) {
-                                        val (start, end) = when (style.dir) {
-                                            GradientDir.Orizzontale -> Offset(left, top + h/2f)    to Offset(left + w, top + h/2f)
-                                            GradientDir.Verticale   -> Offset(left + w/2f, top)    to Offset(left + w/2f, top + h)
-                                            GradientDir.DiagTL_BR   -> Offset(left, top)           to Offset(left + w, top + h)
-                                            GradientDir.DiagTR_BL   -> Offset(left + w, top)       to Offset(left, top + h)
-                                            else -> Offset(left, top) to Offset(left, top)
+                                    // prova immagine; se non c’è, gradiente; altrimenti tinta
+                                    val imgStyle = imageStyles[item]
+                                    val imgBitmap = rememberBitmap(imgStyle?.uri)
+
+                                    if (imgStyle != null && imgBitmap != null) {
+                                        val iw = imgBitmap.width.toFloat()
+                                        val ih = imgBitmap.height.toFloat()
+                                        val dstW = w
+                                        val dstH = h
+
+                                        val (srcOffset, srcSize) = when (imgStyle.fit) {
+                                            ImageFit.Stretch -> IntOffset(0, 0) to IntSize(iw.toInt(), ih.toInt())
+                                            ImageFit.Cover -> {
+                                                val scale = kotlin.math.max(dstW / iw, dstH / ih)
+                                                val sw = (dstW / scale).coerceAtMost(iw)
+                                                val sh = (dstH / scale).coerceAtMost(ih)
+                                                val sx = ((iw - sw) * 0.5f).coerceAtLeast(0f)
+                                                val sy = ((ih - sh) * 0.5f).coerceAtLeast(0f)
+                                                IntOffset(sx.toInt(), sy.toInt()) to IntSize(sw.toInt(), sh.toInt())
+                                            }
+                                            ImageFit.Contain -> {
+                                                val scale = kotlin.math.min(dstW / iw, dstH / ih)
+                                                val sw = (dstW / scale).coerceAtMost(iw)
+                                                val sh = (dstH / scale).coerceAtMost(ih)
+                                                val sx = ((iw - sw) * 0.5f).coerceAtLeast(0f)
+                                                val sy = ((ih - sh) * 0.5f).coerceAtLeast(0f)
+                                                IntOffset(sx.toInt(), sy.toInt()) to IntSize(sw.toInt(), sh.toInt())
+                                            }
                                         }
+
+                                        val cf = colorFilterFor(imgStyle.filter)
                                         clipPath(path) {
-                                            drawRect(
-                                                brush = Brush.linearGradient(listOf(style.col1, style.col2), start = start, end = end),
-                                                topLeft = Offset(left, top),
-                                                size = Size(w, h)
+                                            drawImage(
+                                                image = imgBitmap,
+                                                srcOffset = srcOffset,
+                                                srcSize = srcSize,
+                                                dstOffset = IntOffset(left.toInt(), top.toInt()),
+                                                dstSize = IntSize(dstW.toInt(), dstH.toInt()),
+                                                colorFilter = cf,
+                                                filterQuality = FilterQuality.Medium
                                             )
                                         }
                                     } else {
-                                        drawPath(path = path, color = item.fillColor, style = Fill)
+                                        // gradiente se definito, altrimenti tinta
+                                        if (style != null && style.dir != GradientDir.Monocolore && style.col2 != null) {
+                                            val (start, end) = when (style.dir) {
+                                                GradientDir.Orizzontale -> Offset(left, top + h/2f)    to Offset(left + w, top + h/2f)
+                                                GradientDir.Verticale   -> Offset(left + w/2f, top)    to Offset(left + w/2f, top + h)
+                                                GradientDir.DiagTL_BR   -> Offset(left, top)           to Offset(left + w, top + h)
+                                                GradientDir.DiagTR_BL   -> Offset(left + w, top)       to Offset(left, top + h)
+                                                else -> Offset(left, top) to Offset(left, top)
+                                            }
+                                            clipPath(path) {
+                                                drawRect(
+                                                    brush = Brush.linearGradient(listOf(style.col1, style.col2), start = start, end = end),
+                                                    topLeft = Offset(left, top),
+                                                    size = Size(w, h)
+                                                )
+                                            }
+                                        } else {
+                                            drawPath(path = path, color = item.fillColor, style = Fill)
+                                        }
                                     }
                                 }
                                 // 2) FX opzionali (clip alla forma)
@@ -613,7 +658,6 @@ fun CanvasStage(
                                     }
                                 }
                             }
-
                             // 3) BORDI in base a variant
                             when (varnt) {
                                 Variant.Text -> Unit // niente bordi, niente fill
