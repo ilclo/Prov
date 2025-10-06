@@ -1039,10 +1039,9 @@ fun EditorMenusOnly(
                                     cropTargetRect = sr
                                     cropOverlayVisible = true
                                 } else {
-                                    // se non c’è immagine, chiedila prima
                                     pickImageLauncher.launch("image/*")
                                 }
-                                return@enter  // ⬅️ label valida della lambda
+                                return@SubMenuBar
                             }
 
                             when {
@@ -2652,6 +2651,7 @@ private fun ContainerLevel(
 
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
+            ToolbarIconButton(EditorIcons.Square, "Angoli") { onEnter("Angoli") }
 
             IconDropdown(EditorIcons.SwipeVertical, "Scrollabilità ",
                 current = get("scroll") ?: "Assente",
@@ -2678,15 +2678,6 @@ private fun ContainerLevel(
                 current = get("tipo") ?: "Normale",
                 options = listOf("Normale", "Sfogliabile", "Tab"),
                 onSelected = { onPick("tipo", it) }
-            )
-            // Angoli (ic_as, ic_ad, ic_bs, ic_bd)
-            val dpOptions = listOf("0dp","4dp","8dp","12dp","16dp","24dp","32dp")
-            IconDropdown(
-                icon = ImageVector.vectorResource(id = R.drawable.ic_as),
-                contentDescription = "Angolo alto-sx",
-                current = get("ic_as") ?: "0dp",
-                options = listOf("0dp","4dp","8dp","12dp","16dp"),
-                onSelected = { onPick("ic_as", it) }
             )
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_ad),
@@ -2757,6 +2748,25 @@ private fun ContainerLevel(
                 current = get("fx") ?: "Vignettatura",
                 options = listOf("Vignettatura", "Noise", "Strisce"),
                 onSelected = { onPick("fx", it) }
+            )
+        }
+        "Angoli" -> {
+            val dpOpts = listOf("0dp","4dp","8dp","12dp","16dp","24dp")
+            IconDropdown(EditorIcons.Square, "ic_as",
+                current = get("ic_as") ?: "0dp", options = dpOpts,
+                onSelected = { onPick("ic_as", it) }
+            )
+            IconDropdown(EditorIcons.Square, "ic_ad",
+                current = get("ic_ad") ?: "0dp", options = dpOpts,
+                onSelected = { onPick("ic_ad", it) }
+            )
+            IconDropdown(EditorIcons.Square, "ic_bs",
+                current = get("ic_bs") ?: "0dp", options = dpOpts,
+                onSelected = { onPick("ic_bs", it) }
+            )
+            IconDropdown(EditorIcons.Square, "ic_bd",
+                current = get("ic_bd") ?: "0dp", options = dpOpts,
+                onSelected = { onPick("ic_bd", it) }
             )
         }
         "Immagini" -> {
