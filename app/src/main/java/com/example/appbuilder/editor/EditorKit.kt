@@ -908,6 +908,7 @@ fun EditorMenusOnly(
                     shapes       = rectShapes,
                     corners      = rectCorners,
                     fx           = rectFx,
+                    images      = rectImageLinks, 
                     imageStyles  = rectImages
                 )
             }
@@ -1191,18 +1192,25 @@ fun EditorMenusOnly(
                                 when (label) {
                                     // Variant
                                     "variant" -> {
-                                        rect?.let {
-                                            val v = when ((value as? String)?.lowercase()?.trim()) {
-                                                "full"       -> com.example.appbuilder.canvas.Variant.Full
-                                                "outlined"   -> com.example.appbuilder.canvas.Variant.Outlined
-                                                "text"       -> com.example.appbuilder.canvas.Variant.Text
-                                                "topbottom"  -> com.example.appbuilder.canvas.Variant.TopBottom
-                                                else         -> com.example.appbuilder.canvas.Variant.Full
-                                            }
-                                            rectVariants[it] = v
+                                        val r = selectedRect ?: return@pick
+                                        val v = when (value) {
+                                            "Full"      -> Variant.Full
+                                            "Outlined"  -> Variant.Outlined
+                                            "TopBottom" -> Variant.TopBottom
+                                            "Text"      -> Variant.Text
+                                            else        -> Variant.Full
                                         }
+                                        rectVariants[r] = v
                                     }
-
+                                    "b_thick" -> {
+                                        val r = selectedRect ?: return@pick
+                                        val newWidth = keyToDp(value)          // es: "4dp" -> 4.dp (hai già keyToDp)
+                                        val updated = r.copy(borderWidth = newWidth)
+                                        val items = pageState?.items ?: return@pick
+                                        val ix = items.indexOf(r)
+                                        if (ix >= 0) items[ix] = updated
+                                        selectedRect = updated                 // mantieni selezione coerente
+                                    }
                                     // Shape (blocco "cerchio" se non è quadrato)
                                     "shape" -> {
                                         rect?.let {
@@ -2655,7 +2663,6 @@ private fun ContainerLevel(
 
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
-            ToolbarIconButton(EditorIcons.Square, "Angoli") { onEnter("Angoli") }
 
             IconDropdown(EditorIcons.SwipeVertical, "Scrollabilità ",
                 current = get("scroll") ?: "Assente",
@@ -2685,25 +2692,31 @@ private fun ContainerLevel(
             )
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_ad),
-                contentDescription = "Angolo alto-dx",
+                contentDescription = "ic_ad",
                 current = get("ic_ad") ?: "0dp",
-                options = listOf("0dp","4dp","8dp","12dp","16dp"),
-                onSelected = { onPick("ic_ad", it) }
-            )
-            IconDropdown(
-                icon = ImageVector.vectorResource(id = R.drawable.ic_bs),
-                contentDescription = "Angolo basso-sx",
-                current = get("ic_bs") ?: "0dp",
-                options = listOf("0dp","4dp","8dp","12dp","16dp"),
-                onSelected = { onPick("ic_bs", it) }
-            )
+                options = listOf("0dp", "4dp", "8dp", "16dp")
+            ) { v -> onPick("ic_ad", v) }
+
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_bd),
-                contentDescription = "Angolo basso-dx",
+                contentDescription = "ic_bd",
                 current = get("ic_bd") ?: "0dp",
-                options = listOf("0dp","4dp","8dp","12dp","16dp"),
-                onSelected = { onPick("ic_bd", it) }
-            )
+                options = listOf("0dp", "4dp", "8dp", "16dp")
+            ) { v -> onPick("ic_bd", v) }
+
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_bs),
+                contentDescription = "ic_bs",
+                current = get("ic_bs") ?: "0dp",
+                options = listOf("0dp", "4dp", "8dp", "16dp")
+            ) { v -> onPick("ic_bs", v) }
+
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_as),
+                contentDescription = "ic_as",
+                current = get("ic_as") ?: "0dp",
+                options = listOf("0dp", "4dp", "8dp", "16dp")
+            ) { v -> onPick("ic_as", v) }
 
             IconDropdown(
                 icon = Icons.Outlined.BookmarkAdd,
@@ -2752,25 +2765,6 @@ private fun ContainerLevel(
                 current = get("fx") ?: "Vignettatura",
                 options = listOf("Vignettatura", "Noise", "Strisce"),
                 onSelected = { onPick("fx", it) }
-            )
-        }
-        "Angoli" -> {
-            val dpOpts = listOf("0dp","4dp","8dp","12dp","16dp","24dp")
-            IconDropdown(EditorIcons.Square, "ic_as",
-                current = get("ic_as") ?: "0dp", options = dpOpts,
-                onSelected = { onPick("ic_as", it) }
-            )
-            IconDropdown(EditorIcons.Square, "ic_ad",
-                current = get("ic_ad") ?: "0dp", options = dpOpts,
-                onSelected = { onPick("ic_ad", it) }
-            )
-            IconDropdown(EditorIcons.Square, "ic_bs",
-                current = get("ic_bs") ?: "0dp", options = dpOpts,
-                onSelected = { onPick("ic_bs", it) }
-            )
-            IconDropdown(EditorIcons.Square, "ic_bd",
-                current = get("ic_bd") ?: "0dp", options = dpOpts,
-                onSelected = { onPick("ic_bd", it) }
             )
         }
         "Immagini" -> {
