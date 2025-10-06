@@ -232,6 +232,53 @@ private fun tokenToColor(token: String?): Color? = when(token?.lowercase()?.trim
 }
 
 /* ---------- AGGIUNGI ---------- */
+
+@Composable
+private fun BoxScope.CropImageOverlay(
+    visible: Boolean,
+    imageUri: Uri?,
+    onDismiss: () -> Unit,
+    onApply: (com.example.appbuilder.canvas.ImageStyle) -> Unit
+) {
+    if (!visible) return
+    Surface(
+        color = Color(0xCC0D1117),
+        contentColor = Color.White,
+        modifier = Modifier.fillMaxSize().zIndex(1000f)
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Ritaglia immagine", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            // Qui metterai la tua UI di crop manuale (pinch/zoom/drag, griglia, ecc.)
+            Box(
+                Modifier.fillMaxWidth().weight(1f).padding(vertical = 12.dp)
+                    .background(Color(0xFF131A24), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Anteprima crop (stub)")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    border = BorderStroke(1.dp, WIZ_AZURE),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Annulla") }
+                Button(
+                    onClick = {
+                        // per ora non cambiamo nulla: rimandiamo la logica di crop a quando avrai la UI
+                        imageUri?.let { onApply(com.example.appbuilder.canvas.ImageStyle(uri = it)) } ?: onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Applica") }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AddLevel(
     path: List<String>,
@@ -376,8 +423,7 @@ fun EditorMenusOnly(
     val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FxKind>() }
     // immagini per rettangolo (foto come sfondo)
     val rectImages  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ImageStyle>() }
-    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
-    var lastChanged by remember { mutableStateOf<String?>(null) }
+
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -386,6 +432,10 @@ fun EditorMenusOnly(
             rectImages[rect] = com.example.appbuilder.canvas.ImageStyle(uri = uri)
             lastChanged = "Immagine: selezionata"
             dirty = true
+
+            // APRI SUBITO l’overlay crop
+            cropTargetRect = rect
+            cropOverlayVisible = true
         }
     }
 
@@ -395,6 +445,8 @@ fun EditorMenusOnly(
     var pickerOffset by remember { mutableStateOf(IntOffset(0, 0)) }
 
 
+// Ultima opzione interessata (per mostrare info extra nel path)
+    var lastChanged by remember { mutableStateOf<String?>(null) }
 // Conferma all'uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
     var classicEditing by remember { mutableStateOf(false) } // false = Deck, true = Classic (vecchia root)
@@ -410,6 +462,7 @@ fun EditorMenusOnly(
     var infoMode by remember { mutableStateOf(false) }          // flag modalità  info
     var infoCard by remember { mutableStateOf<Pair<String, String>?>(null) } // (titolo, testo)
     var infoCardVisible by remember { mutableStateOf(false) }
+    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
     // === Stato palette colori flottante ===
     var showColorPicker by remember { mutableStateOf(false) }
     var colorPickTarget by remember { mutableStateOf<ColorTarget?>(null) }
@@ -417,6 +470,8 @@ fun EditorMenusOnly(
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
     fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
+    var cropOverlayVisible by remember { mutableStateOf(false) }
+    var cropTargetRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
     fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
         val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 1f
         return n.dp
@@ -831,20 +886,15 @@ fun EditorMenusOnly(
                             applyContainerMenuFromRect(rect)
                         }
                     },
-                    onUpdateItem = { old, updated ->
+                    onUpdateItem    = { old, updated ->
                         val items = pageState?.items ?: return@CanvasStage
                         val ix = items.indexOf(old)
                         if (ix >= 0) {
                             items[ix] = updated
-
-                            // trasferisci decorazioni/stili senza inserire null nella mappa
-                            rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
-                            rectImages.remove(old)?.let     { rectImages[updated]     = it }
-                            rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
-                            rectVariants.remove(old)?.let   { rectVariants[updated]   = it }
-                            rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
-                            rectFx.remove(old)?.let         { rectFx[updated]         = it }
-
+                            // trasferisci le “decorazioni”
+                            rectFillStyles[updated] = rectFillStyles.remove(old) ?: rectFillStyles[updated] ?: return@CanvasStage
+                            rectImages[updated]     = rectImages.remove(old)     ?: rectImages[updated]     ?: return@CanvasStage
+                            rectCorners[updated]    = rectCorners.remove(old)    ?: rectCorners[updated]    ?: return@CanvasStage
                             if (selectedRect == old) {
                                 selectedRect = updated
                                 applyContainerMenuFromRect(updated)
@@ -852,13 +902,13 @@ fun EditorMenusOnly(
                         }
                     },
 
-                    fillStyles  = rectFillStyles,
-                    variants    = rectVariants,
-                    shapes      = rectShapes,
-                    corners     = rectCorners,
-                    fx          = rectFx,
-                    imageStyles = rectImages
+                    // già passavi fillStyles nella versione attuale:
+                    fillStyles = rectFillStyles,
+                    corners     = rectCorners
                 )
+            }
+            var idError by remember { mutableStateOf(false) }
+            if (menuPath.isEmpty()) {
 // PRIMA BARRA
                 MainBottomBar(
                     onUndo = { /* ... */ },
@@ -979,11 +1029,20 @@ fun EditorMenusOnly(
                             }
                             lastChanged = null
                             // === Apertura palette se entri su un nodo "Colore" ===
+
                             val fullPath = (menuPath + label).joinToString(" / ")
 
-                            // Apri picker quando entri in "Contenitore / Aggiungi foto" 
-                            if (fullPath.endsWith("Contenitore / Aggiungi foto")) {
-                                pickImageLauncher.launch("image/*")
+                            // se l'utente tocca "Crop" in Contenitore → Aggiungi foto
+                            if (fullPath.endsWith("Contenitore / Aggiungi foto / Crop")) {
+                                val sr = selectedRect
+                                if (sr != null && rectImages[sr]?.uri != null) {
+                                    cropTargetRect = sr
+                                    cropOverlayVisible = true
+                                } else {
+                                    // se non c’è immagine, chiedila prima
+                                    pickImageLauncher.launch("image/*")
+                                }
+                                return@SubMenuBarOnEnterHack // vedi nota sotto
                             }
 
                             when {
@@ -1093,29 +1152,29 @@ fun EditorMenusOnly(
 
                             // --- IMMAGINE: adatta + filtro (cluster "Aggiungi foto") ---
                             if ((menuPath.firstOrNull() ?: "") == "Contenitore" && menuPath.contains("Aggiungi foto")) {
-                                val rect = selectedRect ?: return@SubMenuBar
-                                val st = rectImages[rect] ?: com.example.appbuilder.canvas.ImageStyle(uri = (rectImages[rect]?.uri ?: return@SubMenuBar))
+                                val rect = selectedRect ?: return@pick
+                                val st = rectImages[rect] ?: com.example.appbuilder.canvas.ImageStyle(
+                                    uri = (rectImages[rect]?.uri ?: return@pick)
+                                )
                                 when (label) {
                                     "fitCont" -> {
                                         val fit = when ((value as? String)?.trim()?.lowercase()) {
-                                            "cover"       -> com.example.appbuilder.canvas.ImageFit.Cover
-                                            "contain"     -> com.example.appbuilder.canvas.ImageFit.Contain
-                                            "fill", "riempi" -> com.example.appbuilder.canvas.ImageFit.Stretch
-                                            "fitwidth", "fitheight" -> com.example.appbuilder.canvas.ImageFit.Contain // fallback ragionevole
+                                            "cover"      -> com.example.appbuilder.canvas.ImageFit.Cover
+                                            "contain"    -> com.example.appbuilder.canvas.ImageFit.Contain
+                                            "stretch", "riempi" -> com.example.appbuilder.canvas.ImageFit.Stretch
                                             else -> com.example.appbuilder.canvas.ImageFit.Cover
                                         }
                                         rectImages[rect] = st.copy(fit = fit)
                                     }
-
                                     "filtro" -> {
                                         val f = when ((value as? String)?.trim()?.lowercase()) {
-                                            "bianco e nero", "mono", "b&w", "b/n" -> com.example.appbuilder.canvas.ImageFilter.Mono
-                                            "seppia", "sepia", "vintage"          -> com.example.appbuilder.canvas.ImageFilter.Sepia
+                                            "bianco e nero", "mono", "b&w" -> com.example.appbuilder.canvas.ImageFilter.Mono
+                                            "seppia", "sepia"              -> com.example.appbuilder.canvas.ImageFilter.Sepia
                                             else -> com.example.appbuilder.canvas.ImageFilter.None
                                         }
                                         rectImages[rect] = st.copy(filter = f)
                                     }
-
+                                    // "crop" nel tuo set attuale è un pick; interpretiamo "Nessuno"=false, il resto=true
                                     "crop" -> {
                                         val on = !((value as? String).orEmpty().equals("Nessuno", ignoreCase = true))
                                         rectImages[rect] = st.copy(cropToShape = on)
@@ -1410,7 +1469,19 @@ fun EditorMenusOnly(
                 },
                 onDismiss = { levelPanelOpen = false }
             )
-
+            CropImageOverlay(
+                visible = cropOverlayVisible,
+                imageUri = cropTargetRect?.let { rectImages[it]?.uri },
+                onDismiss = { cropOverlayVisible = false },
+                onApply = { style ->
+                    cropTargetRect?.let { tgt ->
+                        rectImages[tgt] = style
+                        lastChanged = "Ritaglio applicato"
+                        dirty = true
+                    }
+                    cropOverlayVisible = false
+                }
+            )
             // 2) Toast informativo (in alto, scompare con fade)
             InfoToastCard(
                 visible = infoCardVisible && infoCard != null,
@@ -1424,6 +1495,130 @@ fun EditorMenusOnly(
         }
     }
 }
+
+
+@Composable
+fun FloatingColorPickerOverlay(
+    visible: Boolean,
+    initialColor: Color,
+    onDismiss: () -> Unit,
+    onPick: (Color) -> Unit
+) {
+    if (!visible) return
+
+    // palette: 24 tinte "ruota" + alcuni neutri al centro
+    val ring = remember {
+        listOf(
+            0xFFFF3B30, 0xFFFF9500, 0xFFFFCC00, 0xFF34C759, 0xFF30B0C7, 0xFF007AFF,
+            0xFF5856D6, 0xFFAF52DE, 0xFFFF2D55, 0xFFFF6B81, 0xFFFFD166, 0xFFA7E34B,
+            0xFF64D2FF, 0xFF74A7FF, 0xFF8E8AFF, 0xFFCDA7FF, 0xFFFF8FA3, 0xFFFFB86C,
+            0xFFEDE56A, 0xFF72E7A9, 0xFF80E8FF, 0xFFB0CCFF, 0xFFD0B0FF, 0xFFFFA7C2
+        ).map { Color(it) }
+    }
+    val neutrals = listOf(Color.Black, Color.DarkGray, Color.Gray, Color.LightGray, Color.White)
+
+    var drag by remember { mutableStateOf(IntOffset.Zero) }
+
+    Box(Modifier.fillMaxSize().zIndex(1000f)) {
+        // scrim e tap-chiusura
+        Box(
+            Modifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f))
+                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) }
+        )
+
+        // pannello trascinabile
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                .offset { drag }
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        drag = drag.copy(
+                            x = drag.x + dragAmount.x.toInt(),
+                            y = drag.y + dragAmount.y.toInt()
+                        )
+                    }
+                }
+        ) {
+            // "ruota" + preview
+            Box(
+                Modifier
+                    .size(260.dp)
+                    .background(Color(0xFF10151F), shape = RoundedCornerShape(16.dp))
+                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+            ) {
+                // anello di chip circolari
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val n = ring.size
+                    val radius = 88.dp
+                    val chip = 32.dp
+                    val centerX = maxWidth / 2
+                    val centerY = maxHeight / 2
+                    val r = radius
+                    val step = 360f / n
+
+                    ring.forEachIndexed { i, c ->
+                        val ang = Math.toRadians((i * step - 90f).toDouble()) // parte da alto
+                        val dx = ((cos(ang) * r.value).toFloat()).dp
+                        val dy = ((sin(ang) * r.value).toFloat()).dp
+
+                        Box(
+                            Modifier
+                                .size(chip)
+                                .offset(x = dx, y = dy)
+                                .align(Alignment.Center)
+                                .clip(CircleShape)
+                                .background(c)
+                                .border(2.dp, Color.White.copy(alpha = 0.70f), CircleShape)
+                                .pointerInput(c) {
+                                    detectTapGestures(onTap = { onPick(c) })
+                                }
+                        )
+                    }
+                }
+
+                // neutri centrali + HEX
+                Column(
+                    Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        neutrals.forEach { c ->
+                            Box(
+                                Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                    .pointerInput(c) {
+                                        detectTapGestures(onTap = { onPick(c) })
+                                    }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        color = initialColor.copy(alpha = 0.15f),
+                        contentColor = initialColor,
+                        shape = RoundedCornerShape(10.dp),
+                        tonalElevation = 2.dp,
+                        shadowElevation = 6.dp
+                    ) {
+                        Text(
+                            text = initialColor.toHex(),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 
 @Composable
@@ -2434,8 +2629,6 @@ private fun LayoutLevel(
                         options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
                         onSelected = { onPick("filtro", it) }
                     )
-
-                    )
                     IconDropdown(EditorIcons.Layout, "Cornice",
                         current = get("frame") ?: "Sottile",
                         options = listOf("Nessuna", "Sottile", "Marcata"),
@@ -2443,11 +2636,10 @@ private fun LayoutLevel(
                     )
                 }
                 "Aggiungi album" -> {
-                    IconDropdown(EditorIcons.Crop, "Crop",
-                        current = get("cropAlbum") ?: "Nessuno",
-                        options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                        onSelected = { onPick("cropAlbum", it) }
-                    )
+                    ToolbarIconButton(
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
+                        contentDescription = "Crop"
+                    ) { onEnter("Crop") }   // non apre menu; segnala un'azione
                     IconDropdown(EditorIcons.Layout, "Cornice",
                         current = get("frameAlbum") ?: "Sottile",
                         options = listOf("Nessuna", "Sottile", "Marcata"),
@@ -2543,11 +2735,10 @@ private fun LayoutLevel(
             )
         }
         "Aggiungi album" -> {
-            IconDropdown(EditorIcons.Crop, "Crop",
-                current = get("cropAlbum") ?: "Nessuno",
-                options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                onSelected = { onPick("cropAlbum", it) }
-            )
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
+                contentDescription = "Crop"
+            ) { onEnter("Crop") }   // non apre menu; segnala un'azione
             IconDropdown(EditorIcons.Layout, "Cornice",
                 current = get("frameAlbum") ?: "Sottile",
                 options = listOf("Nessuna", "Sottile", "Marcata"),
@@ -2709,11 +2900,10 @@ private fun ContainerLevel(
             ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album") { onEnter("Aggiungi album") }
         }
         "Aggiungi foto" -> {
-            IconDropdown(EditorIcons.Crop, "Crop",
-                current = get("crop") ?: "Nessuno",
-                options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                onSelected = { onPick("crop", it) }
-            )
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
+                contentDescription = "Crop"
+            ) { onEnter("Crop") }   // non apre menu; segnala un'azione
             IconDropdown(EditorIcons.Layout, "Cornice",
                 current = get("frame") ?: "Sottile",
                 options = listOf("Nessuna", "Sottile", "Marcata"),
@@ -2731,11 +2921,10 @@ private fun ContainerLevel(
             )
         }
         "Aggiungi album" -> {
-            IconDropdown(EditorIcons.Crop, "Crop",
-                current = get("cropAlbum") ?: "Nessuno",
-                options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                onSelected = { onPick("cropAlbum", it) }
-            )
+            ToolbarIconButton(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
+                contentDescription = "Crop"
+            ) { onEnter("Crop") }   // non apre menu; segnala un'azione
             IconDropdown(EditorIcons.Layout, "Cornice",
                 current = get("frameAlbum") ?: "Sottile",
                 options = listOf("Nessuna", "Sottile", "Marcata"),

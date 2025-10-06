@@ -547,6 +547,7 @@ fun CanvasStage(
                                         p.close()
                                     }
                                 }
+                                p  
                             }
 
                             // 1) FILL (solo se non "Text")
