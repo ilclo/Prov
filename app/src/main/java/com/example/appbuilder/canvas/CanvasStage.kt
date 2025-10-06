@@ -97,7 +97,7 @@ fun CanvasStage(
     variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
     shapes  : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
     corners : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
-    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),   // ⬅︎ virgola qui
+    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),  
     imageStyles: Map<DrawItem.RectItem, ImageStyle> = emptyMap(), // ⬅︎ nuovo
     pageBackgroundColor: Color = Color.White,
     pageBackgroundBrush: Brush? = null

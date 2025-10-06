@@ -423,7 +423,13 @@ fun EditorMenusOnly(
     val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FxKind>() }
     // immagini per rettangolo (foto come sfondo)
     val rectImages  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ImageStyle>() }
+    // --- STATO USATO DAL PICKER: deve stare PRIMA del launcher ---
+    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+    var lastChanged by remember { mutableStateOf<String?>(null) }
+    var cropOverlayVisible by remember { mutableStateOf(false) }
+    var cropTargetRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
 
+    // Launcher immagini
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -433,7 +439,7 @@ fun EditorMenusOnly(
             lastChanged = "Immagine: selezionata"
             dirty = true
 
-            // APRI SUBITO l’overlay crop
+            // Se usi l’overlay di crop, aprilo subito:
             cropTargetRect = rect
             cropOverlayVisible = true
         }
@@ -1032,7 +1038,7 @@ fun EditorMenusOnly(
 
                             val fullPath = (menuPath + label).joinToString(" / ")
 
-                            // se l'utente tocca "Crop" in Contenitore → Aggiungi foto
+                            // Caso "Contenitore / Aggiungi foto / Crop"
                             if (fullPath.endsWith("Contenitore / Aggiungi foto / Crop")) {
                                 val sr = selectedRect
                                 if (sr != null && rectImages[sr]?.uri != null) {
@@ -1042,7 +1048,7 @@ fun EditorMenusOnly(
                                     // se non c’è immagine, chiedila prima
                                     pickImageLauncher.launch("image/*")
                                 }
-                                return@SubMenuBarOnEnterHack // vedi nota sotto
+                                return@enter  // ⬅️ label valida della lambda
                             }
 
                             when {
@@ -1384,11 +1390,10 @@ fun EditorMenusOnly(
                 visible = showColorPicker,
                 initialColor = colorPickInitial,
                 onDismiss = { showColorPicker = false },
-                onPick = { picked ->
+                onPick = { picked: Color ->    // ⬅️ tipo esplicito
                     val hex = picked.toHex()
                     when (val tgt = colorPickTarget) {
                         ColorTarget.Border -> {
-                            // aggiorna modello
                             selectedRect?.let { rect ->
                                 pageState?.let { ps ->
                                     val i = ps.items.indexOf(rect)
@@ -1399,11 +1404,9 @@ fun EditorMenusOnly(
                                     }
                                 }
                             }
-                            // aggiorna menù (targhetta HEX sotto icona)
                             menuSelections[(listOf("Contenitore") + "b_color").joinToString(" / ")] = hex
                         }
                         is ColorTarget.ContainerFill -> {
-                            // per ora: monocolore → fillColor
                             selectedRect?.let { rect ->
                                 if (tgt.slot == 1) {
                                     pageState?.let { ps ->
@@ -1414,14 +1417,11 @@ fun EditorMenusOnly(
                                             selectedRect = updated
                                         }
                                     }
-                                    // menù
                                     menuSelections[(listOf("Contenitore","Colore") + "col1").joinToString(" / ")] = hex
                                 } else {
-                                    // col2: aggiorno solo il menù (il gating PRO resta nel tuo SubMenuBar)
                                     menuSelections[(listOf("Contenitore","Colore") + "col2").joinToString(" / ")] = hex
                                 }
                             } ?: run {
-                                // se non c'è un rettangolo selezionato, aggiorno solo il menù
                                 val key = (listOf("Contenitore","Colore") + if (tgt.slot==1) "col1" else "col2").joinToString(" / ")
                                 menuSelections[key] = hex
                             }
@@ -1439,6 +1439,7 @@ fun EditorMenusOnly(
                     showColorPicker = false
                 }
             )
+
 
 
             // Overlay: Slider densità griglia (valori NON arbitrari)
