@@ -450,9 +450,6 @@ fun EditorMenusOnly(
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
     var pickerOffset by remember { mutableStateOf(IntOffset(0, 0)) }
 
-
-// Ultima opzione interessata (per mostrare info extra nel path)
-    var lastChanged by remember { mutableStateOf<String?>(null) }
 // Conferma all'uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
     var classicEditing by remember { mutableStateOf(false) } // false = Deck, true = Classic (vecchia root)
@@ -468,7 +465,6 @@ fun EditorMenusOnly(
     var infoMode by remember { mutableStateOf(false) }          // flag modalità  info
     var infoCard by remember { mutableStateOf<Pair<String, String>?>(null) } // (titolo, testo)
     var infoCardVisible by remember { mutableStateOf(false) }
-    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
     // === Stato palette colori flottante ===
     var showColorPicker by remember { mutableStateOf(false) }
     var colorPickTarget by remember { mutableStateOf<ColorTarget?>(null) }
@@ -476,8 +472,6 @@ fun EditorMenusOnly(
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
     fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
-    var cropOverlayVisible by remember { mutableStateOf(false) }
-    var cropTargetRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
     fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
         val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 1f
         return n.dp
