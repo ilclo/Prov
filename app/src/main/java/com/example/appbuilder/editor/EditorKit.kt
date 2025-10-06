@@ -237,6 +237,197 @@ private fun tokenToColor(token: String?): Color? = when(token?.lowercase()?.trim
 }
 
 /* ---------- AGGIUNGI ---------- */
+// 1) Upload immagine (ic_uplo_photo)
+fun onUploadImage() {
+    val rect = selectedRect ?: return
+    if (rectImages.containsKey(rect)) {
+        // già presente: avvisa che bisogna prima cancellare
+        // usa il tuo sistema messaggi; ad es.:
+        // infoCard = "Foto già presente" to "Cancella prima la foto attuale per caricarne una nuova."
+        // infoCardVisible = true
+        showDeleteImageDialog = true
+        return
+    }
+    pickImageLauncher.launch("image/*")
+}
+
+// 2) Ritaglia (ic_scissor)
+fun onCropAgain() {
+    val rect = selectedRect ?: return
+    val st = rectImages[rect] ?: return
+    cropperImageUri = st.uri
+    cropperTarget = rect
+    cropperVisible = true
+}
+
+// 3) Adatta (ic_adapt) – cambia il fit
+fun onChangeFit(newFit: ImageFit) {
+    val rect = selectedRect ?: return
+    rectImages[rect]?.let { st ->
+        rectImages[rect] = st.copy(fit = newFit)
+    }
+}
+
+// 4) Filtro (ic_filter)
+fun onChangeFilter(newFilter: ImageFilter) {
+    val rect = selectedRect ?: return
+    rectImages[rect]?.let { st ->
+        rectImages[rect] = st.copy(filter = newFilter)
+    }
+}
+
+@Composable
+fun ImageCropperDialog(
+    uri: Uri,
+    initial: ImageCrop? = null,
+    onDismiss: () -> Unit,
+    onConfirm: (ImageCrop) -> Unit
+) {
+    val context = LocalContext.current
+    val bmp = remember(uri) {
+        try {
+            context.contentResolver.openInputStream(uri)?.use { s ->
+                BitmapFactory.decodeStream(s)?.asImageBitmap()
+            }
+        } catch (_: Throwable) { null }
+    }
+
+    if (bmp == null) {
+        onDismiss()
+        return
+    }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        var boxSize by remember { mutableStateOf(IntSize(1, 1)) }
+
+        // rettangolo normalizzato [0..1] (left, top, right, bottom)
+        var crop by remember {
+            mutableStateOf(initial ?: ImageCrop(0f, 0f, 1f, 1f))
+        }
+
+        // handle attivo: 0=tl,1=tr,2=br,3=bl,4=move
+        var active by remember { mutableStateOf<Int?>(null) }
+
+        androidx.compose.material.Surface(
+            shape = androidx.compose.material.MaterialTheme.shapes.medium,
+            color = androidx.compose.ui.graphics.Color(0xFF111111)
+        ) {
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier.padding(12.dp)
+            ) {
+                // area immagine con overlay crop
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { boxSize = it }
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { pos ->
+                                    // quale handle?
+                                    val w = boxSize.width.toFloat()
+                                    val h = boxSize.height.toFloat()
+                                    val tl = Offset(crop.left * w,  crop.top * h)
+                                    val tr = Offset(crop.right * w, crop.top * h)
+                                    val br = Offset(crop.right * w, crop.bottom * h)
+                                    val bl = Offset(crop.left * w,  crop.bottom * h)
+                                    val handles = listOf(tl, tr, br, bl)
+                                    val r = 24.dp.toPx()
+                                    val idx = handles.indexOfFirst { handle ->
+                                        (pos - handle).getDistance() <= r
+                                    }
+                                    active = if (idx >= 0) idx else 4 // 4=move area
+                                },
+                                onDrag = { change, drag ->
+                                    val w = boxSize.width.toFloat()
+                                    val h = boxSize.height.toFloat()
+                                    var L = crop.left; var T = crop.top
+                                    var R = crop.right; var B = crop.bottom
+                                    val dx = drag.x / w
+                                    val dy = drag.y / h
+                                    when (active) {
+                                        0 -> { L += dx; T += dy }
+                                        1 -> { R += dx; T += dy }
+                                        2 -> { R += dx; B += dy }
+                                        3 -> { L += dx; B += dy }
+                                        4 -> { L += dx; T += dy; R += dx; B += dy }
+                                    }
+                                    // clamp + min size
+                                    val minSide = 0.05f
+                                    L = L.coerceIn(0f, 1f - minSide)
+                                    T = T.coerceIn(0f, 1f - minSide)
+                                    R = R.coerceIn(L + minSide, 1f)
+                                    B = B.coerceIn(T + minSide, 1f)
+                                    crop = ImageCrop(L, T, R, B)
+                                },
+                                onDragEnd = { active = null },
+                                onDragCancel = { active = null }
+                            )
+                        }
+                ) {
+                    // rapporto immagine
+                    val ar = bmp.width.toFloat() / bmp.height.toFloat()
+                    androidx.compose.foundation.Image(
+                        bitmap = bmp,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(ar),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    )
+
+                    // overlay scuro + riquadro crop
+                    androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                        val w = size.width
+                        val h = size.height
+                        // zona esterna scurita
+                        drawRect(Color.Black.copy(alpha = 0.35f))
+                        // "buca" trasparente sul rettangolo crop
+                        val left = crop.left * w
+                        val top = crop.top * h
+                        val right = crop.right * w
+                        val bottom = crop.bottom * h
+                        val path = Path().apply {
+                            addRect(Rect(0f, 0f, w, h))
+                            addRect(Rect(left, top, right, bottom))
+                        }
+                        clipPath(path, clipOp = androidx.compose.ui.graphics.ClipOp.Difference) { }
+                        // bordo
+                        drawRect(
+                            color = Color.White,
+                            topLeft = Offset(left, top),
+                            size = Size(right - left, bottom - top),
+                            style = Stroke(width = 2.dp.toPx())
+                        )
+                        // maniglie
+                        val r = 6.dp.toPx()
+                        val handles = listOf(
+                            Offset(left, top), Offset(right, top),
+                            Offset(right, bottom), Offset(left, bottom)
+                        )
+                        handles.forEach {
+                            drawCircle(Color.White, radius = r, center = it)
+                        }
+                    }
+                }
+
+                androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
+                androidx.compose.foundation.layout.Row(
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    androidx.compose.material.TextButton(onClick = onDismiss) {
+                        androidx.compose.material.Text("Annulla")
+                    }
+                    androidx.compose.material.TextButton(onClick = {
+                        onConfirm(crop)
+                    }) {
+                        androidx.compose.material.Text("OK")
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun BoxScope.CropImageOverlay(
@@ -393,6 +584,31 @@ fun EditorMenusOnly(
 // Modifiche in corso (serve per mostrare la barra di conferma alla risalita)
     var dirty by remember { mutableStateOf(false) }
     // stile riempimento (per non toccare RectItem)
+    // === IMMAGINI PER I CONTENITORI ===
+    val rectImages = remember { mutableStateMapOf<DrawItem.RectItem, ImageStyle>() }
+    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+
+    // Dialog/overlay crop
+    var cropperVisible by remember { mutableStateOf(false) }
+    var cropperImageUri by remember { mutableStateOf<Uri?>(null) }
+    var cropperTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+
+    // Conferma cancellazione immagine
+    var showDeleteImageDialog by remember { mutableStateOf(false) }
+
+    // Launcher per scegliere l’immagine dalla galleria
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        val rect = selectedRect ?: return@rememberLauncherForActivityResult
+        if (uri != null) {
+            // Salva stile base + apri subito il crop
+            rectImages[rect] = ImageStyle(uri = uri, fit = ImageFit.Cover)
+            cropperImageUri = uri
+            cropperTarget = rect
+            cropperVisible = true
+        }
+    }
     val rectFillStyles = remember { 
         mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FillStyle>() 
     }
@@ -403,23 +619,10 @@ fun EditorMenusOnly(
     val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, FxKind>() }
     val rectImages   = remember { mutableStateMapOf<DrawItem.RectItem, ImageStyle>() }
     // --- STATO USATO DAL PICKER: deve stare PRIMA del launcher ---
-    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
     var lastChanged by remember { mutableStateOf<String?>(null) }
     var cropOverlayVisible by remember { mutableStateOf(false) }
     var cropTargetRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
 
-    val pickImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        val rect = selectedRect ?: return@rememberLauncherForActivityResult
-        if (uri != null) {
-            // crea/imposta lo stile immagine
-            rectImages[rect] = ImageStyle(uri = uri, fit = ImageFit.Cover)
-            // apri subito il crop
-            cropTargetRect = rect
-            cropOverlayVisible = true
-        }
-    }
     // overlay palette colore
     var colorPickerVisible by remember { mutableStateOf(false) }
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
@@ -884,8 +1087,9 @@ fun EditorMenusOnly(
                     shapes       = rectShapes,
                     corners      = rectCorners,
                     fx           = rectFx,
-                    images      = rectImageLinks, 
-                    imageStyles  = rectImages
+                    imageStyles  = rectImages,
+                    pageBackgroundColor = Color.White,
+                    pageBackgroundBrush = null
                 )
 
             }
@@ -2511,16 +2715,25 @@ private fun LayoutLevel(
 
                     ToolbarIconButton(ImageVector.vectorResource(R.drawable.ic_cancel), "Cancella foto") {
                         val rect = selectedRect ?: return@ToolbarIconButton
-                        confirmDialog = Confirm(
-                            title = "Cancellare?",
-                            text  = "Attenzione, se scegli Sì perderai tutte le modifiche che hai apportato alla tua foto.",
-                            onYes = {
-                                rectImages.remove(rect)
-                                // azzera eventuali selezioni menù immagine
-                                menuSelections[key(menuPath, "filtro")] = "Nessuno"
-                                menuSelections[key(menuPath, "fitCont")] = "Cover"
-                            }
-                        )
+                        if (showDeleteImageDialog) {
+                            androidx.compose.material.AlertDialog(
+                                onDismissRequest = { showDeleteImageDialog = false },
+                                title = { androidx.compose.material.Text("Cancellare?") },
+                                text = { androidx.compose.material.Text("Attenzione, se scegli Sì perderai tutte le modifiche apportate alla tua foto.") },
+                                confirmButton = {
+                                    androidx.compose.material.TextButton(onClick = {
+                                        val rect = selectedRect
+                                        if (rect != null) rectImages.remove(rect)
+                                        showDeleteImageDialog = false
+                                    }) { androidx.compose.material.Text("Sì") }
+                                },
+                                dismissButton = {
+                                    androidx.compose.material.TextButton(onClick = {
+                                        showDeleteImageDialog = false
+                                    }) { androidx.compose.material.Text("Annulla") }
+                                }
+                            )
+                        }
                     }
                 }
                 "Aggiungi album" -> {
