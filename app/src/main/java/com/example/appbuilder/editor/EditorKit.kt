@@ -499,7 +499,7 @@ fun EditorMenusOnly(
         menuSelections[(listOf("Contenitore") + "shape").joinToString(" / ")] = s
 
         // angoli
-        val cr = rectCorners[rect] ?: CornerRadii()
+        val cr = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
         menuSelections["Contenitore / ic_as"] = dpToKey(cr.tl)
         menuSelections["Contenitore / ic_ad"] = dpToKey(cr.tr)
         menuSelections["Contenitore / ic_bs"] = dpToKey(cr.bl)
@@ -879,7 +879,7 @@ fun EditorMenusOnly(
                     selected        = selectedRect,
                     onAddItem       = { item -> pageState?.items?.add(item) },
 
-                    onRequestEdit   = { rect -> 
+                    onRequestEdit   = { rect ->
                         selectedRect = rect
                         if (rect != null) {
                             if (menuPath.firstOrNull() != "Contenitore") menuPath = listOf("Contenitore")
@@ -902,9 +902,13 @@ fun EditorMenusOnly(
                         }
                     },
 
-                    // già passavi fillStyles nella versione attuale:
-                    fillStyles = rectFillStyles,
-                    corners     = rectCorners
+                    // mappe
+                    fillStyles   = rectFillStyles,
+                    variants     = rectVariants,
+                    shapes       = rectShapes,
+                    corners      = rectCorners,
+                    fx           = rectFx,
+                    imageStyles  = rectImages
                 )
             }
             var idError by remember { mutableStateOf(false) }
@@ -1151,9 +1155,9 @@ fun EditorMenusOnly(
 
                             // --- IMMAGINE: adatta + filtro (cluster "Aggiungi foto") ---
                             if ((menuPath.firstOrNull() ?: "") == "Contenitore" && menuPath.contains("Aggiungi foto")) {
-                                val rect = selectedRect ?: return@pick
+                                val rect = selectedRect ?: return@pick          // <— prima era return@SubMenuBar
                                 val st = rectImages[rect] ?: com.example.appbuilder.canvas.ImageStyle(
-                                    uri = (rectImages[rect]?.uri ?: return@pick)
+                                    uri = rectImages[rect]?.uri ?: return@pick   // <— prima era return@SubMenuBar
                                 )
                                 when (label) {
                                     "fitCont" -> {
@@ -1220,7 +1224,7 @@ fun EditorMenusOnly(
                                         val rect = selectedRect
                                         if (rect != null) {
                                             val dp = keyToDp(value)
-                                            val current = rectCorners[rect] ?: CornerRadii()
+                                            val current = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
                                             rectCorners[rect] = when (label) {
                                                 "ic_as" -> current.copy(tl = dp)
                                                 "ic_ad" -> current.copy(tr = dp)

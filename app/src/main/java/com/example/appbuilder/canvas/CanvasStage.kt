@@ -35,7 +35,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
-
+import androidx.compose.ui.graphics.drawscope.DrawScope
 
 
 // Variante di rendering del contenitore
@@ -94,17 +94,16 @@ fun CanvasStage(
     fillStyles: Map<DrawItem.RectItem, FillStyle> = emptyMap(),
 
     // NUOVO – tutti con default per non toccare EditorMenusOnly:
+    images  : Map<DrawItem.RectItem, ImageStyle> = emptyMap(),
     variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
     shapes  : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
     corners : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
-    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),  
-    images  : Map<DrawItem.RectItem, ImageStyle> = emptyMap(),
-    imageStyles: Map<DrawItem.RectItem, ImageStyle> = emptyMap(), // ⬅︎ nuovo
+    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),
+    imageStyles: Map<DrawItem.RectItem, ImageStyle> = emptyMap(), 
     pageBackgroundColor: Color = Color.White,
     pageBackgroundBrush: Brush? = null
 ) {
     val context = LocalContext.current
-    val bitmapsByItem = images.mapValues { (_, st) -> rememberBitmap(st.uri) }
 
     // Cache semplice per le immagini caricate (per URI)
     val imageCache = remember { mutableMapOf<Uri, ImageBitmap?>() }
@@ -485,7 +484,7 @@ fun CanvasStage(
                     )
                 }
             }
-    ) {
+        {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cell = min(size.width / cols, size.height / cols)
             val rows = if (cell > 0f) floor(size.height / cell).toInt() else 0
@@ -559,29 +558,27 @@ fun CanvasStage(
                                     val imgStyle = imageStyles[item]
                                     val imgBitmap = loadBitmap(imgStyle?.uri)
 
-                                    if (varnt != Variant.Text && imgStyle != null && imgBitmap != null) {
-                                        val srcW = bmp.width.toFloat()
-                                        val srcH = bmp.height.toFloat()
+                                    if (imgStyle != null && imgBitmap != null) {
+                                        val srcW = imgBitmap.width.toFloat()
+                                        val srcH = imgBitmap.height.toFloat()
 
                                         val (dstW, dstH) = when (imgStyle.fit) {
                                             ImageFit.Cover -> {
-                                                val s = max(w / srcW, h / srcH)
+                                                val s = kotlin.math.max(w / srcW, h / srcH)
                                                 srcW * s to srcH * s
                                             }
                                             ImageFit.Contain -> {
-                                                val s = min(w / srcW, h / srcH)
+                                                val s = kotlin.math.min(w / srcW, h / srcH)
                                                 srcW * s to srcH * s
                                             }
-                                            ImageFit.Stretch -> {
-                                                w to h
-                                            }
+                                            ImageFit.Stretch -> w to h
                                         }
                                         val dx = left + (w - dstW) / 2f
                                         val dy = top  + (h - dstH) / 2f
 
                                         val drawImageBlock: DrawScope.() -> Unit = {
                                             drawImage(
-                                                image = bmp,
+                                                image = imgBitmap,
                                                 dstOffset = IntOffset(dx.toInt(), dy.toInt()),
                                                 dstSize = IntSize(dstW.toInt(), dstH.toInt()),
                                                 filterQuality = FilterQuality.Low,
@@ -594,7 +591,6 @@ fun CanvasStage(
                                         } else {
                                             drawImageBlock()
                                         }
-
                                         // opzionale: applica FX sopra l’immagine (mantieni la tua logica fxKind)
                                     } else {
                                         // gradiente se definito, altrimenti tinta
