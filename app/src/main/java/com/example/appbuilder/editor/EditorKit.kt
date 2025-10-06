@@ -136,6 +136,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import com.example.appbuilder.canvas.CornerRadii
 import com.example.appbuilder.canvas.ImageStyle
+import com.example.appbuilder.canvas.ImageCrop
+import com.example.appbuilder.canvas.Variant
+import com.example.appbuilder.canvas.ShapeKind
+import com.example.appbuilder.canvas.FxKind
 import com.example.appbuilder.canvas.ImageFit
 import com.example.appbuilder.canvas.ImageFilter
 
@@ -417,29 +421,25 @@ fun EditorMenusOnly(
         mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FillStyle>() 
     }
     // Stili aggiuntivi per RectItem
-    val rectVariants = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.Variant>() }
-    val rectShapes   = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ShapeKind>() }
-    val rectCorners  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.CornerRadii>() }
-    val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FxKind>() }
-    // immagini per rettangolo (foto come sfondo)
-    val rectImages  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ImageStyle>() }
+    val rectVariants = remember { mutableStateMapOf<DrawItem.RectItem, Variant>() }
+    val rectShapes   = remember { mutableStateMapOf<DrawItem.RectItem, ShapeKind>() }
+    val rectCorners  = remember { mutableStateMapOf<DrawItem.RectItem, CornerRadii>() }
+    val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, FxKind>() }
+    val rectImages   = remember { mutableStateMapOf<DrawItem.RectItem, ImageStyle>() }
     // --- STATO USATO DAL PICKER: deve stare PRIMA del launcher ---
     var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
     var lastChanged by remember { mutableStateOf<String?>(null) }
     var cropOverlayVisible by remember { mutableStateOf(false) }
     var cropTargetRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
 
-    // Launcher immagini
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         val rect = selectedRect ?: return@rememberLauncherForActivityResult
         if (uri != null) {
-            rectImages[rect] = com.example.appbuilder.canvas.ImageStyle(uri = uri)
-            lastChanged = "Immagine: selezionata"
-            dirty = true
-
-            // Se usi l’overlay di crop, aprilo subito:
+            // crea/imposta lo stile immagine
+            rectImages[rect] = ImageStyle(uri = uri, fit = ImageFit.Cover)
+            // apri subito il crop
             cropTargetRect = rect
             cropOverlayVisible = true
         }
@@ -1146,7 +1146,20 @@ fun EditorMenusOnly(
                             menuSelections[fullKey] = value
                             lastChanged = "$label: $value"
                             dirty = true
-
+                            if ((menuPath.firstOrNull() ?: "") == "Contenitore" && label == "b_thick") {
+                                val rect = selectedRect
+                                if (rect != null) {
+                                    val newDp = keyToDp(value) // già definita utility in EditorKit
+                                    pageState?.let { ps ->
+                                        val i = ps.items.indexOf(rect)
+                                        if (i >= 0) {
+                                            val updated = rect.copy(borderWidth = newDp)
+                                            ps.items[i] = updated
+                                            selectedRect = updated
+                                        }
+                                    }
+                                }
+                            }
                             // --- ANGOLO per rettangoli ---
                             if ((menuPath.firstOrNull() ?: "") == "Contenitore" && label in setOf("ic_as","ic_ad","ic_bd","ic_bs")) {
                                 val rect = selectedRect
@@ -1499,14 +1512,19 @@ fun EditorMenusOnly(
                 onDismiss = { levelPanelOpen = false }
             )
             CropImageOverlay(
-                visible = cropOverlayVisible,
-                imageUri = cropTargetRect?.let { rectImages[it]?.uri },
+                visible   = cropOverlayVisible,
+                imageUri  = cropTargetRect?.let { rectImages[it]?.uri },
+                initial   = cropTargetRect?.let { rectImages[it]?.crop }, // opzionale
                 onDismiss = { cropOverlayVisible = false },
-                onApply = { style ->
+                onApply   = { normCrop: ImageCrop ->
                     cropTargetRect?.let { tgt ->
-                        rectImages[tgt] = style
-                        lastChanged = "Ritaglio applicato"
-                        dirty = true
+                        val prev = rectImages[tgt] ?: return@let
+                        rectImages[tgt] = prev.copy(
+                            crop = normCrop,
+                            // default sensata all’inserimento: Cover
+                            fit = prev.fit.takeIf { it != ImageFit.Stretch } ?: ImageFit.Cover,
+                            filter = prev.filter
+                        )
                     }
                     cropOverlayVisible = false
                 }

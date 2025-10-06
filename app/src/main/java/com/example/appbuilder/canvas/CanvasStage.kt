@@ -38,6 +38,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.DrawScope
 
 
+data class ImageCrop(
+    val left: Float,   // [0f,1f]
+    val top: Float,    // [0f,1f]
+    val right: Float,  // [0f,1f]
+    val bottom: Float  // [0f,1f]
+)
+
 // Variante di rendering del contenitore
 enum class Variant { Full, Outlined, Text, TopBottom }
 
@@ -51,7 +58,7 @@ data class ImageStyle(
     val uri: Uri,
     val fit: ImageFit = ImageFit.Cover,
     val filter: ImageFilter = ImageFilter.None,
-    // crop base: l’immagine viene “ritagliata” all’interno della forma del contenitore
+    val crop: ImageCrop? = null,
     val cropToShape: Boolean = true
 )
 
@@ -75,6 +82,18 @@ data class FillStyle(
     val dir: GradientDir = GradientDir.Monocolore
 )
 
+@Composable
+fun rememberBitmap(uri: Uri?): ImageBitmap? {
+    val context = LocalContext.current
+    return remember(uri) {
+        if (uri == null) return@remember null
+        try {
+            context.contentResolver.openInputStream(uri)?.use { s ->
+                BitmapFactory.decodeStream(s)?.asImageBitmap()
+            }
+        } catch (_: Throwable) { null }
+    }
+}
 
 @Composable
 fun CanvasStage(
@@ -107,6 +126,7 @@ fun CanvasStage(
 
     // Cache semplice per le immagini caricate (per URI)
     val imageCache = remember { mutableMapOf<Uri, ImageBitmap?>() }
+
 
     // Loader NON-@Composable (si può usare dentro draw{})
     fun loadBitmap(uri: Uri?): ImageBitmap? {
@@ -592,26 +612,73 @@ fun CanvasStage(
                                             val srcW = img.width.toFloat()
                                             val srcH = img.height.toFloat()
 
-                                            // calcolo della porzione sorgente da crop normalizzato (0..1), se presente
-                                            val crop = imgSt.crop
-                                            val srcLeft   = ((crop?.left  ?: 0f) * srcW).toInt().coerceIn(0, srcW.toInt())
-                                            val srcTop    = ((crop?.top   ?: 0f) * srcH).toInt().coerceIn(0, srcH.toInt())
-                                            val srcRight  = ((crop?.right ?: 1f) * srcW).toInt().coerceIn(0, srcW.toInt())
-                                            val srcBottom = ((crop?.bottom?: 1f) * srcH).toInt().coerceIn(0, srcH.toInt())
-                                            val srcSize   = IntSize((srcRight - srcLeft).coerceAtLeast(1), (srcBottom - srcTop).coerceAtLeast(1))
-                                            val srcOff    = IntOffset(srcLeft, srcTop)
 
-                                            // calcolo adattamento (Cover/Contain/Stretch) sulla destinazione (w/h)
-                                            val (dstW, dstH) = when (imgSt.fit) {
-                                                ImageFit.Cover   -> {
-                                                    val s = kotlin.math.max(w / srcSize.width, h / srcSize.height)
-                                                    srcSize.width * s to srcSize.height * s
+                                            val iw = imgBitmap.width
+                                            val ih = imgBitmap.height
+
+                                            // crop normalizzato [0..1] -> pixel
+                                            val crop = imgStyle.crop
+                                            val sx0 = ((crop?.left   ?: 0f) * iw.toFloat()).roundToInt().coerceIn(0, iw)
+                                            val sy0 = ((crop?.top    ?: 0f) * ih.toFloat()).roundToInt().coerceIn(0, ih)
+                                            val sx1 = ((crop?.right  ?: 1f) * iw.toFloat()).roundToInt().coerceIn(0, iw)
+                                            val sy1 = ((crop?.bottom ?: 1f) * ih.toFloat()).roundToInt().coerceIn(0, ih)
+
+                                            var srcOffset = IntOffset(sx0, sy0)
+                                            var srcSize   = IntSize(max(1, sx1 - sx0), max(1, sy1 - sy0))
+
+                                            // area destinazione nel contenitore
+                                            var dstOffset = IntOffset(left.toInt(), top.toInt())
+                                            var dstSize   = IntSize(w.toInt(), h.toInt())
+
+                                            // rapporti d'aspetto: regione croppata vs contenitore
+                                            val cw = srcSize.width.toFloat()
+                                            val ch = srcSize.height.toFloat()
+                                            val containerAR = w / h
+                                            val srcAR = if (ch > 0f) cw / ch else 1f
+
+                                            when (imgStyle.fit) {
+                                                ImageFit.Stretch -> {
+                                                    // src: la regione croppata completa -> stretched su tutto il contenitore
+                                                }
+                                                ImageFit.Cover -> {
+                                                    // ritaglio ulteriore dentro il crop per far combaciare l'AR del contenitore
+                                                    if (srcAR > containerAR) {
+                                                        val newW = (ch * containerAR).roundToInt().coerceAtLeast(1)
+                                                        val extra = (srcSize.width - newW).coerceAtLeast(0)
+                                                        srcOffset = srcOffset.copy(x = srcOffset.x + extra / 2)
+                                                        srcSize   = srcSize.copy(width = newW)
+                                                    } else {
+                                                        val newH = (cw / containerAR).roundToInt().coerceAtLeast(1)
+                                                        val extra = (srcSize.height - newH).coerceAtLeast(0)
+                                                        srcOffset = srcOffset.copy(y = srcOffset.y + extra / 2)
+                                                        srcSize   = srcSize.copy(height = newH)
+                                                    }
+                                                    // dst: riempie completamente il contenitore
                                                 }
                                                 ImageFit.Contain -> {
-                                                    val s = kotlin.math.min(w / srcSize.width, h / srcSize.height)
-                                                    srcSize.width * s to srcSize.height * s
+                                                    // mantieni intera regione croppata, scala per stare tutta nel contenitore
+                                                    val scale = if (srcAR > containerAR) w / cw else h / ch
+                                                    val dW = (cw * scale).roundToInt()
+                                                    val dH = (ch * scale).roundToInt()
+                                                    val dx = left + (w - dW) / 2f
+                                                    val dy = top  + (h - dH) / 2f
+                                                    dstOffset = IntOffset(dx.toInt(), dy.toInt())
+                                                    dstSize   = IntSize(dW, dH)
                                                 }
-                                                ImageFit.Stretch -> w to h
+                                            }
+
+                                            // draw (clip alla forma se richiesto)
+                                            val cf = colorFilterFor(imgStyle.filter)
+                                            clipPath(path) {
+                                                drawImage(
+                                                    image = imgBitmap,
+                                                    srcOffset = srcOffset,
+                                                    srcSize = srcSize,
+                                                    dstOffset = dstOffset,
+                                                    dstSize = dstSize,
+                                                    colorFilter = cf,
+                                                    filterQuality = FilterQuality.Medium
+                                                )
                                             }
                                             val dx = left + (w - dstW) / 2f
                                             val dy = top  + (h - dstH) / 2f
