@@ -804,7 +804,7 @@ fun CanvasStage(
                 }
             }
         }
-    }
+    )
 }
 
 // Stato locale d’appoggio per Resize (angoli).
