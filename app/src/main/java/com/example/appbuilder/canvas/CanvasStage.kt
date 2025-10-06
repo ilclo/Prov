@@ -38,29 +38,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import kotlin.math.roundToInt
 
-data class ImageCrop(
-    val left: Float,   // [0f,1f]
-    val top: Float,    // [0f,1f]
-    val right: Float,  // [0f,1f]
-    val bottom: Float  // [0f,1f]
-)
-
 // Variante di rendering del contenitore
 enum class Variant { Full, Outlined, Text, TopBottom }
 
 // Forme supportate (rettangolo con raggi, cerchio, pillola/stadium, diamante)
 enum class ShapeKind { Rect, Circle, Pill, Diamond }
-
-enum class ImageFit { Cover, Contain, Stretch }
-enum class ImageFilter { None, Mono, Sepia }
-
-data class ImageStyle(
-    val uri: Uri,
-    val fit: ImageFit = ImageFit.Cover,
-    val filter: ImageFilter = ImageFilter.None,
-    val crop: ImageCrop? = null,
-    val cropToShape: Boolean = true
-)
 
 data class CornerRadii(
     val tl: Dp = 0.dp,
@@ -82,6 +64,23 @@ data class FillStyle(
     val dir: GradientDir = GradientDir.Monocolore
 )
 
+data class ImageCrop(
+    val left: Float,   // [0f,1f]
+    val top: Float,    // [0f,1f]
+    val right: Float,  // [0f,1f]
+    val bottom: Float  // [0f,1f]
+)
+
+enum class ImageFit { Cover, Contain, Stretch }
+enum class ImageFilter { None, Mono, Sepia }
+
+data class ImageStyle(
+    val uri: Uri,
+    val fit: ImageFit = ImageFit.Cover,
+    val filter: ImageFilter = ImageFilter.None,
+    val crop: ImageCrop? = null,            // ⬅︎ nuovo
+    val cropToShape: Boolean = true
+)
 
 
 @Composable
@@ -97,11 +96,16 @@ fun CanvasStage(
     onAddItem: (DrawItem) -> Unit,
     onRequestEdit: (DrawItem.RectItem?) -> Unit = {},
     onUpdateItem: (DrawItem.RectItem, DrawItem.RectItem) -> Unit = { _, _ -> },
+
+    // già presente nella tua “attuale”:
     fillStyles: Map<DrawItem.RectItem, FillStyle> = emptyMap(),
-    variants : Map<DrawItem.RectItem, Variant> = emptyMap(),
-    shapes   : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
-    corners  : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
-    fx       : Map<DrawItem.RectItem, FxKind> = emptyMap(),
+
+    // NUOVO – tutti con default per non toccare EditorMenusOnly:
+    images  : Map<DrawItem.RectItem, ImageStyle> = emptyMap(),
+    variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
+    shapes  : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
+    corners : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
+    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),
     imageStyles: Map<DrawItem.RectItem, ImageStyle> = emptyMap(),
     pageBackgroundColor: Color = Color.White,
     pageBackgroundBrush: Brush? = null
@@ -110,7 +114,6 @@ fun CanvasStage(
 
     // Cache semplice per le immagini caricate (per URI)
     val imageCache = remember { mutableMapOf<Uri, ImageBitmap?>() }
-
 
     // Loader NON-@Composable (si può usare dentro draw{})
     fun loadBitmap(uri: Uri?): ImageBitmap? {
@@ -518,8 +521,7 @@ fun CanvasStage(
                             val varnt  = variants[item] ?: Variant.Full
                             val fxKind = fx[item]       ?: FxKind.None
                             val rad    = corners[item]  ?: CornerRadii()
-                            val style  = fillStyles[item]  // può essere null
-                            val imgSt  = imageStyles[item] // può essere null
+                            val style  = fillStyles[item]  // può essere null (=> tinta piena)
 
                             // path della forma (rettangolo arrotondato, cerchio, pillola, rombo)
                             val path: Path = run {
@@ -559,59 +561,51 @@ fun CanvasStage(
                             // 1) FILL (solo se non "Text")
                             if (varnt != Variant.Text) {
                                 if (varnt == Variant.Full) {
-                                    // prova immagine; se non c’è, gradiente; altrimenti tinta
+                                    // immagine; se assente → gradiente → tinta
                                     val imgStyle = imageStyles[item]
-                                    val imgBitmap = loadBitmap(imgStyle?.uri)
+                                    val bmp = loadBitmap(imgStyle?.uri)
 
-                                    if (imgStyle != null && imgBitmap != null) {
-                                        val srcW = imgBitmap.width
-                                        val srcH = imgBitmap.height
-                                        val crop = imgStyle.crop
+                                    if (imgStyle != null && bmp != null) {
+                                        // --- sorgente: ricava il rettangolo crop in px dal bitmap ---
+                                        val crop = imgStyle.crop ?: ImageCrop(0f, 0f, 1f, 1f)
+                                        val srcW = bmp.width
+                                        val srcH = bmp.height
 
-                                        val sx0 = ((crop?.left   ?: 0f) * srcW.toFloat()).roundToInt().coerceIn(0, srcW)
-                                        val sy0 = ((crop?.top    ?: 0f) * srcH.toFloat()).roundToInt().coerceIn(0, srcH)
-                                        val sx1 = ((crop?.right  ?: 1f) * srcW.toFloat()).roundToInt().coerceIn(0, srcW)
-                                        val sy1 = ((crop?.bottom ?: 1f) * srcH.toFloat()).roundToInt().coerceIn(0, srcH)
+                                        val srcLeft   = (crop.left   * srcW).roundToInt().coerceIn(0, srcW)
+                                        val srcTop    = (crop.top    * srcH).roundToInt().coerceIn(0, srcH)
+                                        val srcRight  = (crop.right  * srcW).roundToInt().coerceIn(srcLeft + 1, srcW)
+                                        val srcBottom = (crop.bottom * srcH).roundToInt().coerceIn(srcTop  + 1, srcH)
 
-                                        val srcWidth  = max(1, sx1 - sx0)
-                                        val srcHeight = max(1, sy1 - sy0)
-                                        val srcOffset = IntOffset(sx0, sy0)
-                                        val srcSize   = IntSize(srcWidth, srcHeight)
+                                        val srcSize = IntSize(srcRight - srcLeft, srcBottom - srcTop)
+                                        val srcOff  = IntOffset(srcLeft, srcTop)
 
-                                        // --- calcolo dst (fit nel contenitore)
-                                        val dstW: Float
-                                        val dstH: Float
-                                        when (imgStyle.fit) {
+                                        // --- destinazione: calcola dimensione in base al fit richiesto ---
+                                        val srcWF = srcSize.width.toFloat()
+                                        val srcHF = srcSize.height.toFloat()
+
+                                        val (dstW, dstH) = when (imgStyle.fit) {
                                             ImageFit.Cover -> {
-                                                val s = max(w / srcWidth, h / srcHeight)
-                                                dstW = srcWidth  * s
-                                                dstH = srcHeight * s
+                                                val s = max(w / srcWF, h / srcHF)
+                                                srcWF * s to srcHF * s
                                             }
                                             ImageFit.Contain -> {
-                                                val s = min(w / srcWidth, h / srcHeight)
-                                                dstW = srcWidth  * s
-                                                dstH = srcHeight * s
+                                                val s = min(w / srcWF, h / srcHF)
+                                                srcWF * s to srcHF * s
                                             }
-                                            ImageFit.Stretch -> {
-                                                dstW = w
-                                                dstH = h
-                                            }
+                                            ImageFit.Stretch -> w to h
                                         }
                                         val dx = left + (w - dstW) / 2f
                                         val dy = top  + (h - dstH) / 2f
 
-                                        val dstOffset = IntOffset(dx.roundToInt(), dy.roundToInt())
-                                        val dstSize   = IntSize(dstW.roundToInt(), dstH.roundToInt())
-
                                         val drawImageBlock: DrawScope.() -> Unit = {
                                             drawImage(
-                                                image = imgBitmap,
-                                                srcOffset = srcOffset,
-                                                srcSize = srcSize,
-                                                dstOffset = dstOffset,
-                                                dstSize = dstSize,
+                                                image = bmp,
+                                                srcOffset = srcOff,
+                                                srcSize   = srcSize,
+                                                dstOffset = IntOffset(dx.roundToInt(), dy.roundToInt()),
+                                                dstSize   = IntSize(dstW.roundToInt(), dstH.roundToInt()),
                                                 filterQuality = FilterQuality.Low,
-                                                colorFilter = colorFilterFor(imgStyle.filter)
+                                                colorFilter   = colorFilterFor(imgStyle.filter)
                                             )
                                         }
 
@@ -620,8 +614,9 @@ fun CanvasStage(
                                         } else {
                                             drawImageBlock()
                                         }
+                                        // opzionale: applica FX sopra l’immagine (mantieni la tua logica fxKind)
                                     } else {
-                                        // gradiente o tinta piena come già avevi
+                                        // gradiente se definito, altrimenti tinta
                                         if (style != null && style.dir != GradientDir.Monocolore && style.col2 != null) {
                                             val (start, end) = when (style.dir) {
                                                 GradientDir.Orizzontale -> Offset(left, top + h/2f)    to Offset(left + w, top + h/2f)
