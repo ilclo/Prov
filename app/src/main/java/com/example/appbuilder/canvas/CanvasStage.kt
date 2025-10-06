@@ -41,7 +41,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 // Variante di rendering del contenitore
 enum class Variant { Full, Outlined, Text, TopBottom }
 
-// Forme supportate (rettangolo con raggi, cerchio, pillola/stadium, diamante)
+// Forme supportate (rettangolo con raggi, cerchio,  pillola/stadium, diamante)
 enum class ShapeKind { Rect, Circle, Pill, Diamond }
 
 enum class ImageFit { Cover, Contain, Stretch }
