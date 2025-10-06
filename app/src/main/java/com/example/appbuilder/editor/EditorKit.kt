@@ -142,7 +142,8 @@ import com.example.appbuilder.canvas.ShapeKind
 import com.example.appbuilder.canvas.FxKind
 import com.example.appbuilder.canvas.ImageFit
 import com.example.appbuilder.canvas.ImageFilter
-
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.IntSize
 
 private val LocalIsFree = staticCompositionLocalOf { true }
 
@@ -241,47 +242,22 @@ private fun tokenToColor(token: String?): Color? = when(token?.lowercase()?.trim
 private fun BoxScope.CropImageOverlay(
     visible: Boolean,
     imageUri: Uri?,
+    initial: ImageCrop? = null,              // <-- per riaprire con crop esistente
     onDismiss: () -> Unit,
-    onApply: (com.example.appbuilder.canvas.ImageStyle) -> Unit
+    onApply: (ImageCrop) -> Unit             // <-- ritorna SOLO il crop normalizzato
 ) {
-    if (!visible) return
-    Surface(
-        color = Color(0xCC0D1117),
-        contentColor = Color.White,
-        modifier = Modifier.fillMaxSize().zIndex(1000f)
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("Ritaglia immagine", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-            // Qui metterai la tua UI di crop manuale (pinch/zoom/drag, griglia, ecc.)
-            Box(
-                Modifier.fillMaxWidth().weight(1f).padding(vertical = 12.dp)
-                    .background(Color(0xFF131A24), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Anteprima crop (stub)")
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    border = BorderStroke(1.dp, WIZ_AZURE),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
-                    modifier = Modifier.weight(1f)
-                ) { Text("Annulla") }
-                Button(
-                    onClick = {
-                        // per ora non cambiamo nulla: rimandiamo la logica di crop a quando avrai la UI
-                        imageUri?.let { onApply(com.example.appbuilder.canvas.ImageStyle(uri = it)) } ?: onDismiss()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black),
-                    modifier = Modifier.weight(1f)
-                ) { Text("Applica") }
-            }
+    if (!visible || imageUri == null) return
+
+    // TODO: il tuo vero cropper; per ora mock:
+    Box(Modifier.fillMaxSize()) {
+        // mostra l’immagine e permetti il ritaglio...
+        // quando l’utente conferma:
+        LaunchedEffect(Unit) {
+            onApply(initial ?: ImageCrop(0f,0f,1f,1f))
         }
     }
 }
+
 
 @Composable
 private fun AddLevel(
@@ -443,16 +419,6 @@ fun EditorMenusOnly(
             cropTargetRect = rect
             cropOverlayVisible = true
         }
-    }
-    onCropDone = { normCrop: ImageCrop ->
-        val rect = selectedRect ?: return@onCropDone
-        val prev = rectImages[rect]
-        rectImages[rect] = (prev ?: ImageStyle(uri = pendingCropUri!!)).copy(
-            crop = normCrop,
-            fit = ImageFit.Cover,
-            filter = ImageFilter.None
-        )
-        cropperVisible = false
     }
     // overlay palette colore
     var colorPickerVisible by remember { mutableStateOf(false) }
@@ -876,6 +842,7 @@ fun EditorMenusOnly(
                     .fillMaxSize()
                     // quando la griglia è aperta, sfoca e abbassa l'alpha SOLO del canvas
                     .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
+
             ) {
                 CanvasStage(
                     page            = pageState,
@@ -920,7 +887,9 @@ fun EditorMenusOnly(
                     images      = rectImageLinks, 
                     imageStyles  = rectImages
                 )
+
             }
+
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
 // PRIMA BARRA
@@ -1226,27 +1195,24 @@ fun EditorMenusOnly(
                                     }
                                     "b_thick" -> {
                                         val rect = selectedRect ?: return@pick
-                                        val dpVal = keyToDp(value) // es. "2dp" -> 2.dp
+                                        val dpVal = keyToDp(value) // "2dp" -> 2.dp
                                         val updated = rect.copy(borderWidth = dpVal)
-
-                                        // sostituisci in pageState
                                         val items = pageState?.items ?: return@pick
                                         val ix = items.indexOf(rect)
                                         if (ix >= 0) {
                                             items[ix] = updated
-
-                                            // migra TUTTE le mappe stile al nuovo riferimento
+                                            // migra tutte le mappe stile:
                                             rectFillStyles.remove(rect)?.let { rectFillStyles[updated] = it }
                                             rectImages.remove(rect)?.let     { rectImages[updated]     = it }
                                             rectCorners.remove(rect)?.let    { rectCorners[updated]    = it }
                                             rectVariants.remove(rect)?.let   { rectVariants[updated]   = it }
                                             rectShapes.remove(rect)?.let     { rectShapes[updated]     = it }
                                             rectFx.remove(rect)?.let         { rectFx[updated]         = it }
-
                                             selectedRect = updated
                                             applyContainerMenuFromRect(updated)
                                         }
                                     }
+
                                     // Shape (blocco "cerchio" se non è quadrato)
                                     "shape" -> {
                                         rect?.let {
@@ -1512,20 +1478,14 @@ fun EditorMenusOnly(
                 onDismiss = { levelPanelOpen = false }
             )
             CropImageOverlay(
-                visible   = cropOverlayVisible,
-                imageUri  = cropTargetRect?.let { rectImages[it]?.uri },
-                initial   = cropTargetRect?.let { rectImages[it]?.crop }, // opzionale
+                visible  = cropOverlayVisible,
+                imageUri = cropTargetRect?.let { rectImages[it]?.uri },
+                initial  = cropTargetRect?.let { rectImages[it]?.crop },
                 onDismiss = { cropOverlayVisible = false },
-                onApply   = { normCrop: ImageCrop ->
-                    cropTargetRect?.let { tgt ->
-                        val prev = rectImages[tgt] ?: return@let
-                        rectImages[tgt] = prev.copy(
-                            crop = normCrop,
-                            // default sensata all’inserimento: Cover
-                            fit = prev.fit.takeIf { it != ImageFit.Stretch } ?: ImageFit.Cover,
-                            filter = prev.filter
-                        )
-                    }
+                onApply   = { normCrop ->
+                    val rect = cropTargetRect ?: return@CropImageOverlay
+                    val prev = rectImages[rect] ?: return@CropImageOverlay
+                    rectImages[rect] = prev.copy(crop = normCrop, fit = ImageFit.Cover)
                     cropOverlayVisible = false
                 }
             )
@@ -2530,14 +2490,6 @@ private fun LayoutLevel(
                             } else {
                                 pickImageLauncher.launch("image/*")
                             }
-                        }
-                    }
-
-                    ToolbarIconButton(ImageVector.vectorResource(R.drawable.ic_scissor), "Ritaglia") {
-                        val uri = selectedRect?.let { rectImages[it]?.uri }
-                        if (uri != null) {
-                            pendingCropUri = uri
-                            cropperVisible = true
                         }
                     }
 
