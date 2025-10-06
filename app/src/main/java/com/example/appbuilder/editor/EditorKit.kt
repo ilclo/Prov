@@ -2598,13 +2598,10 @@ private fun LayoutLevel(
                 }
                 "Aggiungi foto" -> {
 
-                    IconDropdown(
+                    ToolbarIconButton(
                         icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
-                        contentDescription = "Ritaglia",
-                        current = get("crop") ?: "Nessuno",
-                        options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                        onSelected = { onPick("crop", it) }
-                    )
+                        contentDescription = "Crop"
+                    ) { onEnter("Crop") }   // non apre menu; segnala un'azione
 
                     IconDropdown(
                         icon = ImageVector.vectorResource(id = R.drawable.ic_adapt),
@@ -2705,13 +2702,10 @@ private fun LayoutLevel(
             ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album") { onEnter("Aggiungi album") }
         }
         "Aggiungi foto" -> {
-            IconDropdown(
+            ToolbarIconButton(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
-                contentDescription = "Ritaglia",
-                current = get("crop") ?: "Nessuno",
-                options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
-                onSelected = { onPick("crop", it) }
-            )
+                contentDescription = "Crop"
+            ) { onEnter("Crop") }   // non apre menu; segnala un'azione
 
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_adapt),
