@@ -135,8 +135,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import com.example.appbuilder.canvas.CornerRadii
+import com.example.appbuilder.canvas.ImageStyle
+import com.example.appbuilder.canvas.ImageFit
+import com.example.appbuilder.canvas.ImageFilter
 
-// Local per sapere ovunque se l’utente è free (true) o no
+
 private val LocalIsFree = staticCompositionLocalOf { true }
 
 private const val codiceprofree = 12345
@@ -373,8 +376,6 @@ fun EditorMenusOnly(
     val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FxKind>() }
     // immagini per rettangolo (foto come sfondo)
     val rectImages  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ImageStyle>() }
-    // angoli del contenitore
-    val rectCorners = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.CornerRadii>() }
     var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
     var lastChanged by remember { mutableStateOf<String?>(null) }
     val pickImageLauncher = rememberLauncherForActivityResult(
@@ -830,18 +831,20 @@ fun EditorMenusOnly(
                             applyContainerMenuFromRect(rect)
                         }
                     },
-                    onUpdateItem    = { old, updated ->
+                    onUpdateItem = { old, updated ->
                         val items = pageState?.items ?: return@CanvasStage
                         val ix = items.indexOf(old)
                         if (ix >= 0) {
                             items[ix] = updated
-                            // trasferisci "decorazioni" e varianti
-                            rectFillStyles[updated] = rectFillStyles.remove(old) ?: rectFillStyles[updated] ?: rectFillStyles[old] ?: rectFillStyles[updated] ?: return@CanvasStage
-                            rectImages[updated]     = rectImages.remove(old)     ?: rectImages[updated]
-                            rectCorners[updated]    = rectCorners.remove(old)    ?: rectCorners[updated]    ?: CornerRadii()
-                            rectVariants[updated]   = rectVariants.remove(old)   ?: rectVariants[updated]   ?: com.example.appbuilder.canvas.Variant.Full
-                            rectShapes[updated]     = rectShapes.remove(old)     ?: rectShapes[updated]     ?: com.example.appbuilder.canvas.ShapeKind.Rect
-                            rectFx[updated]         = rectFx.remove(old)         ?: rectFx[updated]         ?: com.example.appbuilder.canvas.FxKind.None
+
+                            // trasferisci decorazioni/stili senza inserire null nella mappa
+                            rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
+                            rectImages.remove(old)?.let     { rectImages[updated]     = it }
+                            rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
+                            rectVariants.remove(old)?.let   { rectVariants[updated]   = it }
+                            rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
+                            rectFx.remove(old)?.let         { rectFx[updated]         = it }
+
                             if (selectedRect == old) {
                                 selectedRect = updated
                                 applyContainerMenuFromRect(updated)
@@ -2400,15 +2403,6 @@ private fun LayoutLevel(
                 }
                 "Aggiungi foto" -> {
 
-                    // ADATTA (ic_adapt) — usa la tua chiave "fitCont"
-                    IconDropdown(
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_adapt),
-                        contentDescription = "Adatta",
-                        current = get("fitCont") ?: "Cover",
-                        options = listOf("Cover", "Contain", "Fill", "FitWidth", "FitHeight"),
-                        onSelected = { onPick("fitCont", it) }
-                    )
-
                     IconDropdown(
                         icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
                         contentDescription = "Ritaglia",
@@ -2420,9 +2414,17 @@ private fun LayoutLevel(
                     IconDropdown(
                         icon = ImageVector.vectorResource(id = R.drawable.ic_adapt),
                         contentDescription = "Adatta",
-                        current = get("fit") ?: "Cover",
-                        options = listOf("Cover", "Contain", "Fill"),
-                        onSelected = { onPick("fit", it) }
+                        current = get("fitCont") ?: "Cover",
+                        options = listOf("Cover", "Contain", "Stretch"),
+                        onSelected = { onPick("fitCont", it) }
+                    )
+
+                    IconDropdown(
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
+                        contentDescription = "Filtro",
+                        current = get("filtro") ?: "Nessuno",
+                        options = listOf("Nessuno", "B/N", "Seppia"),
+                        onSelected = { onPick("filtro", it) }
                     )
 
                     IconDropdown(
@@ -2511,25 +2513,33 @@ private fun LayoutLevel(
             ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album") { onEnter("Aggiungi album") }
         }
         "Aggiungi foto" -> {
-            IconDropdown(EditorIcons.Crop, "Crop",
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
+                contentDescription = "Ritaglia",
                 current = get("crop") ?: "Nessuno",
                 options = listOf("Nessuno", "4:3", "16:9", "Quadrato"),
                 onSelected = { onPick("crop", it) }
+            )
+
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_adapt),
+                contentDescription = "Adatta",
+                current = get("fitCont") ?: "Cover",
+                options = listOf("Cover", "Contain", "Stretch"),
+                onSelected = { onPick("fitCont", it) }
+            )
+
+            IconDropdown(
+                icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
+                contentDescription = "Filtro",
+                current = get("filtro") ?: "Nessuno",
+                options = listOf("Nessuno", "B/N", "Seppia"),
+                onSelected = { onPick("filtro", it) }
             )
             IconDropdown(EditorIcons.Layout, "Cornice",
                 current = get("frame") ?: "Sottile",
                 options = listOf("Nessuna", "Sottile", "Marcata"),
                 onSelected = { onPick("frame", it) }
-            )
-            IconDropdown(EditorIcons.Layout, "Filtri",
-                current = get("filtro") ?: "Nessuno",
-                options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
-                onSelected = { onPick("filtro", it) }
-            )
-            IconDropdown(EditorIcons.Layout, "Adattamento",
-                current = get("fit") ?: "Cover",
-                options = listOf("Cover", "Contain", "Fill"),
-                onSelected = { onPick("fit", it) }
             )
         }
         "Aggiungi album" -> {
@@ -2618,30 +2628,30 @@ private fun ContainerLevel(
             val dpOptions = listOf("0dp","4dp","8dp","12dp","16dp","24dp","32dp")
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_as),
-                contentDescription = "Angolo alto‑sinistra",
+                contentDescription = "Angolo alto-sx",
                 current = get("ic_as") ?: "0dp",
-                options = dpOptions,
+                options = listOf("0dp","4dp","8dp","12dp","16dp"),
                 onSelected = { onPick("ic_as", it) }
             )
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_ad),
-                contentDescription = "Angolo alto‑destra",
+                contentDescription = "Angolo alto-dx",
                 current = get("ic_ad") ?: "0dp",
-                options = dpOptions,
+                options = listOf("0dp","4dp","8dp","12dp","16dp"),
                 onSelected = { onPick("ic_ad", it) }
             )
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_bs),
-                contentDescription = "Angolo basso‑sinistra",
+                contentDescription = "Angolo basso-sx",
                 current = get("ic_bs") ?: "0dp",
-                options = dpOptions,
+                options = listOf("0dp","4dp","8dp","12dp","16dp"),
                 onSelected = { onPick("ic_bs", it) }
             )
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_bd),
-                contentDescription = "Angolo basso‑destra",
+                contentDescription = "Angolo basso-dx",
                 current = get("ic_bd") ?: "0dp",
-                options = dpOptions,
+                options = listOf("0dp","4dp","8dp","12dp","16dp"),
                 onSelected = { onPick("ic_bd", it) }
             )
 

@@ -97,24 +97,31 @@ fun CanvasStage(
     variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
     shapes  : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
     corners : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
-    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),
-    imageStyles: Map<DrawItem.RectItem, ImageStyle> = emptyMap(),
+    fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),   // ⬅︎ virgola qui
+    imageStyles: Map<DrawItem.RectItem, ImageStyle> = emptyMap(), // ⬅︎ nuovo
     pageBackgroundColor: Color = Color.White,
-    pageBackgroundBrush: Brush? = null    
+    pageBackgroundBrush: Brush? = null
 ) {
     val context = LocalContext.current
 
-    @Composable
-    fun rememberBitmap(uri: Uri?): ImageBitmap? {
-        return remember(uri) {
-            if (uri == null) return@remember null
-            try {
-                context.contentResolver.openInputStream(uri)?.use { stream ->
-                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                }
-            } catch (_: Throwable) { null }
+    // Cache semplice per le immagini caricate (per URI)
+    val imageCache = remember { mutableMapOf<Uri, ImageBitmap?>() }
+
+    // Loader NON-@Composable (si può usare dentro draw{})
+    fun loadBitmap(uri: Uri?): ImageBitmap? {
+        if (uri == null) return null
+        imageCache[uri]?.let { return it }
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { s ->
+                val bmp = BitmapFactory.decodeStream(s)?.asImageBitmap()
+                imageCache[uri] = bmp
+                bmp
+            }
+        } catch (_: Throwable) {
+            null
         }
     }
+
 
     fun colorFilterFor(filter: ImageFilter): ColorFilter? = when (filter) {
         ImageFilter.Mono -> {
@@ -540,7 +547,6 @@ fun CanvasStage(
                                         p.close()
                                     }
                                 }
-                                p
                             }
 
                             // 1) FILL (solo se non "Text")
@@ -548,18 +554,19 @@ fun CanvasStage(
                                 if (varnt == Variant.Full) {
                                     // prova immagine; se non c’è, gradiente; altrimenti tinta
                                     val imgStyle = imageStyles[item]
-                                    val imgBitmap = rememberBitmap(imgStyle?.uri)
+                                    val imgBitmap = loadBitmap(imgStyle?.uri)
 
-                                    if (imgStyle != null && imgBitmap != null) {
+                                    if (varnt != Variant.Text && imgStyle != null && imgBitmap != null) {
                                         val iw = imgBitmap.width.toFloat()
                                         val ih = imgBitmap.height.toFloat()
                                         val dstW = w
                                         val dstH = h
 
+                                        // src window in base al fit
                                         val (srcOffset, srcSize) = when (imgStyle.fit) {
                                             ImageFit.Stretch -> IntOffset(0, 0) to IntSize(iw.toInt(), ih.toInt())
                                             ImageFit.Cover -> {
-                                                val scale = kotlin.math.max(dstW / iw, dstH / ih)
+                                                val scale = max(dstW / iw, dstH / ih)
                                                 val sw = (dstW / scale).coerceAtMost(iw)
                                                 val sh = (dstH / scale).coerceAtMost(ih)
                                                 val sx = ((iw - sw) * 0.5f).coerceAtLeast(0f)
@@ -567,7 +574,7 @@ fun CanvasStage(
                                                 IntOffset(sx.toInt(), sy.toInt()) to IntSize(sw.toInt(), sh.toInt())
                                             }
                                             ImageFit.Contain -> {
-                                                val scale = kotlin.math.min(dstW / iw, dstH / ih)
+                                                val scale = min(dstW / iw, dstH / ih)
                                                 val sw = (dstW / scale).coerceAtMost(iw)
                                                 val sh = (dstH / scale).coerceAtMost(ih)
                                                 val sx = ((iw - sw) * 0.5f).coerceAtLeast(0f)
@@ -577,13 +584,14 @@ fun CanvasStage(
                                         }
 
                                         val cf = colorFilterFor(imgStyle.filter)
+
                                         clipPath(path) {
                                             drawImage(
                                                 image = imgBitmap,
                                                 srcOffset = srcOffset,
-                                                srcSize = srcSize,
+                                                srcSize   = srcSize,
                                                 dstOffset = IntOffset(left.toInt(), top.toInt()),
-                                                dstSize = IntSize(dstW.toInt(), dstH.toInt()),
+                                                dstSize   = IntSize(dstW.toInt(), dstH.toInt()),
                                                 colorFilter = cf,
                                                 filterQuality = FilterQuality.Medium
                                             )
