@@ -429,25 +429,7 @@ fun ImageCropperDialog(
     }
 }
 
-@Composable
-private fun BoxScope.CropImageOverlay(
-    visible: Boolean,
-    imageUri: Uri?,
-    initial: ImageCrop? = null,              // <-- per riaprire con crop esistente
-    onDismiss: () -> Unit,
-    onApply: (ImageCrop) -> Unit             // <-- ritorna SOLO il crop normalizzato
-) {
-    if (!visible || imageUri == null) return
 
-    // TODO: il tuo vero cropper; per ora mock:
-    Box(Modifier.fillMaxSize()) {
-        // mostra l’immagine e permetti il ritaglio...
-        // quando l’utente conferma:
-        LaunchedEffect(Unit) {
-            onApply(initial ?: ImageCrop(0f,0f,1f,1f))
-        }
-    }
-}
 
 
 @Composable
@@ -583,32 +565,7 @@ fun EditorMenusOnly(
     val menuSelections = remember { mutableStateMapOf<String, Any?>() }
 // Modifiche in corso (serve per mostrare la barra di conferma alla risalita)
     var dirty by remember { mutableStateOf(false) }
-    // stile riempimento (per non toccare RectItem)
-    // === IMMAGINI PER I CONTENITORI ===
-    val rectImages = remember { mutableStateMapOf<DrawItem.RectItem, ImageStyle>() }
-    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
 
-    // Dialog/overlay crop
-    var cropperVisible by remember { mutableStateOf(false) }
-    var cropperImageUri by remember { mutableStateOf<Uri?>(null) }
-    var cropperTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
-
-    // Conferma cancellazione immagine
-    var showDeleteImageDialog by remember { mutableStateOf(false) }
-
-    // Launcher per scegliere l’immagine dalla galleria
-    val pickImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        val rect = selectedRect ?: return@rememberLauncherForActivityResult
-        if (uri != null) {
-            // Salva stile base + apri subito il crop
-            rectImages[rect] = ImageStyle(uri = uri, fit = ImageFit.Cover)
-            cropperImageUri = uri
-            cropperTarget = rect
-            cropperVisible = true
-        }
-    }
     val rectFillStyles = remember { 
         mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FillStyle>() 
     }
@@ -617,7 +574,6 @@ fun EditorMenusOnly(
     val rectShapes   = remember { mutableStateMapOf<DrawItem.RectItem, ShapeKind>() }
     val rectCorners  = remember { mutableStateMapOf<DrawItem.RectItem, CornerRadii>() }
     val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, FxKind>() }
-    val rectImages   = remember { mutableStateMapOf<DrawItem.RectItem, ImageStyle>() }
     // --- STATO USATO DAL PICKER: deve stare PRIMA del launcher ---
     var lastChanged by remember { mutableStateOf<String?>(null) }
     var cropOverlayVisible by remember { mutableStateOf(false) }
@@ -627,6 +583,34 @@ fun EditorMenusOnly(
     var colorPickerVisible by remember { mutableStateOf(false) }
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
     var pickerOffset by remember { mutableStateOf(IntOffset(0, 0)) }
+
+    // === IMMAGINI PER CONTENITORI ===
+    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+    val rectImages = remember { mutableStateMapOf<DrawItem.RectItem, ImageStyle>() }
+
+    // === CROP OVERLAY STATE ===
+    var cropperVisible by remember { mutableStateOf(false) }
+    var cropperImageUri by remember { mutableStateOf<Uri?>(null) }
+    var cropperTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+    var showDeleteImageDialog by remember { mutableStateOf(false) }
+
+    // Launcher immagini (APRE subito il crop se non c’è una foto già impostata)
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        val rect = selectedRect ?: return@rememberLauncherForActivityResult
+        if (uri != null) {
+            // setta stile base e apri crop
+            rectImages[rect] = ImageStyle(uri = uri, fit = ImageFit.Cover)
+            cropperImageUri = uri
+            cropperTarget = rect
+            cropperVisible = true
+        }
+    }
+
+
+
+
 
 // Conferma all'uscita dai sottomenu verso la home
     var showConfirm by remember { mutableStateOf(false) }
@@ -1681,18 +1665,26 @@ fun EditorMenusOnly(
                 },
                 onDismiss = { levelPanelOpen = false }
             )
-            CropImageOverlay(
-                visible  = cropOverlayVisible,
-                imageUri = cropTargetRect?.let { rectImages[it]?.uri },
-                initial  = cropTargetRect?.let { rectImages[it]?.crop },
-                onDismiss = { cropOverlayVisible = false },
-                onApply   = { normCrop ->
-                    val rect = cropTargetRect ?: return@CropImageOverlay
-                    val prev = rectImages[rect] ?: return@CropImageOverlay
-                    rectImages[rect] = prev.copy(crop = normCrop, fit = ImageFit.Cover)
-                    cropOverlayVisible = false
-                }
-            )
+            // Apertura crop all’aggiunta o al “ritaglia”
+            if (cropperVisible) {
+                CropImageOverlay(
+                    visible = cropperVisible,
+                    imageUri = cropperImageUri,
+                    initial = rectImages[cropperTarget]?.crop,
+                    onDismiss = { cropperVisible = false },
+                    onApply = { c ->
+                        val r = cropperTarget ?: return@CropImageOverlay
+                        val prev = rectImages[r]
+                        rectImages[r] = (prev ?: ImageStyle(uri = cropperImageUri!!)).copy(
+                            crop = c,
+                            fit = ImageFit.Cover,
+                            filter = ImageFilter.None
+                        )
+                        cropperVisible = false
+                    }
+                )
+            }
+
             // 2) Toast informativo (in alto, scompare con fade)
             InfoToastCard(
                 visible = infoCardVisible && infoCard != null,
@@ -4053,6 +4045,227 @@ private fun SquareTile(
     }
 }
 
+@Composable
+fun CropImageOverlay(
+    visible: Boolean,
+    imageUri: Uri?,
+    initial: ImageCrop?,
+    onDismiss: () -> Unit,
+    onApply: (ImageCrop) -> Unit
+) {
+    if (!visible || imageUri == null) return
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        // sfondo scuro
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(Color(0xCC000000))
+                .padding(16.dp)
+        ) {
+            val context = LocalContext.current
+            val imageBitmap = remember(imageUri) {
+                try {
+                    context.contentResolver.openInputStream(imageUri)?.use { s ->
+                        android.graphics.BitmapFactory.decodeStream(s)?.asImageBitmap()
+                    }
+                } catch (_: Throwable) { null }
+            }
+
+            var boxSize by remember { mutableStateOf(IntSize.Zero) }
+
+            // crop normalizzato [0..1]
+            var crop by remember {
+                mutableStateOf(initial ?: ImageCrop(0f, 0f, 1f, 1f))
+            }
+
+            // per gestire drag angoli o spostamento
+            var dragMode by remember { mutableStateOf<String?>(null) } // "tl","tr","bl","br","move"
+            var lastPos by remember { mutableStateOf(Offset.Zero) }
+
+            Column(
+                Modifier
+                    .background(Color.White, shape = RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                // area immagine + overlay crop
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f) // quadrato semplice; puoi cambiare
+                        .onSizeChanged { boxSize = it }
+                        .clipToBounds()
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { pos ->
+                                    lastPos = pos
+                                    // determina quale angolo stai prendendo
+                                    val w = boxSize.width.toFloat()
+                                    val h = boxSize.height.toFloat()
+                                    val left   = crop.left   * w
+                                    val top    = crop.top    * h
+                                    val right  = crop.right  * w
+                                    val bottom = crop.bottom * h
+
+                                    val tl = Offset(left, top)
+                                    val tr = Offset(right, top)
+                                    val bl = Offset(left, bottom)
+                                    val br = Offset(right, bottom)
+
+                                    fun near(a: Offset, b: Offset, th: Float) =
+                                        (a - b).getDistance() <= th
+
+                                    val th = 32f
+                                    dragMode = when {
+                                        near(pos, tl, th) -> "tl"
+                                        near(pos, tr, th) -> "tr"
+                                        near(pos, bl, th) -> "bl"
+                                        near(pos, br, th) -> "br"
+                                        else -> "move"
+                                    }
+                                },
+                                onDrag = { change, drag ->
+                                    change.consume()
+                                    if (boxSize.width <= 0 || boxSize.height <= 0) return@detectDragGestures
+                                    val w = boxSize.width.toFloat()
+                                    val h = boxSize.height.toFloat()
+
+                                    fun clamp01(v: Float) = v.coerceIn(0f, 1f)
+
+                                    val dx = drag.x / w
+                                    val dy = drag.y / h
+
+                                    when (dragMode) {
+                                        "tl" -> {
+                                            val nl = clamp01(crop.left + dx)
+                                            val nt = clamp01(crop.top + dy)
+                                            crop = crop.copy(
+                                                left = min(nl, crop.right - 0.01f),
+                                                top  = min(nt, crop.bottom - 0.01f)
+                                            )
+                                        }
+                                        "tr" -> {
+                                            val nr = clamp01(crop.right + dx)
+                                            val nt = clamp01(crop.top + dy)
+                                            crop = crop.copy(
+                                                right = max(nr, crop.left + 0.01f),
+                                                top   = min(nt, crop.bottom - 0.01f)
+                                            )
+                                        }
+                                        "bl" -> {
+                                            val nl = clamp01(crop.left + dx)
+                                            val nb = clamp01(crop.bottom + dy)
+                                            crop = crop.copy(
+                                                left   = min(nl, crop.right - 0.01f),
+                                                bottom = max(nb, crop.top + 0.01f)
+                                            )
+                                        }
+                                        "br" -> {
+                                            val nr = clamp01(crop.right + dx)
+                                            val nb = clamp01(crop.bottom + dy)
+                                            crop = crop.copy(
+                                                right  = max(nr, crop.left + 0.01f),
+                                                bottom = max(nb, crop.top + 0.01f)
+                                            )
+                                        }
+                                        "move" -> {
+                                            // sposta tutto il rettangolo, vincolando ai bordi
+                                            var nl = crop.left + dx
+                                            var nt = crop.top  + dy
+                                            var nr = crop.right + dx
+                                            var nb = crop.bottom + dy
+                                            val wC = (nr - nl)
+                                            val hC = (nb - nt)
+                                            if (nl < 0f) { nr -= nl; nl = 0f }
+                                            if (nt < 0f) { nb -= nt; nt = 0f }
+                                            if (nr > 1f) { nl -= (nr - 1f); nr = 1f }
+                                            if (nb > 1f) { nt -= (nb - 1f); nb = 1f }
+                                            crop = crop.copy(left = nl, top = nt, right = nr, bottom = nb)
+                                        }
+                                    }
+                                },
+                                onDragEnd = { dragMode = null },
+                                onDragCancel = { dragMode = null }
+                            )
+                        }
+                ) {
+                    // Immagine
+                    imageBitmap?.let { img ->
+                        androidx.compose.foundation.Image(
+                            bitmap = img,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // Overlay scuro fuori dal crop
+                        Canvas(Modifier.matchParentSize()) {
+                            val w = size.width
+                            val h = size.height
+                            val left   = crop.left   * w
+                            val top    = crop.top    * h
+                            val right  = crop.right  * w
+                            val bottom = crop.bottom * h
+
+                            // oscuramento esterno
+                            drawRect(
+                                color = Color(0f,0f,0f,0.45f),
+                                size = Size(w, h)
+                            )
+                            // "finestra" chiara sul crop
+                            val p = Path().apply {
+                                addRect(Rect(0f, 0f, w, h))
+                                addRect(Rect(left, top, right, bottom))
+                            }
+                            clipPath(p, clipOp = ClipOp.Difference) {
+                                drawRect(color = Color.Transparent)
+                            }
+
+                            // bordo crop
+                            drawRect(
+                                color = Color.White,
+                                topLeft = Offset(left, top),
+                                size = Size(right - left, bottom - top),
+                                style = Stroke(width = 2.dp.toPx())
+                            )
+
+                            // handle angoli
+                            val hs = 10.dp.toPx()
+                            fun handle(cx: Float, cy: Float) {
+                                drawRect(
+                                    color = Color.White,
+                                    topLeft = Offset(cx - hs, cy - hs),
+                                    size = Size(hs * 2, hs * 2)
+                                )
+                            }
+                            handle(left, top)
+                            handle(right, top)
+                            handle(left, bottom)
+                            handle(right, bottom)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    // pulsanti senza Material
+                    Box(Modifier
+                        .padding(end = 12.dp)
+                        .background(Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+                        .clickable { onDismiss() }
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("Annulla", color = Color.Black) }
+
+                    Box(Modifier
+                        .background(Color(0xFF1976D2), RoundedCornerShape(8.dp))
+                        .clickable { onApply(crop) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("OK", color = Color.White) }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun BoxScope.InfoToastCard(
