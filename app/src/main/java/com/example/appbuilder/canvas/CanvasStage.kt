@@ -36,13 +36,24 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import kotlin.math.roundToInt
+
 
 // Variante di rendering del contenitore
 enum class Variant { Full, Outlined, Text, TopBottom }
 
 // Forme supportate (rettangolo con raggi, cerchio, pillola/stadium, diamante)
 enum class ShapeKind { Rect, Circle, Pill, Diamond }
+
+enum class ImageFit { Cover, Contain, Stretch }
+enum class ImageFilter { None, Mono, Sepia }
+
+data class ImageStyle(
+    val uri: Uri,
+    val fit: ImageFit = ImageFit.Cover,
+    val filter: ImageFilter = ImageFilter.None,
+    // crop base: l’immagine viene “ritagliata” all’interno della forma del contenitore
+    val cropToShape: Boolean = true
+)
 
 data class CornerRadii(
     val tl: Dp = 0.dp,
@@ -62,24 +73,6 @@ data class FillStyle(
     val col1: Color,
     val col2: Color? = null,
     val dir: GradientDir = GradientDir.Monocolore
-)
-
-data class ImageCrop(
-    val left: Float,   // [0f,1f]
-    val top: Float,    // [0f,1f]
-    val right: Float,  // [0f,1f]
-    val bottom: Float  // [0f,1f]
-)
-
-enum class ImageFit { Cover, Contain, Stretch }
-enum class ImageFilter { None, Mono, Sepia }
-
-data class ImageStyle(
-    val uri: Uri,
-    val fit: ImageFit = ImageFit.Cover,
-    val filter: ImageFilter = ImageFilter.None,
-    val crop: ImageCrop? = null,            // ⬅︎ nuovo
-    val cropToShape: Boolean = true
 )
 
 
@@ -561,36 +554,22 @@ fun CanvasStage(
                             // 1) FILL (solo se non "Text")
                             if (varnt != Variant.Text) {
                                 if (varnt == Variant.Full) {
-                                    // immagine; se assente → gradiente → tinta
+                                    // prova immagine; se non c’è, gradiente; altrimenti tinta
                                     val imgStyle = imageStyles[item]
-                                    val bmp = loadBitmap(imgStyle?.uri)
+                                    val imgBitmap = loadBitmap(imgStyle?.uri)
 
-                                    if (imgStyle != null && bmp != null) {
-                                        // --- sorgente: ricava il rettangolo crop in px dal bitmap ---
-                                        val crop = imgStyle.crop ?: ImageCrop(0f, 0f, 1f, 1f)
-                                        val srcW = bmp.width
-                                        val srcH = bmp.height
-
-                                        val srcLeft   = (crop.left   * srcW).roundToInt().coerceIn(0, srcW)
-                                        val srcTop    = (crop.top    * srcH).roundToInt().coerceIn(0, srcH)
-                                        val srcRight  = (crop.right  * srcW).roundToInt().coerceIn(srcLeft + 1, srcW)
-                                        val srcBottom = (crop.bottom * srcH).roundToInt().coerceIn(srcTop  + 1, srcH)
-
-                                        val srcSize = IntSize(srcRight - srcLeft, srcBottom - srcTop)
-                                        val srcOff  = IntOffset(srcLeft, srcTop)
-
-                                        // --- destinazione: calcola dimensione in base al fit richiesto ---
-                                        val srcWF = srcSize.width.toFloat()
-                                        val srcHF = srcSize.height.toFloat()
+                                    if (imgStyle != null && imgBitmap != null) {
+                                        val srcW = imgBitmap.width.toFloat()
+                                        val srcH = imgBitmap.height.toFloat()
 
                                         val (dstW, dstH) = when (imgStyle.fit) {
                                             ImageFit.Cover -> {
-                                                val s = max(w / srcWF, h / srcHF)
-                                                srcWF * s to srcHF * s
+                                                val s = kotlin.math.max(w / srcW, h / srcH)
+                                                srcW * s to srcH * s
                                             }
                                             ImageFit.Contain -> {
-                                                val s = min(w / srcWF, h / srcHF)
-                                                srcWF * s to srcHF * s
+                                                val s = kotlin.math.min(w / srcW, h / srcH)
+                                                srcW * s to srcH * s
                                             }
                                             ImageFit.Stretch -> w to h
                                         }
@@ -599,13 +578,11 @@ fun CanvasStage(
 
                                         val drawImageBlock: DrawScope.() -> Unit = {
                                             drawImage(
-                                                image = bmp,
-                                                srcOffset = srcOff,
-                                                srcSize   = srcSize,
-                                                dstOffset = IntOffset(dx.roundToInt(), dy.roundToInt()),
-                                                dstSize   = IntSize(dstW.roundToInt(), dstH.roundToInt()),
+                                                image = imgBitmap,
+                                                dstOffset = IntOffset(dx.toInt(), dy.toInt()),
+                                                dstSize = IntSize(dstW.toInt(), dstH.toInt()),
                                                 filterQuality = FilterQuality.Low,
-                                                colorFilter   = colorFilterFor(imgStyle.filter)
+                                                colorFilter = colorFilterFor(imgStyle.filter)
                                             )
                                         }
 
