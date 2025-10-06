@@ -444,7 +444,16 @@ fun EditorMenusOnly(
             cropOverlayVisible = true
         }
     }
-
+    onCropDone = { normCrop: ImageCrop ->
+        val rect = selectedRect ?: return@onCropDone
+        val prev = rectImages[rect]
+        rectImages[rect] = (prev ?: ImageStyle(uri = pendingCropUri!!)).copy(
+            crop = normCrop,
+            fit = ImageFit.Cover,
+            filter = ImageFilter.None
+        )
+        cropperVisible = false
+    }
     // overlay palette colore
     var colorPickerVisible by remember { mutableStateOf(false) }
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
@@ -1203,13 +1212,27 @@ fun EditorMenusOnly(
                                         rectVariants[r] = v
                                     }
                                     "b_thick" -> {
-                                        val r = selectedRect ?: return@pick
-                                        val newWidth = keyToDp(value)          // es: "4dp" -> 4.dp (hai già keyToDp)
-                                        val updated = r.copy(borderWidth = newWidth)
+                                        val rect = selectedRect ?: return@pick
+                                        val dpVal = keyToDp(value) // es. "2dp" -> 2.dp
+                                        val updated = rect.copy(borderWidth = dpVal)
+
+                                        // sostituisci in pageState
                                         val items = pageState?.items ?: return@pick
-                                        val ix = items.indexOf(r)
-                                        if (ix >= 0) items[ix] = updated
-                                        selectedRect = updated                 // mantieni selezione coerente
+                                        val ix = items.indexOf(rect)
+                                        if (ix >= 0) {
+                                            items[ix] = updated
+
+                                            // migra TUTTE le mappe stile al nuovo riferimento
+                                            rectFillStyles.remove(rect)?.let { rectFillStyles[updated] = it }
+                                            rectImages.remove(rect)?.let     { rectImages[updated]     = it }
+                                            rectCorners.remove(rect)?.let    { rectCorners[updated]    = it }
+                                            rectVariants.remove(rect)?.let   { rectVariants[updated]   = it }
+                                            rectShapes.remove(rect)?.let     { rectShapes[updated]     = it }
+                                            rectFx.remove(rect)?.let         { rectFx[updated]         = it }
+
+                                            selectedRect = updated
+                                            applyContainerMenuFromRect(updated)
+                                        }
                                     }
                                     // Shape (blocco "cerchio" se non è quadrato)
                                     "shape" -> {
@@ -2479,39 +2502,56 @@ private fun LayoutLevel(
                 }
                 "Aggiungi foto" -> {
 
-                    ToolbarIconButton(
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
-                        contentDescription = "Crop"
-                    ) { onEnter("Crop") }   // non apre menu; segnala un'azione
+                    ToolbarIconButton(ImageVector.vectorResource(R.drawable.ic_uplo_photo), "Carica immagine") {
+                        val rect = selectedRect
+                        if (rect != null) {
+                            val hasPhoto = rectImages[rect]?.uri != null
+                            if (hasPhoto) {
+                                // notifica: serve cancellare prima
+                                infoCard = "Operazione non consentita" to "Devi prima cancellare la foto corrente."
+                            } else {
+                                pickImageLauncher.launch("image/*")
+                            }
+                        }
+                    }
+
+                    ToolbarIconButton(ImageVector.vectorResource(R.drawable.ic_scissor), "Ritaglia") {
+                        val uri = selectedRect?.let { rectImages[it]?.uri }
+                        if (uri != null) {
+                            pendingCropUri = uri
+                            cropperVisible = true
+                        }
+                    }
 
                     IconDropdown(
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_adapt),
+                        icon = ImageVector.vectorResource(R.drawable.ic_adapt),
                         contentDescription = "Adatta",
                         current = get("fitCont") ?: "Cover",
-                        options = listOf("Cover", "Contain", "Stretch"),
+                        options = listOf("Cover","Contain","Stretch"),
                         onSelected = { onPick("fitCont", it) }
                     )
 
                     IconDropdown(
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
+                        icon = ImageVector.vectorResource(R.drawable.ic_filter),
                         contentDescription = "Filtro",
                         current = get("filtro") ?: "Nessuno",
-                        options = listOf("Nessuno", "B/N", "Seppia"),
+                        options = listOf("Nessuno","Bianco e nero","Seppia"),
                         onSelected = { onPick("filtro", it) }
                     )
 
-                    IconDropdown(
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
-                        contentDescription = "Filtro",
-                        current = get("filtro") ?: "Nessuno",
-                        options = listOf("Nessuno", "B/N", "Vintage", "Vivido"),
-                        onSelected = { onPick("filtro", it) }
-                    )
-                    IconDropdown(EditorIcons.Layout, "Cornice",
-                        current = get("frame") ?: "Sottile",
-                        options = listOf("Nessuna", "Sottile", "Marcata"),
-                        onSelected = { onPick("frame", it) }
-                    )
+                    ToolbarIconButton(ImageVector.vectorResource(R.drawable.ic_cancel), "Cancella foto") {
+                        val rect = selectedRect ?: return@ToolbarIconButton
+                        confirmDialog = Confirm(
+                            title = "Cancellare?",
+                            text  = "Attenzione, se scegli Sì perderai tutte le modifiche che hai apportato alla tua foto.",
+                            onYes = {
+                                rectImages.remove(rect)
+                                // azzera eventuali selezioni menù immagine
+                                menuSelections[key(menuPath, "filtro")] = "Nessuno"
+                                menuSelections[key(menuPath, "fitCont")] = "Cover"
+                            }
+                        )
+                    }
                 }
                 "Aggiungi album" -> {
                     ToolbarIconButton(
@@ -2690,33 +2730,36 @@ private fun ContainerLevel(
                 options = listOf("Normale", "Sfogliabile", "Tab"),
                 onSelected = { onPick("tipo", it) }
             )
+            val dpOptions = listOf("0dp","4dp","8dp","12dp","16dp","24dp")
+
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_ad),
-                contentDescription = "ic_ad",
+                contentDescription = "Angolo alto‑destra",
                 current = get("ic_ad") ?: "0dp",
-                options = listOf("0dp", "4dp", "8dp", "16dp")
-            ) { v -> onPick("ic_ad", v) }
-
+                options = dpOptions,
+                onSelected = { onPick("ic_ad", it) }
+            )
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_bd),
-                contentDescription = "ic_bd",
+                contentDescription = "Angolo basso‑destra",
                 current = get("ic_bd") ?: "0dp",
-                options = listOf("0dp", "4dp", "8dp", "16dp")
-            ) { v -> onPick("ic_bd", v) }
-
+                options = dpOptions,
+                onSelected = { onPick("ic_bd", it) }
+            )
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_bs),
-                contentDescription = "ic_bs",
+                contentDescription = "Angolo basso‑sinistra",
                 current = get("ic_bs") ?: "0dp",
-                options = listOf("0dp", "4dp", "8dp", "16dp")
-            ) { v -> onPick("ic_bs", v) }
-
+                options = dpOptions,
+                onSelected = { onPick("ic_bs", it) }
+            )
             IconDropdown(
                 icon = ImageVector.vectorResource(id = R.drawable.ic_as),
-                contentDescription = "ic_as",
+                contentDescription = "Angolo alto‑sinistra",
                 current = get("ic_as") ?: "0dp",
-                options = listOf("0dp", "4dp", "8dp", "16dp")
-            ) { v -> onPick("ic_as", v) }
+                options = dpOptions,
+                onSelected = { onPick("ic_as", it) }
+            )
 
             IconDropdown(
                 icon = Icons.Outlined.BookmarkAdd,

@@ -514,7 +514,8 @@ fun CanvasStage(
                             val varnt  = variants[item] ?: Variant.Full
                             val fxKind = fx[item]       ?: FxKind.None
                             val rad    = corners[item]  ?: CornerRadii()
-                            val style  = fillStyles[item]  // può essere null (=> tinta piena)
+                            val style  = fillStyles[item]  // può essere null
+                            val imgSt  = imageStyles[item] // può essere null
 
                             // path della forma (rettangolo arrotondato, cerchio, pillola, rombo)
                             val path: Path = run {
@@ -586,10 +587,49 @@ fun CanvasStage(
                                             )
                                         }
 
-                                        if (imgStyle.cropToShape) {
-                                            clipPath(path) { drawImageBlock() }
-                                        } else {
-                                            drawImageBlock()
+                                        val img = rememberBitmap(imgSt?.uri)
+                                        if (varnt != Variant.Text && imgSt != null && img != null) {
+                                            val srcW = img.width.toFloat()
+                                            val srcH = img.height.toFloat()
+
+                                            // calcolo della porzione sorgente da crop normalizzato (0..1), se presente
+                                            val crop = imgSt.crop
+                                            val srcLeft   = ((crop?.left  ?: 0f) * srcW).toInt().coerceIn(0, srcW.toInt())
+                                            val srcTop    = ((crop?.top   ?: 0f) * srcH).toInt().coerceIn(0, srcH.toInt())
+                                            val srcRight  = ((crop?.right ?: 1f) * srcW).toInt().coerceIn(0, srcW.toInt())
+                                            val srcBottom = ((crop?.bottom?: 1f) * srcH).toInt().coerceIn(0, srcH.toInt())
+                                            val srcSize   = IntSize((srcRight - srcLeft).coerceAtLeast(1), (srcBottom - srcTop).coerceAtLeast(1))
+                                            val srcOff    = IntOffset(srcLeft, srcTop)
+
+                                            // calcolo adattamento (Cover/Contain/Stretch) sulla destinazione (w/h)
+                                            val (dstW, dstH) = when (imgSt.fit) {
+                                                ImageFit.Cover   -> {
+                                                    val s = kotlin.math.max(w / srcSize.width, h / srcSize.height)
+                                                    srcSize.width * s to srcSize.height * s
+                                                }
+                                                ImageFit.Contain -> {
+                                                    val s = kotlin.math.min(w / srcSize.width, h / srcSize.height)
+                                                    srcSize.width * s to srcSize.height * s
+                                                }
+                                                ImageFit.Stretch -> w to h
+                                            }
+                                            val dx = left + (w - dstW) / 2f
+                                            val dy = top  + (h - dstH) / 2f
+
+                                            val drawBlock: DrawScope.() -> Unit = {
+                                                drawImage(
+                                                    image = img,
+                                                    srcOffset = srcOff,
+                                                    srcSize   = srcSize,
+                                                    dstOffset = IntOffset(dx.toInt(), dy.toInt()),
+                                                    dstSize   = IntSize(dstW.toInt(), dstH.toInt()),
+                                                    filterQuality = FilterQuality.Low,
+                                                    colorFilter = colorFilterFor(imgSt.filter)
+                                                )
+                                            }
+                                            if (imgSt.cropToShape) clipPath(path) { drawBlock() } else drawBlock()
+
+                                            // eventuale FX sopra (vignette/noise/stripes) -> già presente nel tuo file
                                         }
                                         // opzionale: applica FX sopra l’immagine (mantieni la tua logica fxKind)
                                     } else {
