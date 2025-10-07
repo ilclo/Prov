@@ -327,14 +327,20 @@ private fun FilterDropdown(
         ToolbarIconButton(icon, contentDescription) { expanded = true }
         if (!current.isNullOrBlank()) {
             Surface(
-                color = Color(0xFF22304B),
+                color = Color.Transparent,            // prima: Color(0xFF22304B)
                 contentColor = Color.White,
                 shape = RoundedCornerShape(6.dp),
+                shadowElevation = 0.dp,               // niente ombra per effetto “float”
+                tonalElevation = 0.dp,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset { IntOffset(0, 14) }
             ) {
-                Text(current, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp)
+                Text(
+                    current,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontSize = 10.sp
+                )
             }
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
