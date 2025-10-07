@@ -3185,51 +3185,45 @@ private fun ContainerLevel(
         "Immagini" -> {
             when (path.getOrNull(2)) {
                 null -> {
-                    // livello 2: scelte principali
                     ToolbarIconButton(EditorIcons.AddPhotoAlternate, "Aggiungi immagine") { onEnter("Aggiungi foto") }
                     ToolbarIconButton(EditorIcons.PermMedia, "Aggiungi album") { onEnter("Aggiungi album") }
                 }
 
                 "Aggiungi foto" -> {
-                    // Upload immagine (ic_uplo_photo)
+                    // Upload immagine
                     ToolbarIconButton(
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_uplo_photo),
+                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_uplo_photo) }
+                            .getOrElse { EditorIcons.AddPhotoAlternate },
                         contentDescription = "Upload immagine"
-                    ) {
-                        if (selectedRect?.let { rectImages[it]?.uri } != null) {
-                            // già presente: avvisa che serve cancellare prima
-                            infoCard = "Immagine già presente" to
-                                    "Per cambiare foto premi l’icona cestino e poi carica una nuova immagine."
-                        } else {
-                            pickImageLauncher.launch("image/*")
-                        }
-                    }
+                    ) { onEnter("Upload") }
 
-
-                    // Ritaglia (ic_scissor)
+                    // Ritaglia
                     ToolbarIconButton(
-                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_scissor) }.getOrElse { EditorIcons.Crop },
+                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_scissor) }
+                            .getOrElse { EditorIcons.Crop },
                         contentDescription = "Ritaglia"
                     ) { onEnter("Crop") }
 
-                    // Adatta (ic_adapt): Cover / Contain / Stretch
+                    // Adatta
                     IconDropdown(
-                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_adapt) }.getOrElse { EditorIcons.Layout },
+                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_adapt) }
+                            .getOrElse { EditorIcons.Layout },
                         contentDescription = "Adatta",
                         current = get("fitCont") ?: "Cover",
                         options = listOf("Cover", "Contain", "Stretch"),
                         onSelected = { onPick("fitCont", it) }
                     )
 
+                    // Filtro (20 opzioni)
                     FilterDropdown(
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
+                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_filter) }
+                            .getOrElse { EditorIcons.Tune },
                         contentDescription = "Filtro",
                         current = get("filtro") ?: "Nessuno",
                         onSelected = { onPick("filtro", it) }
                     )
 
-
-                    // Cancella (ic_cancel)
+                    // Cancella
                     ToolbarIconButton(EditorIcons.Cancel, "Cancella immagine") { onEnter("Cancella immagine") }
                 }
 
