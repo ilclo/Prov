@@ -160,6 +160,8 @@ import kotlin.math.min
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 
 private val LocalIsFree = staticCompositionLocalOf { true }
 
@@ -322,15 +324,27 @@ private fun FilterDropdown(
     onSelected: (String) -> Unit,
     options: List<String> = FILTER_NAMES
 ) {
+    val density = LocalDensity.current
     var expanded by remember { mutableStateOf(false) }
-    Box {
+    var anchorPos by remember { mutableStateOf(IntOffset.Zero) }
+    var anchorSize by remember { mutableStateOf(IntSize.Zero) }
+
+    // Icona + "badge" (badge già completamente trasparente)
+    Box(
+        modifier = Modifier.onGloballyPositioned { c ->
+            val p = c.positionInRoot()
+            anchorPos = IntOffset(p.x.roundToInt(), p.y.roundToInt())
+            anchorSize = c.size
+        }
+    ) {
         ToolbarIconButton(icon, contentDescription) { expanded = true }
+
         if (!current.isNullOrBlank()) {
             Surface(
-                color = Color.Transparent,            // prima: Color(0xFF22304B)
+                color = Color.Transparent,     // <-- trasparente
                 contentColor = Color.White,
                 shape = RoundedCornerShape(6.dp),
-                shadowElevation = 0.dp,               // niente ombra per effetto “float”
+                shadowElevation = 0.dp,
                 tonalElevation = 0.dp,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -343,21 +357,44 @@ private fun FilterDropdown(
                 )
             }
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { name ->
-                DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            FilterSwatch(name)
-                            Text(name)
-                        }
-                    },
-                    onClick = { onSelected(name); expanded = false }
-                )
+    }
+
+    // Menu "flottante" senza alcuna Surface di contenimento
+    if (expanded) {
+        val y = anchorPos.y + anchorSize.height + with(density) { 8.dp.toPx().roundToInt() }
+
+        Popup(
+            alignment = Alignment.TopStart,
+            offset = IntOffset(anchorPos.x, y),
+            onDismissRequest = { expanded = false },
+            properties = PopupProperties(focusable = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .background(Color.Transparent) // nessun sfondo
+            ) {
+                options.forEachIndexed { ix, name ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))  // solo l’item
+                            .clickable { onSelected(name); expanded = false }
+                            .background(Color.Transparent)    // item trasparente
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        // riquadro d’esempio del filtro
+                        FilterSwatch(name)
+                        Text(name, color = Color.White)
+                    }
+                    if (ix != options.lastIndex) Spacer(Modifier.height(6.dp))
+                }
             }
         }
     }
 }
+
 
 
 @Composable
