@@ -387,7 +387,7 @@ private fun FilterDropdown(
     var anchorPos by remember { mutableStateOf(IntOffset.Zero) }
     var anchorSize by remember { mutableStateOf(IntSize.Zero) }
 
-    // Anchor dell’icona
+    // Anchor trasparente dell’icona + badge stato
     Box(
         modifier = Modifier.onGloballyPositioned { c ->
             val p = c.positionInRoot()
@@ -397,7 +397,7 @@ private fun FilterDropdown(
     ) {
         ToolbarIconButton(icon, contentDescription) { expanded = true }
 
-        // Badge stato filtro: già trasparente per l’effetto “float”
+        // Badge stato filtro (float): corpo trasparente, solo testo
         if (!current.isNullOrBlank()) {
             Surface(
                 color = Color.Transparent,
@@ -418,7 +418,7 @@ private fun FilterDropdown(
         }
     }
 
-    // Corpo del menu: trasparente; le voci hanno ciascuna il proprio "tile" chiaro
+    // Corpo menu: popup con background TRASPARENTE.
     if (expanded) {
         val y = anchorPos.y + anchorSize.height + with(density) { 8.dp.toPx().roundToInt() }
 
@@ -428,48 +428,54 @@ private fun FilterDropdown(
             onDismissRequest = { expanded = false },
             properties = PopupProperties(focusable = true)
         ) {
-            // Contenitore trasparente: mantiene l’effetto "flottante"
+            // Il contenitore resta trasparente -> effetto "flottante"
             Box(Modifier.background(Color.Transparent)) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp)
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)           // abilita lo SCROLL verticale
+                        .background(Color.Transparent)
+                        .padding(vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
                 ) {
                     items(options) { name ->
-                        DropdownMenuItem(
-                            text = { Text(name) },
-                            onClick = { onSelect(name) }
-                        )
-                    }
-                }
-
-                Surface(
-                    color = Color(0xF5FFFFFF),                      // chiaro, leggermente traslucido
-                    contentColor = Color.Black,
-                    shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, Color(0x14000000)), // bordo leggero
-                    shadowElevation = 4.dp,                          // lieve ombra
-                    tonalElevation = 0.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            onSelected(name)
-                            expanded = false
+                        // Ogni voce appare come un "tile" chiaro staccato (preview + nome)
+                        Surface(
+                            color = Color(0xF5FFFFFF),      // chiaro e leggermente traslucido
+                            contentColor = Color.Black,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Color(0x14000000)),
+                            shadowElevation = 4.dp,
+                            tonalElevation = 0.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSelected(name)
+                                    expanded = false
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Piccola anteprima del filtro
+                                FilterSwatch(name, modifier = Modifier)
+                                // Testo NERO (leggibile sul tile chiaro)
+                                Text(
+                                    text = name,
+                                    color = Color.Black,
+                                    fontSize = 14.sp
+                                )
+                            }
                         }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                    ) {
-                        // preview filtro
-                        FilterSwatch(name)
-                        // nome filtro in nero (leggibile sul tile chiaro)
-                        Text(name, color = Color(0xFF000000))
                     }
                 }
             }
         }
     }
 }
+
 
 
 
