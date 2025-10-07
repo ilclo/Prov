@@ -164,6 +164,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+// IMPORT — aggiungi vicino agli altri import Compose
+import androidx.compose.runtime.saveable.listSaver
 
 private val LocalIsFree = staticCompositionLocalOf { true }
 
@@ -348,35 +350,28 @@ private fun listToRect(lst: List<Any>): com.example.appbuilder.canvas.DrawItem.R
  *  [0]=id:String, [1]=scroll:String, [2]=grid:Int, [3]=currentLevel:Int, [4]=items:List<List<Any>>
  * Al momento serializziamo i soli RectItem (gli elementi che usi per i contenitori).
  */
-private fun pageStateSaver(): Saver<MutableState<com.example.appbuilder.canvas.PageState?>, Any> =
+// ESEMPIO di implementazione corretta del Saver (estratto)
+private fun pageStateSaver(): Saver<MutableState<PageState?>, Any> =
     listSaver(
         save = { st ->
-            val ps = st.value ?: return@listSaver emptyList()
-            val items = ps.items
-                .mapNotNull { it as? com.example.appbuilder.canvas.DrawItem.RectItem }
-                .map(::rectToList)
+            val ps = st.value ?: return@listSaver emptyList<Any>() // <-- tipizza!
+            val items: List<List<Any>> = ps.items.map(::rectToList)
             listOf(ps.id, ps.scroll, ps.gridDensity, ps.currentLevel, items)
         },
         restore = { list ->
-            if (list.isEmpty()) mutableStateOf(null) else {
+            if (list.isEmpty()) mutableStateOf<PageState?>(null) else {
                 val id           = list[0] as String
-                val scroll       = (list[1] as? String) ?: "Assente"
-                val grid         = (list[2] as Number).toInt()
-                val currentLevel = (list[3] as Number).toInt()
-                @Suppress("UNCHECKED_CAST")
+                val scroll       = list[1] as String
+                val gridDensity  = list[2] as Int
+                val currentLevel = list[3] as Int
                 val itemsData    = list[4] as List<List<Any>>
-
-                val ps = com.example.appbuilder.canvas.PageState(
-                    id = id,
-                    scroll = scroll,
-                    gridDensity = grid,
-                    currentLevel = currentLevel
-                )
+                val ps = PageState(id = id, scroll = scroll, gridDensity = gridDensity, currentLevel = currentLevel)
                 itemsData.map(::listToRect).forEach { ps.items.add(it) }
                 mutableStateOf(ps)
             }
         }
     )
+
 
 
 @Composable
@@ -435,42 +430,40 @@ private fun FilterDropdown(
         ) {
             // Contenitore trasparente: mantiene l’effetto "flottante"
             Box(Modifier.background(Color.Transparent)) {
-                // Lista scrollabile con altezza massima
                 LazyColumn(
-                    modifier = Modifier
-                        .heightIn(max = 360.dp)       // <— limita l’altezza, attiva lo scroll
-                        .background(Color.Transparent)
-                        .padding(vertical = 6.dp),     // aria sopra/sotto per fluttuare
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp)
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp)
                 ) {
                     items(options) { name ->
-                        // Ogni item è un riquadro chiaro “staccato”
-                        Surface(
-                            color = Color(0xF5FFFFFF),                      // chiaro, leggermente traslucido
-                            contentColor = Color.Black,
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, Color(0x14000000)), // bordo leggero
-                            shadowElevation = 4.dp,                          // lieve ombra
-                            tonalElevation = 0.dp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onSelected(name)
-                                    expanded = false
-                                }
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                            ) {
-                                // preview filtro
-                                FilterSwatch(name)
-                                // nome filtro in nero (leggibile sul tile chiaro)
-                                Text(name, color = Color(0xFF000000))
-                            }
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = { onSelect(name) }
+                        )
+                    }
+                }
+
+                Surface(
+                    color = Color(0xF5FFFFFF),                      // chiaro, leggermente traslucido
+                    contentColor = Color.Black,
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0x14000000)), // bordo leggero
+                    shadowElevation = 4.dp,                          // lieve ombra
+                    tonalElevation = 0.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onSelected(name)
+                            expanded = false
                         }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        // preview filtro
+                        FilterSwatch(name)
+                        // nome filtro in nero (leggibile sul tile chiaro)
+                        Text(name, color = Color(0xFF000000))
                     }
                 }
             }
@@ -2911,33 +2904,52 @@ private fun BoxScope.MainMenuBar(
         ) {
             when (LocalSecondBarMode.current) {
                 SecondBarMode.Classic -> {
-                    LocalExitClassic.current?.let { exitClassic ->
+                    LocalExitClassic.current?.let {
                         ToolbarIconButton(
                             icon = Icons.Outlined.ArrowBack,
                             contentDescription = "Indietro",
-                            onClick = LocalExitClassic.current
+                            onClick = it
                         )
                     }
 
-                    ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText,
-                        infoTitle = "Testo", infoBody = "Stili e proprietà  del testo", allowLongPressInInfo = false)
-                    ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer,
-                        infoTitle = "Contenitore", infoBody = "Aspetto e comportamenti del contenitore", allowLongPressInInfo = false)
-                    ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout,
-                        infoTitle = "Layout", infoBody = "Colori/immagini ed effetti dell'area", allowLongPressInInfo = false)
-                    ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd,
-                        infoTitle = "Aggiungi", infoBody = "Inserisci nuovi elementi", allowLongPressInInfo = false)
-                    MainMenuBar(
-                        onLayout = { menuPath = listOf("Layout") },
-                        onContainer = { menuPath = listOf("Contenitore") },
-                        onText = { menuPath = listOf("Testo") },
-                        onAdd = { menuPath = listOf("Aggiungi") },
-                        bottomBarHeightPx = actionsBarHeightPx,
-                        onInfo = { infoOverlayVisible = true } // ⬅️ apre il menù in sovraimpressione
+                    ToolbarIconButton(
+                        icon = EditorIcons.Text, contentDescription = "Testo",
+                        onClick = onText,
+                        infoTitle = "Testo",
+                        infoBody = "Stili e proprietà del testo",
+                        allowLongPressInInfo = false
                     )
-
+                    ToolbarIconButton(
+                        icon = EditorIcons.Container, contentDescription = "Contenitore",
+                        onClick = onContainer,
+                        infoTitle = "Contenitore",
+                        infoBody = "Aspetto e comportamenti del contenitore",
+                        allowLongPressInInfo = false
+                    )
+                    ToolbarIconButton(
+                        icon = EditorIcons.Layout, contentDescription = "Layout",
+                        onClick = onLayout,
+                        infoTitle = "Layout",
+                        infoBody = "Colori/immagini ed effetti dell'area",
+                        allowLongPressInInfo = false
+                    )
+                    ToolbarIconButton(
+                        icon = EditorIcons.Insert, contentDescription = "Aggiungi",
+                        onClick = onAdd,
+                        infoTitle = "Aggiungi",
+                        infoBody = "Inserisci nuovi elementi",
+                        allowLongPressInInfo = false
+                    )
+                    // ← ICONA "?" accanto ad Aggiungi che apre l'overlay Info
+                    ToolbarIconButton(
+                        icon = Icons.Outlined.HelpOutline,
+                        contentDescription = "Info elemento",
+                        onClick = onInfo,
+                        infoTitle = "Cosa trovi qui",
+                        infoBody = "Visualizza e modifica Titolo, ID e Descrizione dell'elemento corrente",
+                        allowLongPressInInfo = false
+                    )
                 }
-
                 SecondBarMode.Deck -> {
 // NUOVA ROOT — MADRI + CLUSTER, con hiding delle madri a destra
                     val deck = LocalDeckState.current
