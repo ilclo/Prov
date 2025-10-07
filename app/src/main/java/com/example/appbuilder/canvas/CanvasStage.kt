@@ -45,7 +45,7 @@ enum class Variant { Full, Outlined, Text, TopBottom }
 enum class ShapeKind { Rect, Circle, Pill, Diamond }
 
 enum class ImageFit { Cover, Contain, Stretch }
-enum class ImageFilter { None, Mono, Sepia }
+
 
 data class ImageStyle(
     val uri: Uri,
@@ -82,6 +82,85 @@ data class FillStyle(
     val col2: Color? = null,
     val dir: GradientDir = GradientDir.Monocolore
 )
+
+enum class ImageFilter {
+    None, Mono, Sepia,
+    Vivid, Desaturate, Warm, Cool,
+    Bright, Dark, ContrastHigh, ContrastLow,
+    Vintage, TealOrange, Rose, Emerald, Indigo,
+    Pastel, Noir, Dramatic, Lomo
+}
+
+private fun satMatrix(s: Float): FloatArray {
+    val lr = 0.213f; val lg = 0.715f; val lb = 0.072f
+    val a = 1f - s
+    return floatArrayOf(
+        lr*a + s, lg*a,     lb*a,     0f, 0f,
+        lr*a,     lg*a + s, lb*a,     0f, 0f,
+        lr*a,     lg*a,     lb*a + s, 0f, 0f,
+        0f,       0f,       0f,       1f, 0f
+    )
+}
+private fun scaleMatrix(r: Float, g: Float, b: Float): FloatArray = floatArrayOf(
+    r, 0f, 0f, 0f, 0f,
+    0f, g, 0f, 0f, 0f,
+    0f, 0f, b, 0f, 0f,
+    0f, 0f, 0f, 1f, 0f
+)
+// concatena due matrici 4x5 trattandole come 5x5 (ultimo rigo = [0,0,0,0,1])
+private fun concat(a: FloatArray, b: FloatArray): FloatArray {
+    val A = FloatArray(25) { 0f }; val B = FloatArray(25) { 0f }
+    // copia 4x5 -> 5x5
+    for (r in 0..3) for (c in 0..4) A[r*5 + c] = a[r*5 + c]
+    A[24] = 1f
+    for (r in 0..3) for (c in 0..4) B[r*5 + c] = b[r*5 + c]
+    B[24] = 1f
+    // C = A * B (5x5)
+    val C = FloatArray(25)
+    for (r in 0..4) for (c in 0..4) {
+        var s = 0f
+        for (k in 0..4) s += A[r*5 + k] * B[k*5 + c]
+        C[r*5 + c] = s
+    }
+    // restituisci 4x5
+    val out = FloatArray(20)
+    for (r in 0..3) for (c in 0..4) out[r*5 + c] = C[r*5 + c]
+    return out
+}
+private fun cm(values: FloatArray) = ColorFilter.colorMatrix(ColorMatrix(values))
+
+fun colorFilterFor(filter: ImageFilter): ColorFilter? = when (filter) {
+    ImageFilter.None -> null
+    ImageFilter.Mono -> ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+    ImageFilter.Sepia -> cm(floatArrayOf(
+        0.393f, 0.769f, 0.189f, 0f, 0f,
+        0.349f, 0.686f, 0.168f, 0f, 0f,
+        0.272f, 0.534f, 0.131f, 0f, 0f,
+        0f,     0f,     0f,     1f, 0f
+    ))
+    ImageFilter.Vivid        -> cm(satMatrix(1.35f))
+    ImageFilter.Desaturate   -> cm(satMatrix(0.60f))
+    ImageFilter.Warm         -> cm(scaleMatrix(1.10f, 1.05f, 0.95f))
+    ImageFilter.Cool         -> cm(scaleMatrix(0.95f, 1.05f, 1.10f))
+    ImageFilter.Bright       -> cm(scaleMatrix(1.15f, 1.15f, 1.15f))
+    ImageFilter.Dark         -> cm(scaleMatrix(0.85f, 0.85f, 0.85f))
+    ImageFilter.ContrastHigh -> cm(concat(satMatrix(1.10f), scaleMatrix(1.10f,1.10f,1.10f)))
+    ImageFilter.ContrastLow  -> cm(concat(satMatrix(0.90f), scaleMatrix(0.95f,0.95f,0.95f)))
+    ImageFilter.Vintage      -> cm(concat(floatArrayOf(
+        0.393f, 0.769f, 0.189f, 0f, 0f,
+        0.349f, 0.686f, 0.168f, 0f, 0f,
+        0.272f, 0.534f, 0.131f, 0f, 0f,
+        0f,     0f,     0f,     1f, 0f
+    ), satMatrix(0.90f)))
+    ImageFilter.TealOrange   -> cm(concat(satMatrix(1.08f), scaleMatrix(1.08f, 1.00f, 0.92f)))
+    ImageFilter.Rose         -> cm(concat(satMatrix(1.05f), scaleMatrix(1.08f, 0.96f, 1.02f)))
+    ImageFilter.Emerald      -> cm(concat(satMatrix(1.10f), scaleMatrix(0.95f, 1.10f, 0.95f)))
+    ImageFilter.Indigo       -> cm(concat(satMatrix(1.05f), scaleMatrix(0.95f, 0.95f, 1.12f)))
+    ImageFilter.Pastel       -> cm(concat(satMatrix(0.80f), scaleMatrix(1.03f, 1.03f, 1.03f)))
+    ImageFilter.Noir         -> cm(concat(satMatrix(0.00f), scaleMatrix(1.08f, 1.08f, 1.08f)))
+    ImageFilter.Dramatic     -> cm(concat(satMatrix(0.85f), scaleMatrix(1.15f, 1.15f, 1.15f)))
+    ImageFilter.Lomo         -> cm(concat(satMatrix(1.20f), scaleMatrix(1.10f, 1.05f, 0.90f)))
+}
 
 
 @Composable
@@ -132,23 +211,6 @@ fun CanvasStage(
     }
 
 
-    fun colorFilterFor(filter: ImageFilter): ColorFilter? = when (filter) {
-        ImageFilter.Mono -> {
-            val m = ColorMatrix()
-            m.setToSaturation(0f)
-            ColorFilter.colorMatrix(m)
-        }
-        ImageFilter.Sepia -> {
-            // matrice seppia semplice
-            ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
-                0.393f, 0.769f, 0.189f, 0f, 0f,
-                0.349f, 0.686f, 0.168f, 0f, 0f,
-                0.272f, 0.534f, 0.131f, 0f, 0f,
-                0f,     0f,     0f,     1f, 0f
-            )))
-        }
-        else -> null
-    }
 
     // Stato "Create" (lasciato invariato)
     var hoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }

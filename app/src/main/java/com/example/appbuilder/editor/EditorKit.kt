@@ -30,7 +30,7 @@ import androidx.compose.material.icons.outlined.*
 import com.example.appbuilder.canvas.ToolMode
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.derivedStateOf 
+import androidx.compose.runtime.derivedStateOf
 import com.example.appbuilder.overlay.GridSliderOverlay
 import com.example.appbuilder.overlay.LevelPickerOverlay
 import androidx.compose.material.icons.outlined.HelpOutline
@@ -171,7 +171,7 @@ private val LocalDeckItems =
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
 private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (stessa in Home e Submenu)
 private val TOP_BAR_HEIGHT = 52.dp           // barra superiore (categorie / submenu)
-private val BARS_GAP = 14.dp                 
+private val BARS_GAP = 14.dp
 private val SAFE_BOTTOM_MARGIN = 32.dp     // barra inferiore più alta rispetto al bordo schermo
 private val LocalExitClassic = staticCompositionLocalOf<() -> Unit> { {} }
 // Accento per i wizard "Crea ..."
@@ -244,53 +244,109 @@ private fun hexToColor(s: String?): Color? {
     }
 }
 
+private val FILTER_NAMES = listOf(
+    "Nessuno","B/N","Seppia","Vivido","Desatura","Caldo","Freddo","Luminoso","Scuro",
+    "Contrasto +","Contrasto -","Vintage","Teal&Orange","Rosa","Smeraldo","Indaco",
+    "Pastello","Noir","Drammatico","Lomo"
+)
+
+// mappa label -> enum
+private fun mapFilterNameToEnum(name: String): com.example.appbuilder.canvas.ImageFilter = when (name.trim().lowercase()) {
+    "nessuno"      -> com.example.appbuilder.canvas.ImageFilter.None
+    "b/n","bn","bianco e nero","mono","grayscale" -> com.example.appbuilder.canvas.ImageFilter.Mono
+    "seppia","sepia" -> com.example.appbuilder.canvas.ImageFilter.Sepia
+    "vivido"       -> com.example.appbuilder.canvas.ImageFilter.Vivid
+    "desatura","desaturato" -> com.example.appbuilder.canvas.ImageFilter.Desaturate
+    "caldo"        -> com.example.appbuilder.canvas.ImageFilter.Warm
+    "freddo"       -> com.example.appbuilder.canvas.ImageFilter.Cool
+    "luminoso","bright" -> com.example.appbuilder.canvas.ImageFilter.Bright
+    "scuro","dark" -> com.example.appbuilder.canvas.ImageFilter.Dark
+    "contrasto +","contrasto alto","contrast +" -> com.example.appbuilder.canvas.ImageFilter.ContrastHigh
+    "contrasto -","contrasto basso","contrast -" -> com.example.appbuilder.canvas.ImageFilter.ContrastLow
+    "vintage"      -> com.example.appbuilder.canvas.ImageFilter.Vintage
+    "teal&orange","teal and orange","teal orange" -> com.example.appbuilder.canvas.ImageFilter.TealOrange
+    "rosa"         -> com.example.appbuilder.canvas.ImageFilter.Rose
+    "smeraldo"     -> com.example.appbuilder.canvas.ImageFilter.Emerald
+    "indaco"       -> com.example.appbuilder.canvas.ImageFilter.Indigo
+    "pastello"     -> com.example.appbuilder.canvas.ImageFilter.Pastel
+    "noir"         -> com.example.appbuilder.canvas.ImageFilter.Noir
+    "drammatico"   -> com.example.appbuilder.canvas.ImageFilter.Dramatic
+    "lomo"         -> com.example.appbuilder.canvas.ImageFilter.Lomo
+    else           -> com.example.appbuilder.canvas.ImageFilter.None
+}
+
+// piccola “targhetta” con bg rappresentativo del filtro
+@Composable
+private fun FilterSwatch(name: String, modifier: Modifier = Modifier) {
+    val brush = when (name) {
+        "B/N"        -> Brush.horizontalGradient(listOf(Color(0xFFEEEEEE), Color(0xFF222222)))
+        "Seppia"     -> Brush.horizontalGradient(listOf(Color(0xFFC2A074), Color(0xFF5C4A2E)))
+        "Vivido"     -> Brush.horizontalGradient(listOf(Color(0xFFFF6B6B), Color(0xFF4DABF7)))
+        "Desatura"   -> Brush.horizontalGradient(listOf(Color(0xFFCFCFCF), Color(0xFF7F7F7F)))
+        "Caldo"      -> Brush.horizontalGradient(listOf(Color(0xFFFFD166), Color(0xFFFF6B6B)))
+        "Freddo"     -> Brush.horizontalGradient(listOf(Color(0xFF64D2FF), Color(0xFF748FFC)))
+        "Luminoso"   -> Brush.horizontalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFEDEDED)))
+        "Scuro"      -> Brush.horizontalGradient(listOf(Color(0xFF1B1B1B), Color(0xFF444444)))
+        "Contrasto +"-> Brush.horizontalGradient(listOf(Color(0xFF000000), Color(0xFFFFFFFF)))
+        "Contrasto -"-> Brush.horizontalGradient(listOf(Color(0xFF666666), Color(0xFFAAAAAA)))
+        "Vintage"    -> Brush.horizontalGradient(listOf(Color(0xFFD9BCA3), Color(0xFF8C6E54)))
+        "Teal&Orange"-> Brush.horizontalGradient(listOf(Color(0xFF54D1C7), Color(0xFFFFA45B)))
+        "Rosa"       -> Brush.horizontalGradient(listOf(Color(0xFFFF8FA3), Color(0xFFFFA7C2)))
+        "Smeraldo"   -> Brush.horizontalGradient(listOf(Color(0xFF5AD1A4), Color(0xFF2D8A6B)))
+        "Indaco"     -> Brush.horizontalGradient(listOf(Color(0xFF6E78FF), Color(0xFF3949AB)))
+        "Pastello"   -> Brush.horizontalGradient(listOf(Color(0xFFFFD1DC), Color(0xFFD1E7FF)))
+        "Noir"       -> Brush.horizontalGradient(listOf(Color(0xFF141414), Color(0xFF585858)))
+        "Drammatico" -> Brush.horizontalGradient(listOf(Color(0xFF101010), Color(0xFF222222)))
+        "Lomo"       -> Brush.horizontalGradient(listOf(Color(0xFF22304B), Color(0xFF58A6FF)))
+        else         -> Brush.horizontalGradient(listOf(Color(0xFF2B2F3A), Color(0xFF3B4150)))
+    }
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        modifier = modifier.size(width = 88.dp, height = 28.dp)
+    ) {
+        Box(Modifier.background(brush))
+    }
+}
+
 @Composable
 private fun FilterDropdown(
+    icon: ImageVector,
+    contentDescription: String,
     current: String?,
-    onSelected: (String) -> Unit
+    onSelected: (String) -> Unit,
+    options: List<String> = FILTER_NAMES
 ) {
-    var open by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     Box {
-        ToolbarIconButton(
-            icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
-            contentDescription = "Filtro"
-        ) { open = true }
-
+        ToolbarIconButton(icon, contentDescription) { expanded = true }
         if (!current.isNullOrBlank()) {
-            // badge come nelle tue dropdown: riuso lo stesso stile
             Surface(
                 color = Color(0xFF22304B),
                 contentColor = Color.White,
                 shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, 14) }
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset { IntOffset(0, 14) }
             ) {
                 Text(current, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp)
             }
         }
-
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            listOf("Nessuno","B/N","Seppia").forEach { name ->
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { name ->
                 DropdownMenuItem(
                     text = {
-                        // Etichetta con "sfondo dimostrativo"
-                        val bg = when (name) {
-                            "B/N"    -> Brush.linearGradient(listOf(Color.Black, Color.White))
-                            "Seppia" -> Brush.linearGradient(listOf(Color(0xFF704214), Color(0xFFE0C9A6)))
-                            else     -> Brush.linearGradient(listOf(Color(0xFF10151F), Color(0xFF1B2334)))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            FilterSwatch(name)
+                            Text(name)
                         }
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .background(bg, RoundedCornerShape(6.dp))
-                                .padding(8.dp)
-                        ) { Text(name, color = if (name=="Seppia") Color.Black else Color.White) }
                     },
-                    onClick = { onSelected(name); open = false }
+                    onClick = { onSelected(name); expanded = false }
                 )
             }
         }
     }
 }
+
 
 @Composable
 private fun rememberImageBitmapFromUri(uri: Uri?): ImageBitmap? {
@@ -352,15 +408,19 @@ fun ImageCropperDialog(
                 .widthIn(min = 280.dp, max = 480.dp)
         ) {
             // area interattiva
+            val cropState = rememberUpdatedState(crop)
+
             Box(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 260.dp, max = 480.dp)
                     .onSizeChanged { boxSize = it }
-                    .pointerInput(boxSize, img, crop) {
+                    // ⬇️ Chiave stabile: NIENTE crop qui
+                    .pointerInput(boxSize, img) {
                         detectDragGestures(
                             onDragStart = { pos ->
-                                // calcolo bounding dell'immagine in "contain"
+                                // leggo lo stato CROP più recente
+                                val c = cropState.value
                                 val bw = boxSize.width.toFloat()
                                 val bh = boxSize.height.toFloat()
                                 val iw = img.width.toFloat()
@@ -371,10 +431,10 @@ fun ImageCropperDialog(
                                 val dx = (bw - dstW) / 2f
                                 val dy = (bh - dstH) / 2f
 
-                                val left   = dx + crop.left   * dstW
-                                val top    = dy + crop.top    * dstH
-                                val right  = dx + crop.right  * dstW
-                                val bottom = dy + crop.bottom * dstH
+                                val left   = dx + c.left   * dstW
+                                val top    = dy + c.top    * dstH
+                                val right  = dx + c.right  * dstW
+                                val bottom = dy + c.bottom * dstH
 
                                 val handles = listOf(
                                     CropMode.TL to Offset(left, top),
@@ -394,6 +454,9 @@ fun ImageCropperDialog(
                             onDragEnd = { mode = CropMode.NONE },
                             onDragCancel = { mode = CropMode.NONE },
                             onDrag = { change, drag ->
+                                change.consume()
+
+                                val c = cropState.value
                                 val bw = boxSize.width.toFloat()
                                 val bh = boxSize.height.toFloat()
                                 val iw = img.width.toFloat()
@@ -404,10 +467,10 @@ fun ImageCropperDialog(
                                 val dx = (bw - dstW) / 2f
                                 val dy = (bh - dstH) / 2f
 
-                                var left   = dx + crop.left   * dstW
-                                var top    = dy + crop.top    * dstH
-                                var right  = dx + crop.right  * dstW
-                                var bottom = dy + crop.bottom * dstH
+                                var left   = dx + c.left   * dstW
+                                var top    = dy + c.top    * dstH
+                                var right  = dx + c.right  * dstW
+                                var bottom = dy + c.bottom * dstH
 
                                 when (mode) {
                                     CropMode.TL -> { left += drag.x; top += drag.y }
@@ -421,22 +484,18 @@ fun ImageCropperDialog(
                                         var nt = change.position.y - moveGrab.y
                                         nl = nl.coerceIn(dx, dx + dstW - w)
                                         nt = nt.coerceIn(dy, dy + dstH - h)
-                                        left = nl
-                                        top = nt
-                                        right = nl + w
-                                        bottom = nt + h
+                                        left = nl; top = nt; right = nl + w; bottom = nt + h
                                     }
                                     else -> Unit
                                 }
 
-                                // limiti + dimensione minima
                                 val minSide = with(density) { 40.dp.toPx() }
                                 left   = left.coerceIn(dx, right - minSide)
                                 top    = top.coerceIn(dy, bottom - minSide)
                                 right  = right.coerceIn(left + minSide, dx + dstW)
                                 bottom = bottom.coerceIn(top + minSide, dy + dstH)
 
-                                // aggiorna crop normalizzato
+                                // aggiorna lo stato NORMALIZZATO 0..1
                                 crop = com.example.appbuilder.canvas.ImageCrop(
                                     left   = ((left   - dx) / dstW).coerceIn(0f, 1f),
                                     top    = ((top    - dy) / dstH).coerceIn(0f, 1f),
@@ -1408,6 +1467,22 @@ fun EditorMenusOnly(
                             // 3) aggiorna il path e continua con la logica standard
                             menuPath = nextPath
                             lastChanged = null
+// Caso "Contenitore / Aggiungi foto / Crop"
+                            if (fullPath.endsWith("Contenitore / Aggiungi foto / Crop")) {
+                                val sr = selectedRect
+                                if (sr != null) {
+                                    val current = rectImages[sr]
+                                    if (current?.uri != null) {
+                                        cropperTarget   = sr
+                                        cropperImageUri = current.uri
+                                        cropperVisible  = true
+                                    } else {
+                                        // nessuna immagine: chiedi upload e apri subito il cropper
+                                        pickImageLauncher.launch("image/*")
+                                    }
+                                }
+                                return@SubMenuBar
+                            }
 
                             // Aperture palette colore già presenti (usano il path aggiornato)
                             if (fullPath.endsWith("Contenitore / Bordi / Colore")) {
@@ -1511,14 +1586,10 @@ fun EditorMenusOnly(
                                         rectImages[rect] = st.copy(fit = fit)
                                     }
                                     "filtro" -> {
-                                        val f = when ((value as? String)?.trim()?.lowercase()) {
-                                            "b/n", "bianco e nero", "mono", "b&w" -> com.example.appbuilder.canvas.ImageFilter.Mono
-                                            "seppia", "sepia"                      -> com.example.appbuilder.canvas.ImageFilter.Sepia
-                                            else                                   -> com.example.appbuilder.canvas.ImageFilter.None
-                                        }
+                                        val f = mapFilterNameToEnum((value as? String).orEmpty())
                                         rectImages[rect] = st.copy(filter = f)
                                     }
-                                    // "crop" (toggle “ritaglia nella forma”)
+
                                     "crop" -> {
                                         val on = !((value as? String).orEmpty().equals("Nessuno", ignoreCase = true))
                                         rectImages[rect] = st.copy(cropToShape = on)
@@ -1625,96 +1696,96 @@ fun EditorMenusOnly(
                         },
                         savedPresets = savedPresets,
                         onFreeGate = { showUpsell = true }
-                        )
-                        BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
-                    }
+                    )
+                    BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
+                }
 
 // Barra di conferma (quando risali con modifiche)
-                    if (showConfirm) {
-                        val isFreeUser = LocalIsFree.current
-                        ConfirmBar(
-                            onCancel = {
-                                dirty = false
-                                lastChanged = null
-                                showConfirm = false
-                                menuPath = emptyList()
-                            },
-                            onOk = {
-                                dirty = false
-                                showConfirm = false
-                                menuPath = emptyList()
-                            },
-                            onSavePreset = {
-                                if (isFreeUser) showUpsell = true
-                                else showSaveDialog = true
-                            }
-                        )
-                    }
+                if (showConfirm) {
+                    val isFreeUser = LocalIsFree.current
+                    ConfirmBar(
+                        onCancel = {
+                            dirty = false
+                            lastChanged = null
+                            showConfirm = false
+                            menuPath = emptyList()
+                        },
+                        onOk = {
+                            dirty = false
+                            showConfirm = false
+                            menuPath = emptyList()
+                        },
+                        onSavePreset = {
+                            if (isFreeUser) showUpsell = true
+                            else showSaveDialog = true
+                        }
+                    )
+                }
 
 // Dialog "Salva come stile"
-                    if (showSaveDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showSaveDialog = false },
-                            title = { Text("Salva come stile") },
-                            text = {
-                                Column {
-                                    Text("Dai un nome allo stile corrente. Se esiste già , verrà  aggiornato.")
-                                    Spacer(Modifier.height(8.dp))
-                                    OutlinedTextField(
-                                        value = newPresetName,
-                                        onValueChange = { newPresetName = it },
-                                        singleLine = true,
-                                        label = { Text("Nome stile") },
-                                        colors = TextFieldDefaults.colors(
-                                            focusedTextColor = Color.White,
-                                            unfocusedTextColor = Color.White,
-                                            cursorColor = WIZ_AZURE,
-                                            focusedIndicatorColor = WIZ_AZURE,
-                                            unfocusedIndicatorColor = Color(0xFF2A3B5B),
-                                            focusedLabelColor = WIZ_AZURE,
-                                            unfocusedLabelColor = Color(0xFF9BA3AF)
-                                        )
+                if (showSaveDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSaveDialog = false },
+                        title = { Text("Salva come stile") },
+                        text = {
+                            Column {
+                                Text("Dai un nome allo stile corrente. Se esiste già , verrà  aggiornato.")
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = newPresetName,
+                                    onValueChange = { newPresetName = it },
+                                    singleLine = true,
+                                    label = { Text("Nome stile") },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        cursorColor = WIZ_AZURE,
+                                        focusedIndicatorColor = WIZ_AZURE,
+                                        unfocusedIndicatorColor = Color(0xFF2A3B5B),
+                                        focusedLabelColor = WIZ_AZURE,
+                                        unfocusedLabelColor = Color(0xFF9BA3AF)
                                     )
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val root = menuPath.firstOrNull() ?: "Contenitore"
+                                val name = newPresetName.trim()
+                                if (name.isNotBlank()) {
+                                    savePreset(root, name)
                                 }
-                            },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    val root = menuPath.firstOrNull() ?: "Contenitore"
-                                    val name = newPresetName.trim()
-                                    if (name.isNotBlank()) {
-                                        savePreset(root, name)
-                                    }
-                                    newPresetName = ""
-                                    dirty = false
-                                    showSaveDialog = false
-                                    showConfirm = false
-                                    menuPath = emptyList()
-                                }) { Text("Salva") }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = {
-                                    newPresetName = ""
-                                    showSaveDialog = false
-                                }) { Text("Annulla") }
-                            }
-                        )
-                    }
-                    if (showDeleteImageDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showDeleteImageDialog = false },
-                            title   = { Text("Cancellare?") },
-                            text    = { Text("Attenzione, se scegli Sì perderai tutte le modifiche che hai apportato alla tua foto.") },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    selectedRect?.let { rectImages.remove(it) }
-                                    showDeleteImageDialog = false
-                                }) { Text("Sì") }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { showDeleteImageDialog = false }) { Text("Annulla") }
-                            }
-                        )
-                    }
+                                newPresetName = ""
+                                dirty = false
+                                showSaveDialog = false
+                                showConfirm = false
+                                menuPath = emptyList()
+                            }) { Text("Salva") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                newPresetName = ""
+                                showSaveDialog = false
+                            }) { Text("Annulla") }
+                        }
+                    )
+                }
+                if (showDeleteImageDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteImageDialog = false },
+                        title   = { Text("Cancellare?") },
+                        text    = { Text("Attenzione, se scegli Sì perderai tutte le modifiche che hai apportato alla tua foto.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                selectedRect?.let { rectImages.remove(it) }
+                                showDeleteImageDialog = false
+                            }) { Text("Sì") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteImageDialog = false }) { Text("Annulla") }
+                        }
+                    )
+                }
             }
 
             InfoEdgeDeck(
@@ -2700,7 +2771,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
-            lastChanged?.let { append("   •   "); append(it) } 
+            lastChanged?.let { append("   •   "); append(it) }
         }
         Row(
             Modifier
@@ -3122,9 +3193,18 @@ private fun ContainerLevel(
                 "Aggiungi foto" -> {
                     // Upload immagine (ic_uplo_photo)
                     ToolbarIconButton(
-                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_uplo_photo) }.getOrElse { EditorIcons.AddPhotoAlternate },
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_uplo_photo),
                         contentDescription = "Upload immagine"
-                    ) { onEnter("Upload") }
+                    ) {
+                        if (selectedRect?.let { rectImages[it]?.uri } != null) {
+                            // già presente: avvisa che serve cancellare prima
+                            infoCard = "Immagine già presente" to
+                                    "Per cambiare foto premi l’icona cestino e poi carica una nuova immagine."
+                        } else {
+                            pickImageLauncher.launch("image/*")
+                        }
+                    }
+
 
                     // Ritaglia (ic_scissor)
                     ToolbarIconButton(
@@ -3141,14 +3221,13 @@ private fun ContainerLevel(
                         onSelected = { onPick("fitCont", it) }
                     )
 
-                    // Filtro (ic_filter)
-                    IconDropdown(
-                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_filter) }.getOrElse { EditorIcons.Functions },
+                    FilterDropdown(
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
                         contentDescription = "Filtro",
                         current = get("filtro") ?: "Nessuno",
-                        options = listOf("Nessuno", "Bianco e nero", "Seppia"),
                         onSelected = { onPick("filtro", it) }
                     )
+
 
                     // Cancella (ic_cancel)
                     ToolbarIconButton(EditorIcons.Cancel, "Cancella immagine") { onEnter("Cancella immagine") }
