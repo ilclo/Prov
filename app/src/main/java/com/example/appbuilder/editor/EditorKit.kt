@@ -162,6 +162,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 
 private val LocalIsFree = staticCompositionLocalOf { true }
 
@@ -329,7 +331,7 @@ private fun FilterDropdown(
     var anchorPos by remember { mutableStateOf(IntOffset.Zero) }
     var anchorSize by remember { mutableStateOf(IntSize.Zero) }
 
-    // Icona + "badge" (badge già completamente trasparente)
+    // Anchor dell’icona
     Box(
         modifier = Modifier.onGloballyPositioned { c ->
             val p = c.positionInRoot()
@@ -339,9 +341,10 @@ private fun FilterDropdown(
     ) {
         ToolbarIconButton(icon, contentDescription) { expanded = true }
 
+        // Badge stato filtro: già trasparente per l’effetto “float”
         if (!current.isNullOrBlank()) {
             Surface(
-                color = Color.Transparent,     // <-- trasparente
+                color = Color.Transparent,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(6.dp),
                 shadowElevation = 0.dp,
@@ -359,7 +362,7 @@ private fun FilterDropdown(
         }
     }
 
-    // Menu "flottante" senza alcuna Surface di contenimento
+    // Corpo del menu: trasparente; le voci hanno ciascuna il proprio "tile" chiaro
     if (expanded) {
         val y = anchorPos.y + anchorSize.height + with(density) { 8.dp.toPx().roundToInt() }
 
@@ -369,31 +372,51 @@ private fun FilterDropdown(
             onDismissRequest = { expanded = false },
             properties = PopupProperties(focusable = true)
         ) {
-            Column(
-                modifier = Modifier
-                    .wrapContentSize()
-                    .background(Color.Transparent) // nessun sfondo
-            ) {
-                options.forEachIndexed { ix, name ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))  // solo l’item
-                            .clickable { onSelected(name); expanded = false }
-                            .background(Color.Transparent)    // item trasparente
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
-                    ) {
-                        // riquadro d’esempio del filtro
-                        FilterSwatch(name)
-                        Text(name, color = Color.White)
+            // Contenitore trasparente: mantiene l’effetto "flottante"
+            Box(Modifier.background(Color.Transparent)) {
+                // Lista scrollabile con altezza massima
+                LazyColumn(
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)       // <— limita l’altezza, attiva lo scroll
+                        .background(Color.Transparent)
+                        .padding(vertical = 6.dp),     // aria sopra/sotto per fluttuare
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
+                ) {
+                    items(options) { name ->
+                        // Ogni item è un riquadro chiaro “staccato”
+                        Surface(
+                            color = Color(0xF5FFFFFF),                      // chiaro, leggermente traslucido
+                            contentColor = Color.Black,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Color(0x14000000)), // bordo leggero
+                            shadowElevation = 4.dp,                          // lieve ombra
+                            tonalElevation = 0.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSelected(name)
+                                    expanded = false
+                                }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                // preview filtro
+                                FilterSwatch(name)
+                                // nome filtro in nero (leggibile sul tile chiaro)
+                                Text(name, color = Color(0xFF000000))
+                            }
+                        }
                     }
-                    if (ix != options.lastIndex) Spacer(Modifier.height(6.dp))
                 }
             }
         }
     }
 }
+
 
 
 
