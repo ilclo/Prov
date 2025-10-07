@@ -275,6 +275,12 @@ private fun mapFilterNameToEnum(name: String): com.example.appbuilder.canvas.Ima
     else           -> com.example.appbuilder.canvas.ImageFilter.None
 }
 
+@Composable
+private fun safeVector(
+    @androidx.annotation.DrawableRes id: Int,
+    fallback: ImageVector
+): ImageVector = runCatching { ImageVector.vectorResource(id) }.getOrElse { fallback }
+
 // piccola “targhetta” con bg rappresentativo del filtro
 @Composable
 private fun FilterSwatch(name: String, modifier: Modifier = Modifier) {
@@ -3192,40 +3198,38 @@ private fun ContainerLevel(
                 "Aggiungi foto" -> {
                     // Upload immagine
                     ToolbarIconButton(
-                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_uplo_photo) }
-                            .getOrElse { EditorIcons.AddPhotoAlternate },
+                        icon = safeVector(R.drawable.ic_uplo_photo, EditorIcons.AddPhotoAlternate),
                         contentDescription = "Upload immagine"
                     ) { onEnter("Upload") }
 
                     // Ritaglia
                     ToolbarIconButton(
-                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_scissor) }
-                            .getOrElse { EditorIcons.Crop },
+                        icon = safeVector(R.drawable.ic_scissor, EditorIcons.Crop),
                         contentDescription = "Ritaglia"
                     ) { onEnter("Crop") }
 
                     // Adatta
                     IconDropdown(
-                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_adapt) }
-                            .getOrElse { EditorIcons.Layout },
+                        icon = safeVector(R.drawable.ic_adapt, EditorIcons.Layout),
                         contentDescription = "Adatta",
                         current = get("fitCont") ?: "Cover",
                         options = listOf("Cover", "Contain", "Stretch"),
                         onSelected = { onPick("fitCont", it) }
                     )
 
-                    // Filtro (20 opzioni)
+                    // Filtro – usa 20 filtri (default definiti da FILTER_NAMES)
                     FilterDropdown(
-                        icon = runCatching { ImageVector.vectorResource(id = R.drawable.ic_filter) }
-                            .getOrElse { EditorIcons.Tune },
+                        icon = safeVector(R.drawable.ic_filter, EditorIcons.Functions),
                         contentDescription = "Filtro",
                         current = get("filtro") ?: "Nessuno",
                         onSelected = { onPick("filtro", it) }
+                        // options = FILTER_NAMES  // opzionale: ha già default a FILTER_NAMES
                     )
 
                     // Cancella
                     ToolbarIconButton(EditorIcons.Cancel, "Cancella immagine") { onEnter("Cancella immagine") }
                 }
+
 
                 "Aggiungi album" -> {
                     // (riuso del tuo vecchio blocco "Aggiungi album")
