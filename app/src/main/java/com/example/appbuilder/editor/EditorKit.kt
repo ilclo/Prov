@@ -157,6 +157,9 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.text.BasicText
 
 private val LocalIsFree = staticCompositionLocalOf { true }
 
@@ -197,16 +200,8 @@ data class EditorShellState(
     val isEditor: Boolean = true
 )
 
-// Ritaglio normalizzato (0..1 sui due assi)
-data class ImageCrop(
-    val left:  Float,
-    val top:   Float,
-    val right: Float,
-    val bottom:Float
-)
-
 // Handle/mode di interazione nel cropper
-private enum class CropMode { NONE, MOVE, TL, TR, BR, BL }
+private enum class CropMode { NONE, TL, TR, BR, BL, MOVE }
 /* =========================================================================================
 *  ENTRY — schermata demo (sfondo neutro + menù)
 * ========================================================================================= */
@@ -263,39 +258,53 @@ private fun rememberImageBitmapFromUri(uri: Uri?): ImageBitmap? {
     }
 }
 
+
 @Composable
 fun ImageCropperDialog(
     visible: Boolean,
     imageUri: Uri?,
-    initial: ImageCrop? = null,
+    initial: com.example.appbuilder.canvas.ImageCrop? = null,
     onDismiss: () -> Unit,
-    onApply: (ImageCrop) -> Unit
+    onApply: (com.example.appbuilder.canvas.ImageCrop) -> Unit
 ) {
     if (!visible || imageUri == null) return
 
     val img = rememberImageBitmapFromUri(imageUri)
     if (img == null) {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            text = { Text("Immagine non caricabile.") },
-            confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } }
-        )
+        // fallback molto leggero
+        Dialog(onDismissRequest = onDismiss) {
+            Box(
+                Modifier
+                    .size(280.dp, 140.dp)
+                    .background(Color(0xFF222222)),
+                contentAlignment = Alignment.Center
+            ) {
+                BasicText("Impossibile aprire l'immagine", Modifier.padding(16.dp))
+            }
+        }
         return
     }
 
     val density = LocalDensity.current
-    var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
-    // crop normalizzato (0..1); default: tutto
-    var crop by remember { mutableStateOf(initial ?: ImageCrop(0f, 0f, 1f, 1f)) }
+    // stato UI
+    var boxSize by remember { mutableStateOf(IntSize(0, 0)) }
     var mode by remember { mutableStateOf(CropMode.NONE) }
     var moveGrab by remember { mutableStateOf(Offset.Zero) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = { onApply(crop) }) { Text("OK") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
-        text = {
+    // crop normalizzato 0..1
+    var crop by remember(imageUri) {
+        mutableStateOf(initial ?: com.example.appbuilder.canvas.ImageCrop(0f, 0f, 1f, 1f))
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .background(Color(0xFF121212))
+                .padding(12.dp)
+                .widthIn(min = 280.dp, max = 480.dp)
+        ) {
+            // area interattiva
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -304,7 +313,7 @@ fun ImageCropperDialog(
                     .pointerInput(boxSize, img, crop) {
                         detectDragGestures(
                             onDragStart = { pos ->
-                                // Calcola area in cui è disegnata l'immagine (contain)
+                                // calcolo bounding dell'immagine in "contain"
                                 val bw = boxSize.width.toFloat()
                                 val bh = boxSize.height.toFloat()
                                 val iw = img.width.toFloat()
@@ -328,8 +337,9 @@ fun ImageCropperDialog(
                                 )
                                 val th = with(density) { 24.dp.toPx() }
                                 val nearest = handles.minByOrNull { (_, p) -> (p - pos).getDistance() }!!
-                                mode = if ((nearest.second - pos).getDistance() <= th) nearest.first
-                                else if (pos.x in left..right && pos.y in top..bottom) {
+                                mode = if ((nearest.second - pos).getDistance() <= th) {
+                                    nearest.first
+                                } else if (pos.x in left..right && pos.y in top..bottom) {
                                     moveGrab = Offset(pos.x - left, pos.y - top)
                                     CropMode.MOVE
                                 } else CropMode.NONE
@@ -372,14 +382,15 @@ fun ImageCropperDialog(
                                     else -> Unit
                                 }
 
-                                // mantieni limiti e area minima
+                                // limiti + dimensione minima
                                 val minSide = with(density) { 40.dp.toPx() }
                                 left   = left.coerceIn(dx, right - minSide)
                                 top    = top.coerceIn(dy, bottom - minSide)
                                 right  = right.coerceIn(left + minSide, dx + dstW)
                                 bottom = bottom.coerceIn(top + minSide, dy + dstH)
 
-                                crop = ImageCrop(
+                                // aggiorna crop normalizzato
+                                crop = com.example.appbuilder.canvas.ImageCrop(
                                     left   = ((left   - dx) / dstW).coerceIn(0f, 1f),
                                     top    = ((top    - dy) / dstH).coerceIn(0f, 1f),
                                     right  = ((right  - dx) / dstW).coerceIn(0f, 1f),
@@ -389,7 +400,7 @@ fun ImageCropperDialog(
                         )
                     }
             ) {
-                // Disegno immagine + overlay crop
+                // Disegno immagine + overlay
                 Canvas(Modifier.matchParentSize()) {
                     val bw = size.width
                     val bh = size.height
@@ -415,7 +426,7 @@ fun ImageCropperDialog(
                     val right  = dx + crop.right  * dstW
                     val bottom = dy + crop.bottom * dstH
 
-                    // maschera scura fuori dal crop (even-odd)
+                    // maschera scura fuori dal crop (even‑odd)
                     val p = Path().apply {
                         fillType = PathFillType.EvenOdd
                         addRect(Rect(0f, 0f, bw, bh))
@@ -428,20 +439,39 @@ fun ImageCropperDialog(
                         color = Color.White,
                         topLeft = Offset(left, top),
                         size = Size(right - left, bottom - top),
-                        style = Stroke(width = 2.dp.toPx())
+                        style = Stroke(width = with(density) { 2.dp.toPx() })
                     )
-                    val r = 6.dp.toPx()
+                    val r = with(density) { 6.dp.toPx() }
                     listOf(
                         Offset(left, top), Offset(right, top),
                         Offset(right, bottom), Offset(left, bottom)
-                    ).forEach { c ->
-                        drawCircle(color = Color.White, radius = r, center = c)
-                    }
+                    ).forEach { c -> drawCircle(color = Color.White, radius = r, center = c) }
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
+
+            // pulsanti essenziali senza Material
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Box(
+                    Modifier
+                        .padding(end = 8.dp)
+                        .clickable { onDismiss() }
+                        .background(Color(0xFF333333))
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) { BasicText("Annulla", Modifier) }
+
+                Box(
+                    Modifier
+                        .clickable { onApply(crop) }
+                        .background(Color(0xFF0066CC))
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) { BasicText("OK", Modifier) }
+            }
         }
-    )
+    }
 }
+
 
 // mapping basilare dei nomi già usati nei default
 private fun tokenToColor(token: String?): Color? = when(token?.lowercase()?.trim()) {
@@ -676,20 +706,20 @@ fun EditorMenusOnly(
     ImageCropperDialog(
         visible = cropperVisible,
         imageUri = cropperImageUri,
-        initial = rectImages[cropperTarget]?.crop,
+        initial = rectImages[cropperTarget]?.crop,   // ora compila
         onDismiss = { cropperVisible = false },
         onApply = { normCrop ->
             val rect = cropperTarget ?: return@ImageCropperDialog
             val prev = rectImages[rect]
             rectImages[rect] = (prev ?: ImageStyle(uri = cropperImageUri!!)).copy(
                 crop = normCrop,
-                // default sensato: Cover
                 fit = ImageFit.Cover,
                 filter = prev?.filter ?: ImageFilter.None
             )
             cropperVisible = false
         }
     )
+
     // overlay palette colore
     var colorPickerVisible by remember { mutableStateOf(false) }
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
@@ -2946,6 +2976,28 @@ private fun ContainerLevel(
 
             // --- SOTTO-MENÙ: Contenitore → Immagini → Aggiungi foto
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Rettangolo correntemente selezionato nel menù “Contenitore”
+                var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+
+                // Mappa stile immagine per rettangolo
+                val rectImages: SnapshotStateMap<DrawItem.RectItem, ImageStyle> = remember { mutableStateMapOf() }
+
+                // Dialog “cancella immagine”
+                var showDeleteImageDialog by remember { mutableStateOf(false) }
+                val pickImageLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.GetContent()
+                ) { uri: Uri? ->
+                    if (uri != null && selectedRect != null) {
+                        cropperImageUri = uri
+                        cropperTarget   = selectedRect
+                        cropperVisible  = true
+                    }
+                }
+
+                var cropperVisible by remember { mutableStateOf(false) }
+                var cropperImageUri by remember { mutableStateOf<Uri?>(null) }
+                var cropperTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+                var crop by remember { mutableStateOf(initial ?: ImageCrop(0f, 0f, 1f, 1f)) }
 
                 // Upload immagine
                 ToolbarIconButton(
@@ -2982,9 +3034,9 @@ private fun ContainerLevel(
                     icon = ImageVector.vectorResource(R.drawable.ic_adapt),
                     contentDescription = "Adatta",
                     current = when (rectImages[selectedRect]?.fit) {
-                        ImageFit.Cover   -> "Cover"
-                        ImageFit.Contain -> "Contain"
-                        ImageFit.Stretch -> "Stretch"
+                        com.example.appbuilder.canvas.ImageFit.Cover   -> "Cover"
+                        com.example.appbuilder.canvas.ImageFit.Contain -> "Contain"
+                        com.example.appbuilder.canvas.ImageFit.Stretch -> "Stretch"
                         else -> "—"
                     },
                     options = listOf("Cover", "Contain", "Stretch"),
@@ -3006,11 +3058,12 @@ private fun ContainerLevel(
                     icon = ImageVector.vectorResource(R.drawable.ic_filter),
                     contentDescription = "Filtro",
                     current = when (rectImages[selectedRect]?.filter) {
-                        ImageFilter.None -> "Nessuno"
-                        ImageFilter.Mono -> "B/N"
-                        ImageFilter.Sepia -> "Seppia"
+                        com.example.appbuilder.canvas.ImageFilter.None  -> "Nessuno"
+                        com.example.appbuilder.canvas.ImageFilter.Mono  -> "B/N"
+                        com.example.appbuilder.canvas.ImageFilter.Sepia -> "Seppia"
                         else -> "—"
                     },
+
                     options = listOf("Nessuno", "B/N", "Seppia"),
                     onSelected = { chosen ->
                         val rect = selectedRect ?: return@IconDropdown

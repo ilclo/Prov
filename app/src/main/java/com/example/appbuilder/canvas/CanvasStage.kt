@@ -51,15 +51,23 @@ data class ImageStyle(
     val uri: Uri,
     val fit: ImageFit = ImageFit.Cover,
     val filter: ImageFilter = ImageFilter.None,
-    // crop base: l’immagine viene “ritagliata” all’interno della forma del contenitore
+    val crop: ImageCrop? = null,    
     val cropToShape: Boolean = true
 )
+
 
 data class CornerRadii(
     val tl: Dp = 0.dp,
     val tr: Dp = 0.dp,
     val br: Dp = 0.dp,
     val bl: Dp = 0.dp
+)
+
+data class ImageCrop(
+    val left: Float,   // 0..1
+    val top: Float,    // 0..1
+    val right: Float,  // 0..1
+    val bottom: Float  // 0..1
 )
 
 // Effetti grafici opzionali
@@ -554,33 +562,40 @@ fun CanvasStage(
                             // 1) FILL (solo se non "Text")
                             if (varnt != Variant.Text) {
                                 if (varnt == Variant.Full) {
-                                    // prova immagine; se non c’è, gradiente; altrimenti tinta
                                     val imgStyle = imageStyles[item]
                                     val imgBitmap = loadBitmap(imgStyle?.uri)
-
                                     if (imgStyle != null && imgBitmap != null) {
-                                        val srcW = imgBitmap.width.toFloat()
-                                        val srcH = imgBitmap.height.toFloat()
+                                        val srcW = imgBitmap.width
+                                        val srcH = imgBitmap.height
 
-                                        val (dstW, dstH) = when (imgStyle.fit) {
-                                            ImageFit.Cover -> {
-                                                val s = kotlin.math.max(w / srcW, h / srcH)
-                                                srcW * s to srcH * s
-                                            }
-                                            ImageFit.Contain -> {
-                                                val s = kotlin.math.min(w / srcW, h / srcH)
-                                                srcW * s to srcH * s
-                                            }
-                                            ImageFit.Stretch -> w to h
+                                        // ⬇️ usa il crop normalizzato (se mancante: piena immagine)
+                                        val c = imgStyle.crop
+                                        val srcLeft   = (((c?.left ?: 0f) * srcW).roundToInt()).coerceIn(0, srcW)
+                                        val srcTop    = (((c?.top  ?: 0f) * srcH).roundToInt()).coerceIn(0, srcH)
+                                        val srcRight  = (((c?.right?: 1f) * srcW).roundToInt()).coerceIn(srcLeft, srcW)
+                                        val srcBottom = (((c?.bottom?: 1f) * srcH).roundToInt()).coerceIn(srcTop, srcH)
+                                        val srcSizeW = max(1, srcRight - srcLeft)
+                                        val srcSizeH = max(1, srcBottom - srcTop)
+
+                                        // adattamento (Cover/Contain/Stretch) sulla regione croppata
+                                        val s = when (imgStyle.fit) {
+                                            ImageFit.Cover   -> max(w / srcSizeW.toFloat(), h / srcSizeH.toFloat())
+                                            ImageFit.Contain -> min(w / srcSizeW.toFloat(), h / srcSizeH.toFloat())
+                                            ImageFit.Stretch -> Float.NaN // gestito sotto
                                         }
+                                        val dstW = if (imgStyle.fit == ImageFit.Stretch) w else srcSizeW * s
+                                        val dstH = if (imgStyle.fit == ImageFit.Stretch) h else srcSizeH * s
+
                                         val dx = left + (w - dstW) / 2f
                                         val dy = top  + (h - dstH) / 2f
 
                                         val drawImageBlock: DrawScope.() -> Unit = {
                                             drawImage(
                                                 image = imgBitmap,
-                                                dstOffset = IntOffset(dx.toInt(), dy.toInt()),
-                                                dstSize = IntSize(dstW.toInt(), dstH.toInt()),
+                                                srcOffset = IntOffset(srcLeft, srcTop),
+                                                srcSize   = IntSize(srcSizeW, srcSizeH),
+                                                dstOffset = IntOffset(dx.roundToInt(), dy.roundToInt()),
+                                                dstSize   = IntSize(dstW.roundToInt(), dstH.roundToInt()),
                                                 filterQuality = FilterQuality.Low,
                                                 colorFilter = colorFilterFor(imgStyle.filter)
                                             )
