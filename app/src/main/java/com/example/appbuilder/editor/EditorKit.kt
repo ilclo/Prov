@@ -1316,19 +1316,27 @@ fun EditorMenusOnly(
                             applyContainerMenuFromRect(rect)
                         }
                     },
-                    onUpdateItem    = { old, updated ->
+                    onUpdateItem = { old, updated ->
                         val items = pageState?.items ?: return@CanvasStage
                         val ix = items.indexOf(old)
                         if (ix >= 0) {
                             items[ix] = updated
-                            // trasferisci le “decorazioni”
-                            rectFillStyles[updated] = rectFillStyles.remove(old) ?: rectFillStyles[updated] ?: return@CanvasStage
-                            rectImages[updated]     = rectImages.remove(old)     ?: rectImages[updated]     ?: return@CanvasStage
-                            rectCorners[updated]    = rectCorners.remove(old)    ?: rectCorners[updated]    ?: return@CanvasStage
+
+                            // 1) Aggiorna SUBITO la selezione per evitare ghost del bordo
                             if (selectedRect == old) {
                                 selectedRect = updated
                                 applyContainerMenuFromRect(updated)
                             }
+
+                            // 2) Sposta le decorazioni SOLO se esistono (niente early return)
+                            rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
+                            rectImages.remove(old)?.let     { rectImages[updated]     = it }
+                            rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
+
+                            // (consigliato) sposta anche queste, così non perdi variant/shape/fx durante il drag
+                            rectVariants.remove(old)?.let { rectVariants[updated] = it }
+                            rectShapes.remove(old)?.let   { rectShapes[updated]   = it }
+                            rectFx.remove(old)?.let       { rectFx[updated]       = it }
                         }
                     },
 
@@ -1645,8 +1653,21 @@ fun EditorMenusOnly(
                                     }
                                 }
                             }
-
-
+                            // --- SPESSORE BORDO ---
+                            if ((menuPath.firstOrNull() ?: "") == "Contenitore" && label == "b_thick") {
+                                val rect = selectedRect
+                                if (rect != null) {
+                                    val dp = keyToDp(value)   // esiste già in questo scope
+                                    pageState?.let { ps ->
+                                        val i = ps.items.indexOf(rect)
+                                        if (i >= 0) {
+                                            val updated = rect.copy(borderWidth = dp)
+                                            ps.items[i] = updated
+                                            selectedRect = updated
+                                        }
+                                    }
+                                }
+                            }
                             // Aggiornamenti mirati sui container
                             if ((menuPath.firstOrNull() ?: "") == "Contenitore") {
                                 val rect = selectedRect
@@ -3154,10 +3175,12 @@ private fun ContainerLevel(
                 options = listOf("Full", "Outlined", "Text", "TopBottom"),
                 onSelected = { onPick("variant", it) }
             )
-            IconDropdown(EditorIcons.LineWeight, "b_tick",
+            IconDropdown(
+                EditorIcons.LineWeight,
+                "Spessore bordo",                  // ← solo label visuale
                 current = get("b_thick") ?: "1dp",
                 options = listOf("0dp", "1dp", "2dp", "3dp"),
-                onSelected = { onPick("b_thick", it) }
+                onSelected = { onPick("b_thick", it) }   // ← la chiave resta "b_thick"
             )
             IconDropdown(EditorIcons.SwipeRight, "Tipo",
                 current = get("tipo") ?: "Normale",
