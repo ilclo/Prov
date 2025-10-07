@@ -3133,7 +3133,10 @@ private fun ContainerLevel(
 
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
-            ToolbarIconButton(EditorIcons.Square, "Angoli") { onEnter("Angoli") }
+            ToolbarIconButton(
+                icon = safeVector(R.drawable.ic_modify_corners, EditorIcons.Square),
+                contentDescription = "Angoli"
+            ) { onEnter("Angoli") }
 
             IconDropdown(EditorIcons.SwipeVertical, "Scrollabilità ",
                 current = get("scroll") ?: "Assente",
@@ -3214,23 +3217,44 @@ private fun ContainerLevel(
         }
         "Angoli" -> {
             val dpOpts = listOf("0dp","4dp","8dp","12dp","16dp","24dp")
-            IconDropdown(EditorIcons.Square, "ic_as",
-                current = get("ic_as") ?: "0dp", options = dpOpts,
-                onSelected = { onPick("ic_as", it) }
-            )
-            IconDropdown(EditorIcons.Square, "ic_ad",
-                current = get("ic_ad") ?: "0dp", options = dpOpts,
+
+            // 1) Alto-Destra (TR) — ic_ad
+            IconDropdown(
+                icon = safeVector(R.drawable.ic_ad, EditorIcons.Square),
+                contentDescription = "Angolo in alto a dx",
+                current = get("ic_ad") ?: "0dp",
+                options = dpOpts,
                 onSelected = { onPick("ic_ad", it) }
             )
-            IconDropdown(EditorIcons.Square, "ic_bs",
-                current = get("ic_bs") ?: "0dp", options = dpOpts,
-                onSelected = { onPick("ic_bs", it) }
-            )
-            IconDropdown(EditorIcons.Square, "ic_bd",
-                current = get("ic_bd") ?: "0dp", options = dpOpts,
+
+            // 2) Basso-Destra (BR) — ic_bd
+            IconDropdown(
+                icon = safeVector(R.drawable.ic_bd, EditorIcons.Square),
+                contentDescription = "Angolo in basso a dx",
+                current = get("ic_bd") ?: "0dp",
+                options = dpOpts,
                 onSelected = { onPick("ic_bd", it) }
             )
+
+            // 3) Basso-Sinistra (BL) — ic_bs
+            IconDropdown(
+                icon = safeVector(R.drawable.ic_bs, EditorIcons.Square),
+                contentDescription = "Angolo in basso a sx",
+                current = get("ic_bs") ?: "0dp",
+                options = dpOpts,
+                onSelected = { onPick("ic_bs", it) }
+            )
+
+            // 4) Alto-Sinistra (TL) — ic_as
+            IconDropdown(
+                icon = safeVector(R.drawable.ic_as, EditorIcons.Square),
+                contentDescription = "Angolo in alto a sx",
+                current = get("ic_as") ?: "0dp",
+                options = dpOpts,
+                onSelected = { onPick("ic_as", it) }
+            )
         }
+
         "Immagini" -> {
             when (path.getOrNull(2)) {
                 null -> {
