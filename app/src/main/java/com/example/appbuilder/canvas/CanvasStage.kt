@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.DrawScope
-
+import kotlin.math.roundToInt
 
 // Variante di rendering del contenitore
 enum class Variant { Full, Outlined, Text, TopBottom }
