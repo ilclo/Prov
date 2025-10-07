@@ -712,8 +712,8 @@ fun EditorMenusOnly(
 // Modifiche in corso (serve per mostrare la barra di conferma alla risalita)
     var dirty by remember { mutableStateOf(false) }
     // stile riempimento (per non toccare RectItem)
-    val rectFillStyles = remember { 
-        mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FillStyle>() 
+    val rectFillStyles = remember {
+        mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FillStyle>()
     }
     // Stili aggiuntivi per RectItem
     val rectVariants = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.Variant>() }
@@ -790,7 +790,7 @@ fun EditorMenusOnly(
     // === Stato palette colori flottante ===
     var showColorPicker by remember { mutableStateOf(false) }
     var colorPickTarget by remember { mutableStateOf<ColorTarget?>(null) }
-    var colorPickInitial by remember { mutableStateOf(Color.Black) }    
+    var colorPickInitial by remember { mutableStateOf(Color.Black) }
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
     fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
@@ -853,17 +853,17 @@ fun EditorMenusOnly(
     }
 
 
-    
+
     // Griglia
     var gridPanelOpen by remember { mutableStateOf(false) }
     var gridIsDragging by remember { mutableStateOf(false) }
     var showGridLines by remember { mutableStateOf(false) }
-    
+
     // Livelli
     var levelPanelOpen by remember { mutableStateOf(false) }
     var currentLevel by remember { mutableStateOf(0) }
     var toolMode by remember { mutableStateOf(ToolMode.Create) }
-        
+
     // Auto‑show griglia completa dopo 500ms se lo slider non è in drag
     LaunchedEffect(gridPanelOpen, gridIsDragging) {
         if (gridPanelOpen && !gridIsDragging) {
@@ -879,17 +879,17 @@ fun EditorMenusOnly(
     ) {
         derivedStateOf {
             classicEditing &&
-            editingClass == DeckRoot.PAGINA &&
-            menuPath.firstOrNull() == "Contenitore" &&   // ← basta essere “dentro Contenitore”
-            !infoMode && !wizardVisible &&
-            !gridPanelOpen && !levelPanelOpen
+                    editingClass == DeckRoot.PAGINA &&
+                    menuPath.firstOrNull() == "Contenitore" &&   // ← basta essere “dentro Contenitore”
+                    !infoMode && !wizardVisible &&
+                    !gridPanelOpen && !levelPanelOpen
         }
     }
     val isContainerContext by remember(classicEditing, editingClass, menuPath) {
         derivedStateOf {
             classicEditing &&
-            editingClass == DeckRoot.PAGINA &&
-            menuPath.firstOrNull() == "Contenitore"
+                    editingClass == DeckRoot.PAGINA &&
+                    menuPath.firstOrNull() == "Contenitore"
         }
     }
 
@@ -1304,14 +1304,14 @@ fun EditorMenusOnly(
                     onCreate  = { wr ->
                         deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
                         wizardVisible = false
-                    
+
                         deckOpen = when (wr.root) {
                             DeckRoot.PAGINA        -> "pagina"
                             DeckRoot.MENU_LATERALE -> "menuL"
                             DeckRoot.MENU_CENTRALE -> "menuC"
                             DeckRoot.AVVISO        -> "avviso"
                         }
-                    
+
                         if (wr.root == DeckRoot.PAGINA) {
                             pageState = PageState(
                                 id = wr.id,
@@ -1345,7 +1345,7 @@ fun EditorMenusOnly(
                             }
                         },
                         onEnter = { label ->
-                            // PRIMA calcolo la nuova rotta, POI la applico, e uso quella per i match
+                            // evita accumulo "foglie sorelle" (Aggiungi foto/album/video)
                             val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
                             val nextPath = when {
                                 menuPath.lastOrNull() == label -> menuPath
@@ -1360,59 +1360,45 @@ fun EditorMenusOnly(
 
                             // --- UPLOAD: Contenitore / Immagini / Aggiungi foto / Upload
                             if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Upload")) {
-                                // evita accumulo "foglie sorelle" (Aggiungi foto/album/video)
-                                val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
-                                val nextPath = when {
-                                    menuPath.lastOrNull() == label -> menuPath
-                                    menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
-                                        menuPath.dropLast(1) + label
-                                    else -> menuPath + label
-                                }
-                                menuPath = nextPath
-                                lastChanged = null
-
-                                val fullPath = nextPath.joinToString(" / ")
-
-                                // --- UPLOAD: Contenitore / Immagini / Aggiungi foto / Upload
-                                if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Upload")) {
-                                    val rect = selectedRect
-                                    when {
-                                        rect == null -> {
-                                            infoCard = "Nessun contenitore" to "Seleziona prima un contenitore nella griglia."
-                                        }
-                                        rectImages[rect]?.uri != null -> {
-                                            infoCard = "Foto già presente" to "Per caricare una nuova immagine, premi ic_cancel e conferma la cancellazione."
-                                        }
-                                        else -> {
-                                            pickImageLauncher.launch("image/*")  // al ritorno apre direttamente il cropper
-                                        }
+                                val rect = selectedRect
+                                when {
+                                    rect == null -> {
+                                        infoCard = "Nessun contenitore" to "Seleziona prima un contenitore nella griglia."
                                     }
-                                    return@SubMenuBar
-                                }
-
-                                // --- CROP: Contenitore / Immagini / Aggiungi foto / Crop
-                                if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Crop")) {
-                                    val rect = selectedRect ?: return@SubMenuBar
-                                    val existing = rectImages[rect]
-                                    if (existing?.uri != null) {
-                                        cropperImageUri = existing.uri
-                                        cropperTarget   = rect
-                                        cropperVisible  = true         // riapre il cropper reale (ImageCropperDialog)
-                                    } else {
-                                        pickImageLauncher.launch("image/*")
+                                    rectImages[rect]?.uri != null -> {
+                                        infoCard = "Foto già presente" to "Per caricare una nuova immagine, premi ic_cancel e conferma la cancellazione."
                                     }
-                                    return@SubMenuBar
-                                }
-
-                                // --- CANCELLA: Contenitore / Immagini / Aggiungi foto / Cancella immagine
-                                if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Cancella immagine")) {
-                                    if (selectedRect != null && rectImages[selectedRect] != null) {
-                                        showDeleteImageDialog = true
-                                    } else {
-                                        infoCard = "Nessuna foto da cancellare" to "Non c'è un'immagine associata al contenitore selezionato."
+                                    else -> {
+                                        pickImageLauncher.launch("image/*")  // al ritorno apre direttamente il cropper
                                     }
-                                    return@SubMenuBar
                                 }
+                                return@SubMenuBar
+                            }
+
+                            // --- CROP: Contenitore / Immagini / Aggiungi foto / Crop
+                            if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Crop")) {
+                                val rect = selectedRect ?: return@SubMenuBar
+                                val existing = rectImages[rect]
+                                if (existing?.uri != null) {
+                                    cropperImageUri = existing.uri
+                                    cropperTarget   = rect
+                                    cropperVisible  = true         // riapre il cropper reale (ImageCropperDialog)
+                                } else {
+                                    pickImageLauncher.launch("image/*")
+                                }
+                                return@SubMenuBar
+                            }
+
+                            // --- CANCELLA: Contenitore / Immagini / Aggiungi foto / Cancella immagine
+                            if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Cancella immagine")) {
+                                if (selectedRect != null && rectImages[selectedRect] != null) {
+                                    showDeleteImageDialog = true
+                                } else {
+                                    infoCard = "Nessuna foto da cancellare" to "Non c'è un'immagine associata al contenitore selezionato."
+                                }
+                                return@SubMenuBar
+                            }
+
                             when {
                                 // Bordi -> Colore
                                 fullPath.endsWith("Contenitore / Bordi / Colore") -> {
@@ -1450,7 +1436,7 @@ fun EditorMenusOnly(
                                     showColorPicker = true
                                 }
                             }
-                        }
+                        },
                         onToggle = { label, value ->
                             val root = menuPath.firstOrNull() ?: "Contenitore"
                             menuSelections[key(menuPath, label)] = value
@@ -1462,16 +1448,16 @@ fun EditorMenusOnly(
                             if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
                                 menuSelections[styleKey] = "Nessuno"
                             }
-                        }
+                        },
                         onPick = pick@{ label, value ->
                             // --- Intercetta e apre la palette flottante al posto del dropdown ---
                             run {
                                 val isBordiColore = menuPath.size >= 2 &&
-                                    menuPath[0] == "Contenitore" && menuPath[1] == "Bordi" && label == "Colore"
+                                        menuPath[0] == "Contenitore" && menuPath[1] == "Bordi" && label == "Colore"
                                 val isContCol1 = menuPath.size >= 2 &&
-                                    menuPath[0] == "Contenitore" && menuPath[1] == "Colore" && label == "col1"
+                                        menuPath[0] == "Contenitore" && menuPath[1] == "Colore" && label == "col1"
                                 val isContCol2 = menuPath.size >= 2 &&
-                                    menuPath[0] == "Contenitore" && menuPath[1] == "Colore" && label == "col2"
+                                        menuPath[0] == "Contenitore" && menuPath[1] == "Colore" && label == "col2"
 
                                 if (isBordiColore) {
                                     colorPickTarget = ColorTarget.Border
@@ -1548,6 +1534,7 @@ fun EditorMenusOnly(
                                 }
                             }
 
+
                             // Aggiornamenti mirati sui container
                             if ((menuPath.firstOrNull() ?: "") == "Contenitore") {
                                 val rect = selectedRect
@@ -1575,7 +1562,7 @@ fun EditorMenusOnly(
                                             val isSquare = rows == cols
                                             val s = when ((value as? String)?.lowercase()?.trim()) {
                                                 "cerchio"   -> if (isSquare) com.example.appbuilder.canvas.ShapeKind.Circle
-                                                            else { infoCard = "Forma non disponibile" to "Cerchio è selezionabile solo per contenitori quadrati."; com.example.appbuilder.canvas.ShapeKind.Rect }
+                                                else { infoCard = "Forma non disponibile" to "Cerchio è selezionabile solo per contenitori quadrati."; com.example.appbuilder.canvas.ShapeKind.Rect }
                                                 "pillola"   -> com.example.appbuilder.canvas.ShapeKind.Pill
                                                 "diamante"  -> com.example.appbuilder.canvas.ShapeKind.Diamond
                                                 else        -> com.example.appbuilder.canvas.ShapeKind.Rect
@@ -1646,96 +1633,96 @@ fun EditorMenusOnly(
                         },
                         savedPresets = savedPresets,
                         onFreeGate = { showUpsell = true }
-                    )
-                    BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
-                }
+                        )
+                        BreadcrumbBar(path = menuPath, lastChanged = lastChanged)
+                    }
 
 // Barra di conferma (quando risali con modifiche)
-                if (showConfirm) {
-                    val isFreeUser = LocalIsFree.current
-                    ConfirmBar(
-                        onCancel = {
-                            dirty = false
-                            lastChanged = null
-                            showConfirm = false
-                            menuPath = emptyList()
-                        },
-                        onOk = {
-                            dirty = false
-                            showConfirm = false
-                            menuPath = emptyList()
-                        },
-                        onSavePreset = {
-                            if (isFreeUser) showUpsell = true
-                            else showSaveDialog = true
-                        }
-                    )
-                }
-
-// Dialog "Salva come stile"
-                if (showSaveDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showSaveDialog = false },
-                        title = { Text("Salva come stile") },
-                        text = {
-                            Column {
-                                Text("Dai un nome allo stile corrente. Se esiste già , verrà  aggiornato.")
-                                Spacer(Modifier.height(8.dp))
-                                OutlinedTextField(
-                                    value = newPresetName,
-                                    onValueChange = { newPresetName = it },
-                                    singleLine = true,
-                                    label = { Text("Nome stile") },
-                                    colors = TextFieldDefaults.colors(
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White,
-                                        cursorColor = WIZ_AZURE,
-                                        focusedIndicatorColor = WIZ_AZURE,
-                                        unfocusedIndicatorColor = Color(0xFF2A3B5B),
-                                        focusedLabelColor = WIZ_AZURE,
-                                        unfocusedLabelColor = Color(0xFF9BA3AF)
-                                    )
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                val root = menuPath.firstOrNull() ?: "Contenitore"
-                                val name = newPresetName.trim()
-                                if (name.isNotBlank()) {
-                                    savePreset(root, name)
-                                }
-                                newPresetName = ""
+                    if (showConfirm) {
+                        val isFreeUser = LocalIsFree.current
+                        ConfirmBar(
+                            onCancel = {
                                 dirty = false
-                                showSaveDialog = false
+                                lastChanged = null
                                 showConfirm = false
                                 menuPath = emptyList()
-                            }) { Text("Salva") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = {
-                                newPresetName = ""
-                                showSaveDialog = false
-                            }) { Text("Annulla") }
-                        }
-                    )
-                }
-                if (showDeleteImageDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showDeleteImageDialog = false },
-                        title   = { Text("Cancellare?") },
-                        text    = { Text("Attenzione, se scegli Sì perderai tutte le modifiche che hai apportato alla tua foto.") },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                selectedRect?.let { rectImages.remove(it) }
-                                showDeleteImageDialog = false
-                            }) { Text("Sì") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showDeleteImageDialog = false }) { Text("Annulla") }
-                        }
-                    )
-                }
+                            },
+                            onOk = {
+                                dirty = false
+                                showConfirm = false
+                                menuPath = emptyList()
+                            },
+                            onSavePreset = {
+                                if (isFreeUser) showUpsell = true
+                                else showSaveDialog = true
+                            }
+                        )
+                    }
+
+// Dialog "Salva come stile"
+                    if (showSaveDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showSaveDialog = false },
+                            title = { Text("Salva come stile") },
+                            text = {
+                                Column {
+                                    Text("Dai un nome allo stile corrente. Se esiste già , verrà  aggiornato.")
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(
+                                        value = newPresetName,
+                                        onValueChange = { newPresetName = it },
+                                        singleLine = true,
+                                        label = { Text("Nome stile") },
+                                        colors = TextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
+                                            cursorColor = WIZ_AZURE,
+                                            focusedIndicatorColor = WIZ_AZURE,
+                                            unfocusedIndicatorColor = Color(0xFF2A3B5B),
+                                            focusedLabelColor = WIZ_AZURE,
+                                            unfocusedLabelColor = Color(0xFF9BA3AF)
+                                        )
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    val root = menuPath.firstOrNull() ?: "Contenitore"
+                                    val name = newPresetName.trim()
+                                    if (name.isNotBlank()) {
+                                        savePreset(root, name)
+                                    }
+                                    newPresetName = ""
+                                    dirty = false
+                                    showSaveDialog = false
+                                    showConfirm = false
+                                    menuPath = emptyList()
+                                }) { Text("Salva") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    newPresetName = ""
+                                    showSaveDialog = false
+                                }) { Text("Annulla") }
+                            }
+                        )
+                    }
+                    if (showDeleteImageDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteImageDialog = false },
+                            title   = { Text("Cancellare?") },
+                            text    = { Text("Attenzione, se scegli Sì perderai tutte le modifiche che hai apportato alla tua foto.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    selectedRect?.let { rectImages.remove(it) }
+                                    showDeleteImageDialog = false
+                                }) { Text("Sì") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteImageDialog = false }) { Text("Annulla") }
+                            }
+                        )
+                    }
             }
 
             InfoEdgeDeck(
@@ -1828,7 +1815,7 @@ fun EditorMenusOnly(
                 onEndDrag = { gridIsDragging = false },
                 onDismiss = { gridPanelOpen = false }
             )
-            
+
             // Deriva il range livelli dagli items e dal livello corrente
             val minLvl = pageState?.items?.minOfOrNull { it.level } ?: 0
             val maxFromItems = pageState?.items?.maxOfOrNull { it.level } ?: 0
@@ -3173,6 +3160,7 @@ private fun ContainerLevel(
                 contentDescription = "Cancella immagine"
             ) { onEnter("Cancella immagine") }
         }
+
 
         "Aggiungi album" -> {
             ToolbarIconButton(
