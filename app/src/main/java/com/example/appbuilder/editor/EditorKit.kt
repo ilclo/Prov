@@ -318,6 +318,67 @@ private fun FilterSwatch(name: String, modifier: Modifier = Modifier) {
     }
 }
 
+// ---------------------- SAVE/RESTORE PAGESTATE ----------------------
+private fun rectToList(r: com.example.appbuilder.canvas.DrawItem.RectItem): List<Any> = listOf(
+    "rect",
+    r.level, r.r0, r.c0, r.r1, r.c1,
+    r.borderWidth.value,             // Float
+    colorToHex(r.borderColor),       // String
+    colorToHex(r.fillColor)          // String
+)
+
+private fun listToRect(lst: List<Any>): com.example.appbuilder.canvas.DrawItem.RectItem {
+    val lvl = (lst[1] as Number).toInt()
+    val r0  = (lst[2] as Number).toInt()
+    val c0  = (lst[3] as Number).toInt()
+    val r1  = (lst[4] as Number).toInt()
+    val c1  = (lst[5] as Number).toInt()
+    val bw  = ((lst[6] as Number).toFloat()).dp
+    val bc  = hexToColor(lst[7] as String) ?: Color.Black
+    val fc  = hexToColor(lst[8] as String) ?: Color.Transparent
+    return com.example.appbuilder.canvas.DrawItem.RectItem(
+        level = lvl, r0 = r0, c0 = c0, r1 = r1, c1 = c1,
+        borderWidth = bw, borderColor = bc, fillColor = fc
+    )
+}
+
+/**
+ * Saver per ricordare PageState su rotazione/recreate.
+ * Serializza:
+ *  [0]=id:String, [1]=scroll:String, [2]=grid:Int, [3]=currentLevel:Int, [4]=items:List<List<Any>>
+ * Al momento serializziamo i soli RectItem (gli elementi che usi per i contenitori).
+ */
+private fun pageStateSaver(): Saver<MutableState<com.example.appbuilder.canvas.PageState?>, Any> =
+    listSaver(
+        save = { st ->
+            val ps = st.value ?: return@listSaver emptyList()
+            val items = ps.items
+                .mapNotNull { it as? com.example.appbuilder.canvas.DrawItem.RectItem }
+                .map(::rectToList)
+            listOf(ps.id, ps.scroll, ps.gridDensity, ps.currentLevel, items)
+        },
+        restore = { list ->
+            if (list.isEmpty()) mutableStateOf(null) else {
+                val id           = list[0] as String
+                val scroll       = (list[1] as? String) ?: "Assente"
+                val grid         = (list[2] as Number).toInt()
+                val currentLevel = (list[3] as Number).toInt()
+                @Suppress("UNCHECKED_CAST")
+                val itemsData    = list[4] as List<List<Any>>
+
+                val ps = com.example.appbuilder.canvas.PageState(
+                    id = id,
+                    scroll = scroll,
+                    gridDensity = grid,
+                    currentLevel = currentLevel
+                )
+                itemsData.map(::listToRect).forEach { ps.items.add(it) }
+                mutableStateOf(ps)
+            }
+        }
+    )
+
+
 @Composable
 private fun FilterDropdown(
     icon: ImageVector,
@@ -836,7 +897,7 @@ fun EditorMenusOnly(
     var deckOpen by remember { mutableStateOf<String?>(null) }        // "pagina"|"menuL"|"menuC"|"avviso"|null
     var editingClass by remember { mutableStateOf<DeckRoot?>(null) }   // classe della figlia aperta (per flag Layout)
 // Path del menù (es. ["Contenitore", "Bordi", "Spessore"])
-    var menuPath by remember { mutableStateOf<List<String>>(emptyList()) }
+    var menuPath by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
 // Selezioni effimere dei dropdown/toggle (key = pathTestuale)
     val menuSelections = remember { mutableStateMapOf<String, Any?>() }
 // Modifiche in corso (serve per mostrare la barra di conferma alla risalita)
@@ -933,7 +994,7 @@ fun EditorMenusOnly(
     var colorPickTarget by remember { mutableStateOf<ColorTarget?>(null) }
     var colorPickInitial by remember { mutableStateOf(Color.Black) }
     // ====== STATO CANVAS/OVERLAY ======
-    var pageState by remember { mutableStateOf<PageState?>(null) }
+    var pageState by rememberSaveable(saver = pageStateSaver()) { mutableStateOf<com.example.appbuilder.canvas.PageState?>(null) }
     fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
     fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
         val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 1f
