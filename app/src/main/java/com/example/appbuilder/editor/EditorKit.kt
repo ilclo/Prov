@@ -1450,9 +1450,7 @@ fun EditorMenusOnly(
                                     showColorPicker = true
                                 }
                             }
-
-
-                        },
+                        }
                         onToggle = { label, value ->
                             val root = menuPath.firstOrNull() ?: "Contenitore"
                             menuSelections[key(menuPath, label)] = value
@@ -1464,7 +1462,7 @@ fun EditorMenusOnly(
                             if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
                                 menuSelections[styleKey] = "Nessuno"
                             }
-                        },
+                        }
                         onPick = pick@{ label, value ->
                             // --- Intercetta e apre la palette flottante al posto del dropdown ---
                             run {
