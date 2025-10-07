@@ -244,6 +244,53 @@ private fun hexToColor(s: String?): Color? {
     }
 }
 
+@Composable
+private fun FilterDropdown(
+    current: String?,
+    onSelected: (String) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        ToolbarIconButton(
+            icon = ImageVector.vectorResource(id = R.drawable.ic_filter),
+            contentDescription = "Filtro"
+        ) { open = true }
+
+        if (!current.isNullOrBlank()) {
+            // badge come nelle tue dropdown: riuso lo stesso stile
+            Surface(
+                color = Color(0xFF22304B),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, 14) }
+            ) {
+                Text(current, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp)
+            }
+        }
+
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf("Nessuno","B/N","Seppia").forEach { name ->
+                DropdownMenuItem(
+                    text = {
+                        // Etichetta con "sfondo dimostrativo"
+                        val bg = when (name) {
+                            "B/N"    -> Brush.linearGradient(listOf(Color.Black, Color.White))
+                            "Seppia" -> Brush.linearGradient(listOf(Color(0xFF704214), Color(0xFFE0C9A6)))
+                            else     -> Brush.linearGradient(listOf(Color(0xFF10151F), Color(0xFF1B2334)))
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(bg, RoundedCornerShape(6.dp))
+                                .padding(8.dp)
+                        ) { Text(name, color = if (name=="Seppia") Color.Black else Color.White) }
+                    },
+                    onClick = { onSelected(name); open = false }
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun rememberImageBitmapFromUri(uri: Uri?): ImageBitmap? {
@@ -1298,31 +1345,61 @@ fun EditorMenusOnly(
                             }
                         },
                         onEnter = { label ->
-// evita accumulo "foglie sorelle" (Aggiungi foto/album/video)
+                            // PRIMA calcolo la nuova rotta, POI la applico, e uso quella per i match
                             val leafSiblings = setOf("Aggiungi foto", "Aggiungi album", "Aggiungi video")
-                            menuPath = when {
+                            val nextPath = when {
                                 menuPath.lastOrNull() == label -> menuPath
                                 menuPath.lastOrNull() in leafSiblings && label in leafSiblings ->
                                     menuPath.dropLast(1) + label
                                 else -> menuPath + label
                             }
+                            menuPath = nextPath
                             lastChanged = null
-                            // === Apertura palette se entri su un nodo "Colore" ===
 
-                            val fullPath = (menuPath + label).joinToString(" / ")
+                            val fullPath = nextPath.joinToString(" / ")
 
-                            // Caso "Contenitore / Aggiungi foto / Crop"
-                            if (fullPath.endsWith("Contenitore / Aggiungi foto / Crop")) {
-                                val sr = selectedRect
-                                if (sr != null && rectImages[sr]?.uri != null) {
-                                    cropTargetRect = sr
-                                    cropOverlayVisible = true
+                            // --- UPLOAD: Contenitore / Immagini / Aggiungi foto / Upload
+                            if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Upload")) {
+                                val rect = selectedRect
+                                when {
+                                    rect == null -> {
+                                        infoCard = "Nessun contenitore" to "Seleziona prima un contenitore nella griglia."
+                                    }
+                                    rectImages[rect]?.uri != null -> {
+                                        // Non permetto l'upload: prima serve la cancellazione esplicita come da requisiti
+                                        infoCard = "Foto già presente" to "Per caricare una nuova immagine, premi ic_cancel e conferma la cancellazione."
+                                    }
+                                    else -> {
+                                        pickImageLauncher.launch("image/*")
+                                    }
+                                }
+                                return@SubMenuBar
+                            }
+
+                            // --- CROP: Contenitore / Immagini / Aggiungi foto / Crop
+                            if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Crop")) {
+                                val rect = selectedRect ?: return@SubMenuBar
+                                val existing = rectImages[rect]
+                                if (existing?.uri != null) {
+                                    cropperImageUri = existing.uri
+                                    cropperTarget   = rect
+                                    cropperVisible  = true    // riapre il cropper vero, non lo stub
                                 } else {
+                                    // niente immagine: vado di upload → al termine si apre il cropper
                                     pickImageLauncher.launch("image/*")
                                 }
                                 return@SubMenuBar
                             }
 
+                            // --- CANCELLA: Contenitore / Immagini / Aggiungi foto / Cancella immagine
+                            if (fullPath.endsWith("Contenitore / Immagini / Aggiungi foto / Cancella immagine")) {
+                                if (selectedRect != null && rectImages[selectedRect] != null) {
+                                    showDeleteImageDialog = true
+                                } else {
+                                    infoCard = "Nessuna foto da cancellare" to "Non c'è un'immagine associata al contenitore selezionato."
+                                }
+                                return@SubMenuBar
+                            }
                             when {
                                 // Bordi -> Colore
                                 fullPath.endsWith("Contenitore / Bordi / Colore") -> {
@@ -1435,28 +1512,33 @@ fun EditorMenusOnly(
                                     uri = rectImages[rect]?.uri ?: return@pick   // <— prima era return@SubMenuBar
                                 )
                                 when (label) {
-                                    "fitCont" -> {
-                                        val fit = when ((value as? String)?.trim()?.lowercase()) {
-                                            "cover"      -> com.example.appbuilder.canvas.ImageFit.Cover
-                                            "contain"    -> com.example.appbuilder.canvas.ImageFit.Contain
-                                            "stretch", "riempi" -> com.example.appbuilder.canvas.ImageFit.Stretch
-                                            else -> com.example.appbuilder.canvas.ImageFit.Cover
-                                        }
-                                        rectImages[rect] = st.copy(fit = fit)
-                                    }
-                                    "filtro" -> {
-                                        val f = when ((value as? String)?.trim()?.lowercase()) {
-                                            "bianco e nero", "mono", "b&w" -> com.example.appbuilder.canvas.ImageFilter.Mono
-                                            "seppia", "sepia"              -> com.example.appbuilder.canvas.ImageFilter.Sepia
-                                            else -> com.example.appbuilder.canvas.ImageFilter.None
-                                        }
-                                        rectImages[rect] = st.copy(filter = f)
-                                    }
-                                    // "crop" nel tuo set attuale è un pick; interpretiamo "Nessuno"=false, il resto=true
-                                    "crop" -> {
-                                        val on = !((value as? String).orEmpty().equals("Nessuno", ignoreCase = true))
-                                        rectImages[rect] = st.copy(cropToShape = on)
-                                    }
+                                    // Upload immagine (ic_uplo_photo): apre l’explorer se non c’è già una foto
+                                    ToolbarIconButton(
+                                        icon = ImageVector.vectorResource(id = R.drawable.ic_uplo_photo), // se non hai la risorsa, usa EditorIcons.AddPhotoAlternate
+                                        contentDescription = "Upload immagine"
+                                    ) { onEnter("Upload") }
+
+                                    // Ritaglia (ic_scissor): riapre il cropper per modificare il ritaglio
+                                    ToolbarIconButton(
+                                        icon = ImageVector.vectorResource(id = R.drawable.ic_scissor),
+                                        contentDescription = "Crop"
+                                    ) { onEnter("Crop") }
+
+                                    // Adatta (ic_adapt): Cover/Contain/Stretch
+                                    IconDropdown(
+                                        icon = ImageVector.vectorResource(id = R.drawable.ic_adapt),
+                                        contentDescription = "Adatta",
+                                        current = get("fitCont") ?: "Cover",
+                                        options = listOf("Cover", "Contain", "Stretch"),
+                                        onSelected = { onPick("fitCont", it) }
+                                    )
+
+                                    FilterDropdown(current = get("filtro")) { onPick("filtro", it) }
+                                    // Cancella (ic_cancel): chiede conferma e rimuove la foto
+                                    ToolbarIconButton(
+                                        icon = EditorIcons.Cancel,
+                                        contentDescription = "Cancella immagine"
+                                    ) { onEnter("Cancella immagine") }
                                 }
                             }
                             // Aggiornamenti mirati sui container
