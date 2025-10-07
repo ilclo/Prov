@@ -1653,21 +1653,6 @@ fun EditorMenusOnly(
                                     }
                                 }
                             }
-                            // --- SPESSORE BORDO ---
-                            if ((menuPath.firstOrNull() ?: "") == "Contenitore" && label == "b_thick") {
-                                val rect = selectedRect
-                                if (rect != null) {
-                                    val dp = keyToDp(value)   // esiste già in questo scope
-                                    pageState?.let { ps ->
-                                        val i = ps.items.indexOf(rect)
-                                        if (i >= 0) {
-                                            val updated = rect.copy(borderWidth = dp)
-                                            ps.items[i] = updated
-                                            selectedRect = updated
-                                        }
-                                    }
-                                }
-                            }
                             // Aggiornamenti mirati sui container
                             if ((menuPath.firstOrNull() ?: "") == "Contenitore") {
                                 val rect = selectedRect
@@ -1701,6 +1686,20 @@ fun EditorMenusOnly(
                                                 else        -> com.example.appbuilder.canvas.ShapeKind.Rect
                                             }
                                             rectShapes[it] = s
+                                        }
+                                    }
+                                    // Spessore bordo
+                                    "b_thick" -> {
+                                        rect?.let {
+                                            val dp = keyToDp(value) // "0dp","1dp"... -> Dp
+                                            pageState?.let { ps ->
+                                                val ix = ps.items.indexOf(it)
+                                                if (ix >= 0) {
+                                                    val updated = it.copy(borderWidth = dp)
+                                                    ps.items[ix] = updated
+                                                    selectedRect = updated
+                                                }
+                                            }
                                         }
                                     }
 
