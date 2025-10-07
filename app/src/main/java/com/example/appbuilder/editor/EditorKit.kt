@@ -1078,12 +1078,13 @@ fun EditorMenusOnly(
 
     val deckItems = remember {
         mutableStateMapOf(
-            DeckRoot.PAGINA        to mutableListOf("pg001"),
-            DeckRoot.MENU_LATERALE to mutableListOf("ml001"),
-            DeckRoot.MENU_CENTRALE to mutableListOf("mc001"),
-            DeckRoot.AVVISO        to mutableListOf("al001")
+            DeckRoot.PAGINA        to mutableStateListOf<String>(),
+            DeckRoot.MENU_LATERALE to mutableStateListOf<String>(),
+            DeckRoot.MENU_CENTRALE to mutableStateListOf<String>(),
+            DeckRoot.AVVISO        to mutableStateListOf<String>()
         )
     }
+
 
     fun openWizardFor(root: DeckRoot) {
         wizardTarget = root
