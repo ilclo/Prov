@@ -810,16 +810,15 @@ private enum class SecondBarMode { Deck, Classic }
 private data class DeckState(val openKey: String?, val toggle: (String) -> Unit)
 
 private data class DeckController(
-    val openChild: (DeckRoot) -> Unit,
+    val openChild: (DeckRoot, String) -> Unit,
     val openWizard: (DeckRoot) -> Unit
 )
-
 // Locals per pilotare MainMenuBar senza cambiare la sua firma
 private val LocalSecondBarMode = compositionLocalOf { SecondBarMode.Deck }
 private val LocalDeckState = compositionLocalOf { DeckState(null) { _ -> } }
 
 private val LocalDeckController = compositionLocalOf {
-    DeckController(openChild = { _ -> }, openWizard = { _ -> })
+    DeckController(openChild = { _, _ -> }, openWizard = { _ -> })
 }
 private val LocalIsPageContext = compositionLocalOf { false }
 
@@ -855,6 +854,17 @@ fun EditorMenusOnly(
     var lastChanged by remember { mutableStateOf<String?>(null) }
     var cropOverlayVisible by remember { mutableStateOf(false) }
     var cropTargetRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+    // Metadati e PageStates indicizzate per ID
+    val elementMeta = remember { mutableStateMapOf<String, ElementMeta>() }
+    val pageStates  = remember { mutableStateMapOf<String, PageState>() }
+
+    // Quale figlia è in editing nella barra "classica"
+    var editingId by remember { mutableStateOf<String?>(null) }
+
+    // Overlay Info/Modifica metadati
+    var infoOverlayVisible by remember { mutableStateOf(false) }
+    var editMetaVisible  by remember { mutableStateOf(false) }
+
 
     // Rettangolo correntemente selezionato nel menù “Contenitore”
     var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
@@ -1085,6 +1095,32 @@ fun EditorMenusOnly(
         )
     }
 
+    fun renameElement(root: DeckRoot, oldId: String, newId: String) {
+        if (oldId == newId) return
+
+        // aggiorna lista icone figlie
+        deckItems[root]?.let { list ->
+            val ix = list.indexOf(oldId)
+            if (ix >= 0) list[ix] = newId
+        }
+
+        // metadati
+        elementMeta.remove(oldId)?.let { m ->
+            m.id = newId
+            elementMeta[newId] = m
+        }
+
+        // pagine: sposta PageState e aggiorna canvas se serve
+        if (root == DeckRoot.PAGINA) {
+            pageStates.remove(oldId)?.let { ps ->
+                val newPs = ps.copy(id = newId)
+                pageStates[newId] = newPs
+                if (pageState?.id == oldId) pageState = newPs
+            }
+        }
+
+        if (editingId == oldId) editingId = newId
+    }
 
     fun openWizardFor(root: DeckRoot) {
         wizardTarget = root
@@ -1408,10 +1444,20 @@ fun EditorMenusOnly(
                             toggle = { key -> deckOpen = if (deckOpen == key) null else key }
                         ),
                         LocalDeckController provides DeckController(
-                            openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
-                            openWizard = { root -> wizardTarget = root; wizardVisible = true }
+                            openChild = { root, id ->
+                                classicEditing = true
+                                editingClass   = root
+                                editingId      = id
+                                deckOpen       = null
+                                if (root == DeckRoot.PAGINA) {
+                                    pageState = pageStates[id] ?: pageState
+                                }
+                            },
+                            openWizard = { root ->
+                                wizardTarget = root
+                                wizardVisible = true
+                            }
                         ),
-
                         LocalDeckItems provides deckItems.mapValues { entry -> entry.value.toList() }
                     ) {
                         MainMenuBar(
@@ -1441,8 +1487,17 @@ fun EditorMenusOnly(
                     target  = wizardTarget,
                     existingIds = deckItems.values.flatten().toSet(),   // • tutti gli ID esistenti
                     onDismiss = { wizardVisible = false },
-                    onCreate  = { wr ->
+                    onCreate = { wr ->
                         deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
+
+                        // salva metadati
+                        elementMeta[wr.id] = ElementMeta(
+                            root = wr.root,
+                            id = wr.id,
+                            title = wr.name,
+                            description = wr.description
+                        )
+
                         wizardVisible = false
 
                         deckOpen = when (wr.root) {
@@ -1453,15 +1508,17 @@ fun EditorMenusOnly(
                         }
 
                         if (wr.root == DeckRoot.PAGINA) {
-                            pageState = PageState(
+                            val ps = PageState(
                                 id = wr.id,
                                 scroll = wr.scroll,
                                 gridDensity = 6,
                                 currentLevel = 0
                             )
+                            pageStates[wr.id] = ps
+                            pageState = ps
 
-                            // entra nella “pagina figlia” appena creata (seconda barra in Classic)
                             editingClass   = DeckRoot.PAGINA
+                            editingId      = wr.id
                             classicEditing = true
                         } else {
                             classicEditing = false
@@ -2002,6 +2059,38 @@ fun EditorMenusOnly(
                     cropOverlayVisible = false
                 }
             )
+            // Overlay "Info elemento"
+            ElementInfoOverlay(
+                visible = infoOverlayVisible,
+                meta = elementMeta[editingId ?: ""],
+                onDismiss = { infoOverlayVisible = false },
+                onEdit = {
+                    infoOverlayVisible = false
+                    editMetaVisible = true
+                }
+            )
+
+            // Overlay "Modifica metadati"
+            EditMetaOverlay(
+                visible = editMetaVisible,
+                initial = elementMeta[editingId ?: ""],
+                existingIds = deckItems.values.flatten().filter { it != editingId }.toSet(),
+                onDismiss = { editMetaVisible = false },
+                onSave = { newId, newTitle, newDescription ->
+                    val root = editingClass ?: return@EditMetaOverlay
+                    val oldId = editingId ?: return@EditMetaOverlay
+
+                    if (newId != oldId) renameElement(root, oldId, newId)
+
+                    val m = elementMeta[newId] ?: ElementMeta(root, newId, newTitle, newDescription)
+                    m.title = newTitle
+                    m.description = newDescription
+                    elementMeta[newId] = m
+
+                    editMetaVisible = false
+                }
+            )
+
             // 2) Toast informativo (in alto, scompare con fade)
             InfoToastCard(
                 visible = infoCardVisible && infoCard != null,
@@ -2011,6 +2100,187 @@ fun EditorMenusOnly(
             )
             if (showUpsell) {
                 ProUpsellSheet(onClose = { showUpsell = false })
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.ElementInfoOverlay(
+    visible: Boolean,
+    meta: ElementMeta?,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit
+) {
+    if (!visible) return
+    Surface(
+        modifier = Modifier.fillMaxSize().align(Alignment.Center),
+        color = Color(0xCC0D1117),
+        contentColor = Color.White
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Surface(
+                color = Color(0xFF131A24),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(14.dp),
+                tonalElevation = 10.dp,
+                shadowElevation = 10.dp,
+                modifier = Modifier.padding(16.dp).widthIn(max = 520.dp)
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Info elemento", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                    val subtitle = when (meta?.root) {
+                        DeckRoot.PAGINA -> "Pagina"
+                        DeckRoot.MENU_LATERALE -> "Menù laterale"
+                        DeckRoot.MENU_CENTRALE -> "Menù centrale"
+                        DeckRoot.AVVISO -> "Avviso"
+                        else -> "—"
+                    }
+                    Text(subtitle, color = Color(0xFF9BA3AF), fontSize = 12.sp)
+
+                    ElevatedCard {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Titolo", fontSize = 11.sp, color = Color(0xFF9BA3AF))
+                            Text(meta?.title.orEmpty(), fontWeight = FontWeight.Medium)
+
+                            Spacer(Modifier.height(8.dp))
+                            Text("ID", fontSize = 11.sp, color = Color(0xFF9BA3AF))
+                            Text(meta?.id.orEmpty(), fontFamily = MaterialTheme.typography.bodySmall.fontFamily)
+
+                            Spacer(Modifier.height(8.dp))
+                            Text("Descrizione", fontSize = 11.sp, color = Color(0xFF9BA3AF))
+                            Text(meta?.description.orEmpty())
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            border = BorderStroke(1.dp, WIZ_AZURE),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Chiudi") }
+
+                        Button(
+                            onClick = onEdit,
+                            colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Modifica") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.EditMetaOverlay(
+    visible: Boolean,
+    initial: ElementMeta?,
+    existingIds: Set<String>,
+    onDismiss: () -> Unit,
+    onSave: (newId: String, newTitle: String, newDescription: String) -> Unit
+) {
+    if (!visible || initial == null) return
+
+    var title by remember(initial) { mutableStateOf(initial.title) }
+    var desc  by remember(initial) { mutableStateOf(initial.description) }
+    var id    by remember(initial) { mutableStateOf(initial.id) }
+    var idErr by remember { mutableStateOf<String?>(null) }
+
+    fun sanitizeId(s: String) = s.lowercase()
+        .replace(' ', '_')
+        .filter { it.isLetterOrDigit() || it == '-' || it == '_' }
+        .take(15)
+
+    Surface(
+        modifier = Modifier.fillMaxSize().align(Alignment.Center),
+        color = Color(0xCC0D1117),
+        contentColor = Color.White
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Surface(
+                color = Color(0xFF131A24),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(14.dp),
+                tonalElevation = 10.dp,
+                shadowElevation = 10.dp,
+                modifier = Modifier.padding(16.dp).widthIn(max = 520.dp)
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Modifica metadati", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        singleLine = true,
+                        label = { Text("Titolo") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            cursorColor = WIZ_AZURE
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = id,
+                        onValueChange = {
+                            id = sanitizeId(it)
+                            idErr = null
+                        },
+                        singleLine = true,
+                        label = { Text("ID") },
+                        isError = idErr != null,
+                        supportingText = { idErr?.let { Text(it) } },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            cursorColor = WIZ_AZURE
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = desc,
+                        onValueChange = { desc = it },
+                        label = { Text("Descrizione") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            cursorColor = WIZ_AZURE
+                        )
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            border = BorderStroke(1.dp, WIZ_AZURE),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Annulla") }
+
+                        Button(
+                            onClick = {
+                                val newId = sanitizeId(id)
+                                if (newId.isBlank()) { idErr = "L'ID non può essere vuoto"; return@Button }
+                                if (newId != initial.id && existingIds.contains(newId)) {
+                                    idErr = "ID già esistente"
+                                    return@Button
+                                }
+                                onSave(newId, title.trim(), desc.trim())
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Salva") }
+                    }
+                }
             }
         }
     }
@@ -2547,7 +2817,8 @@ private fun BoxScope.MainMenuBar(
     onContainer: () -> Unit,
     onText: () -> Unit,
     onAdd: () -> Unit,
-    bottomBarHeightPx: Int
+    bottomBarHeightPx: Int,
+    onInfo: () -> Unit = {} 
 ) {
     val dy = with(LocalDensity.current) {
         (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) +
@@ -2595,12 +2866,15 @@ private fun BoxScope.MainMenuBar(
                         infoTitle = "Layout", infoBody = "Colori/immagini ed effetti dell'area", allowLongPressInInfo = false)
                     ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd,
                         infoTitle = "Aggiungi", infoBody = "Inserisci nuovi elementi", allowLongPressInInfo = false)
-                    ToolbarIconButton(
-                        icon = ImageVector.vectorResource(id = R.drawable.ic_question),
-                        contentDescription = "Info",
-                        onClick = { /* stub */ },
-                        infoTitle = "Info elemento", infoBody = "Dati descrittivi (stub)", allowLongPressInInfo = false
+                    MainMenuBar(
+                        onLayout = { menuPath = listOf("Layout") },
+                        onContainer = { menuPath = listOf("Contenitore") },
+                        onText = { menuPath = listOf("Testo") },
+                        onAdd = { menuPath = listOf("Aggiungi") },
+                        bottomBarHeightPx = actionsBarHeightPx,
+                        onInfo = { infoOverlayVisible = true } // ⬅️ apre il menù in sovraimpressione
                     )
+
                 }
 
                 SecondBarMode.Deck -> {
@@ -2652,7 +2926,7 @@ private fun BoxScope.MainMenuBar(
                                     ChildIconWithBadge(
                                         icon = ImageVector.vectorResource(id = m.iconRes),
                                         id = childId,
-                                        onClick = { controller.openChild(m.root) }, // long-press lo richiama comunque
+                                        onClick = { controller.openChild(m.root, childId) }, // ⬅️ prima passava solo la classe
                                         badgeBg = DECK_BADGE_BG,
                                         badgeTxt = DECK_BADGE_TXT
                                     )
@@ -4085,6 +4359,12 @@ private data class WizardResult(
     val side: String? = null
 )
 
+private data class ElementMeta(
+    val root: DeckRoot,
+    var id: String,
+    var title: String,
+    var description: String
+)
 
 // Piccolo dropdown "scuro" in linea con lo stile
 @Composable
