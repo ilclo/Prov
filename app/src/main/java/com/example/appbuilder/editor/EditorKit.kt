@@ -164,16 +164,13 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-// IMPORT — aggiungi vicino agli altri import Compose
-import androidx.compose.runtime.saveable.listSaver
 
 private val LocalIsFree = staticCompositionLocalOf { true }
 
 private const val codiceprofree = 12345
 private val LocalDeckItems =
     staticCompositionLocalOf<Map<DeckRoot, List<String>>> { emptyMap() }
-private fun DrawItem.RectItem.withBorderColor(c: Color) = copy(borderColor = c)
-private fun DrawItem.RectItem.withFillColor(c: Color)   = copy(fillColor = c)
+
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
 private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (stessa in Home e Submenu)
@@ -251,10 +248,6 @@ private fun hexToColor(s: String?): Color? {
     }
 }
 
-private fun DrawItem.RectItem.withBorderColor(c: Color) = copy(borderColor = c)
-private fun DrawItem.RectItem.withFillColor(c: Color)   = copy(fillColor = c)
-
-
 private val FILTER_NAMES = listOf(
     "Nessuno","B/N","Seppia","Vivido","Desatura","Caldo","Freddo","Luminoso","Scuro",
     "Contrasto +","Contrasto -","Vintage","Teal&Orange","Rosa","Smeraldo","Indaco",
@@ -325,109 +318,6 @@ private fun FilterSwatch(name: String, modifier: Modifier = Modifier) {
     }
 }
 
-// ---------------------- SAVE/RESTORE PAGESTATE ----------------------
-private fun rectToList(r: com.example.appbuilder.canvas.DrawItem.RectItem): List<Any> = listOf(
-    "rect",
-    r.level, r.r0, r.c0, r.r1, r.c1,
-    r.borderWidth.value,             // Float
-    colorToHex(r.borderColor),       // String
-    colorToHex(r.fillColor)          // String
-)
-
-private fun listToRect(lst: List<Any>): com.example.appbuilder.canvas.DrawItem.RectItem {
-    val lvl = (lst[1] as Number).toInt()
-    val r0  = (lst[2] as Number).toInt()
-    val c0  = (lst[3] as Number).toInt()
-    val r1  = (lst[4] as Number).toInt()
-    val c1  = (lst[5] as Number).toInt()
-    val bw  = ((lst[6] as Number).toFloat()).dp
-    val bc  = hexToColor(lst[7] as String) ?: Color.Black
-    val fc  = hexToColor(lst[8] as String) ?: Color.Transparent
-    return com.example.appbuilder.canvas.DrawItem.RectItem(
-        level = lvl, r0 = r0, c0 = c0, r1 = r1, c1 = c1,
-        borderWidth = bw, borderColor = bc, fillColor = fc
-    )
-}
-
-
-// --- TOP-LEVEL (fuori dai composable): unico saver per MutableState<PageState?> ---
-private fun mutablePageStateSaver(): Saver<MutableState<PageState?>, Any> =
-    listSaver(
-        save = { st ->
-            val ps = st.value ?: return@listSaver emptyList<Any>()
-            val itemsFlat: List<List<Any>> = ps.items.map { item ->
-                when (item) {
-                    is DrawItem.RectItem -> listOf(
-                        "R",
-                        item.level,
-                        item.r0, item.c0, item.r1, item.c1,
-                        item.borderWidth.value,
-                        colorToHex(item.borderColor),
-                        colorToHex(item.fillColor)
-                    )
-                    is DrawItem.LineItem -> listOf(
-                        "L",
-                        item.level,
-                        item.r0, item.c0, item.r1, item.c1,
-                        item.width.value,
-                        colorToHex(item.color)
-                    )
-                }
-            }
-            listOf(
-                ps.id ?: "",
-                ps.scroll ?: "Assente",
-                ps.gridDensity,
-                ps.currentLevel,
-                itemsFlat
-            )
-        },
-        restore = { lst ->
-            if (lst.isEmpty()) mutableStateOf<PageState?>(null) else {
-                val id     = lst[0] as String
-                val scroll = lst[1] as String
-                val grid   = lst[2] as Int
-                val level  = lst[3] as Int
-                @Suppress("UNCHECKED_CAST")
-                val itemsFlat = lst[4] as List<List<*>>
-
-                val ps = PageState(
-                    id = id,
-                    scroll = scroll,
-                    gridDensity = grid,
-                    currentLevel = level
-                )
-                itemsFlat.forEach { it ->
-                    when (it[0] as String) {
-                        "R" -> ps.items.add(
-                            DrawItem.RectItem(
-                                level = it[1] as Int,
-                                r0 = it[2] as Int, c0 = it[3] as Int,
-                                r1 = it[4] as Int, c1 = it[5] as Int,
-                                borderWidth = ((it[6] as Number).toFloat()).dp,
-                                borderColor = hexToColor(it[7] as String) ?: Color.Black,
-                                fillColor   = hexToColor(it[8] as String) ?: Color.Transparent
-                            )
-                        )
-                        "L" -> ps.items.add(
-                            DrawItem.LineItem(
-                                level = it[1] as Int,
-                                r0 = it[2] as Int, c0 = it[3] as Int,
-                                r1 = it[4] as Int, c1 = it[5] as Int,
-                                width = ((it[6] as Number).toFloat()).dp,
-                                color = hexToColor(it[7] as String) ?: Color.Black
-                            )
-                        )
-                    }
-                }
-                mutableStateOf(ps)
-            }
-        }
-    )
-
-
-
-
 @Composable
 private fun FilterDropdown(
     icon: ImageVector,
@@ -441,7 +331,7 @@ private fun FilterDropdown(
     var anchorPos by remember { mutableStateOf(IntOffset.Zero) }
     var anchorSize by remember { mutableStateOf(IntSize.Zero) }
 
-    // Anchor trasparente dell’icona + badge stato
+    // Anchor dell’icona
     Box(
         modifier = Modifier.onGloballyPositioned { c ->
             val p = c.positionInRoot()
@@ -451,7 +341,7 @@ private fun FilterDropdown(
     ) {
         ToolbarIconButton(icon, contentDescription) { expanded = true }
 
-        // Badge stato filtro (float): corpo trasparente, solo testo
+        // Badge stato filtro: già trasparente per l’effetto “float”
         if (!current.isNullOrBlank()) {
             Surface(
                 color = Color.Transparent,
@@ -472,7 +362,7 @@ private fun FilterDropdown(
         }
     }
 
-    // Corpo menu: popup con background TRASPARENTE.
+    // Corpo del menu: trasparente; le voci hanno ciascuna il proprio "tile" chiaro
     if (expanded) {
         val y = anchorPos.y + anchorSize.height + with(density) { 8.dp.toPx().roundToInt() }
 
@@ -482,24 +372,25 @@ private fun FilterDropdown(
             onDismissRequest = { expanded = false },
             properties = PopupProperties(focusable = true)
         ) {
-            // Il contenitore resta trasparente -> effetto "flottante"
+            // Contenitore trasparente: mantiene l’effetto "flottante"
             Box(Modifier.background(Color.Transparent)) {
+                // Lista scrollabile con altezza massima
                 LazyColumn(
                     modifier = Modifier
-                        .heightIn(max = 360.dp)           // abilita lo SCROLL verticale
+                        .heightIn(max = 360.dp)       // <— limita l’altezza, attiva lo scroll
                         .background(Color.Transparent)
-                        .padding(vertical = 6.dp),
+                        .padding(vertical = 6.dp),     // aria sopra/sotto per fluttuare
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = 6.dp)
                 ) {
                     items(options) { name ->
-                        // Ogni voce appare come un "tile" chiaro staccato (preview + nome)
+                        // Ogni item è un riquadro chiaro “staccato”
                         Surface(
-                            color = Color(0xF5FFFFFF),      // chiaro e leggermente traslucido
+                            color = Color(0xF5FFFFFF),                      // chiaro, leggermente traslucido
                             contentColor = Color.Black,
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, Color(0x14000000)),
-                            shadowElevation = 4.dp,
+                            border = BorderStroke(1.dp, Color(0x14000000)), // bordo leggero
+                            shadowElevation = 4.dp,                          // lieve ombra
                             tonalElevation = 0.dp,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -509,18 +400,14 @@ private fun FilterDropdown(
                                 }
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
                             ) {
-                                // Piccola anteprima del filtro
-                                FilterSwatch(name, modifier = Modifier)
-                                // Testo NERO (leggibile sul tile chiaro)
-                                Text(
-                                    text = name,
-                                    color = Color.Black,
-                                    fontSize = 14.sp
-                                )
+                                // preview filtro
+                                FilterSwatch(name)
+                                // nome filtro in nero (leggibile sul tile chiaro)
+                                Text(name, color = Color(0xFF000000))
                             }
                         }
                     }
@@ -530,12 +417,6 @@ private fun FilterDropdown(
     }
 }
 
-
-// vicino a colorToHex(...) e hexToColor(...)
-private fun hexToColorSafe(s: String?): Color {
-    // riusa il tuo hexToColor top-level, con fallback sicuro
-    return hexToColor(s) ?: Color.Black
-}
 
 
 
@@ -929,15 +810,16 @@ private enum class SecondBarMode { Deck, Classic }
 private data class DeckState(val openKey: String?, val toggle: (String) -> Unit)
 
 private data class DeckController(
-    val openChild: (DeckRoot, String) -> Unit,
+    val openChild: (DeckRoot) -> Unit,
     val openWizard: (DeckRoot) -> Unit
 )
+
 // Locals per pilotare MainMenuBar senza cambiare la sua firma
 private val LocalSecondBarMode = compositionLocalOf { SecondBarMode.Deck }
 private val LocalDeckState = compositionLocalOf { DeckState(null) { _ -> } }
 
 private val LocalDeckController = compositionLocalOf {
-    DeckController(openChild = { _, _ -> }, openWizard = { _ -> })
+    DeckController(openChild = { _ -> }, openWizard = { _ -> })
 }
 private val LocalIsPageContext = compositionLocalOf { false }
 
@@ -955,7 +837,7 @@ fun EditorMenusOnly(
     var deckOpen by remember { mutableStateOf<String?>(null) }        // "pagina"|"menuL"|"menuC"|"avviso"|null
     var editingClass by remember { mutableStateOf<DeckRoot?>(null) }   // classe della figlia aperta (per flag Layout)
 // Path del menù (es. ["Contenitore", "Bordi", "Spessore"])
-    var menuPath by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var menuPath by remember { mutableStateOf<List<String>>(emptyList()) }
 // Selezioni effimere dei dropdown/toggle (key = pathTestuale)
     val menuSelections = remember { mutableStateMapOf<String, Any?>() }
 // Modifiche in corso (serve per mostrare la barra di conferma alla risalita)
@@ -972,18 +854,6 @@ fun EditorMenusOnly(
     var lastChanged by remember { mutableStateOf<String?>(null) }
     var cropOverlayVisible by remember { mutableStateOf(false) }
     var cropTargetRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
-    // Metadati e PageStates indicizzate per ID
-    val elementMeta = remember { mutableStateMapOf<String, ElementMeta>() }
-    val pageStates  = remember { mutableStateMapOf<String, PageState>() }
-
-
-    // Quale figlia è in editing nella barra "classica"
-    var editingId by remember { mutableStateOf<String?>(null) }
-
-    // Overlay Info/Modifica metadati
-    var infoOverlayVisible by remember { mutableStateOf(false) }
-    var editMetaVisible  by remember { mutableStateOf(false) }
-
 
     // Rettangolo correntemente selezionato nel menù “Contenitore”
     var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
@@ -1052,19 +922,7 @@ fun EditorMenusOnly(
     var colorPickTarget by remember { mutableStateOf<ColorTarget?>(null) }
     var colorPickInitial by remember { mutableStateOf(Color.Black) }
     // ====== STATO CANVAS/OVERLAY ======
-
-    // Funzioni d’appoggio per serializzare colori e Dp
-    fun Color.toHex(): String = String.format("#%02X%02X%02X",
-        (red * 255).toInt().coerceIn(0,255),
-        (green * 255).toInt().coerceIn(0,255),
-        (blue * 255).toInt().coerceIn(0,255)
-    )
-
-    var pageState by rememberSaveable(stateSaver = mutablePageStateSaver()) {
-        mutableStateOf<PageState?>(null)
-    }
-
-
+    var pageState by remember { mutableStateOf<PageState?>(null) }
     fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
     fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
         val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 1f
@@ -1073,7 +931,7 @@ fun EditorMenusOnly(
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
         // spessore (già esistente)
         menuSelections[(listOf("Contenitore") + "b_thick").joinToString(" / ")] = dpToKey(rect.borderWidth)
-
+        
         // shape
         val s = when (rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect) {
             com.example.appbuilder.canvas.ShapeKind.Rect    -> "Rettangolo"
@@ -1217,32 +1075,6 @@ fun EditorMenusOnly(
         )
     }
 
-    fun renameElement(root: DeckRoot, oldId: String, newId: String) {
-        if (oldId == newId) return
-
-        // aggiorna lista icone figlie
-        deckItems[root]?.let { list ->
-            val ix = list.indexOf(oldId)
-            if (ix >= 0) list[ix] = newId
-        }
-
-        // metadati
-        elementMeta.remove(oldId)?.let { m ->
-            m.id = newId
-            elementMeta[newId] = m
-        }
-
-        // pagine: sposta PageState e aggiorna canvas se serve
-        if (root == DeckRoot.PAGINA) {
-            pageStates.remove(oldId)?.let { ps ->
-                val newPs = ps.copy(id = newId)
-                pageStates[newId] = newPs
-                if (pageState?.id == oldId) pageState = newPs
-            }
-        }
-
-        if (editingId == oldId) editingId = newId
-    }
 
     fun openWizardFor(root: DeckRoot) {
         wizardTarget = root
@@ -1496,10 +1328,10 @@ fun EditorMenusOnly(
                         }
                     },
                     onUpdateItem = { old, updated ->
-                        val pageItems = pageState?.items ?: return@CanvasStage
-                        val ix = pageItems.indexOf(old)
+                        val items = pageState?.items ?: return@CanvasStage
+                        val ix = items.indexOf(old)
                         if (ix >= 0) {
-                            pageItems[ix] = updated
+                            items[ix] = updated
 
                             // 1) Aggiorna SUBITO la selezione per evitare ghost del bordo
                             if (selectedRect == old) {
@@ -1512,10 +1344,9 @@ fun EditorMenusOnly(
                             rectImages.remove(old)?.let     { rectImages[updated]     = it }
                             rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
 
-                            // sposta shape/fx per non perdere decorazioni durante il drag
+                            // (consigliato) sposta anche queste, così non perdi shape/fx durante il drag
                             rectShapes.remove(old)?.let   { rectShapes[updated]   = it }
                             rectFx.remove(old)?.let       { rectFx[updated]       = it }
-                            
                         }
                     },
 
@@ -1562,20 +1393,10 @@ fun EditorMenusOnly(
                             toggle = { key -> deckOpen = if (deckOpen == key) null else key }
                         ),
                         LocalDeckController provides DeckController(
-                            openChild = { root, id ->
-                                classicEditing = true
-                                editingClass   = root
-                                editingId      = id
-                                deckOpen       = null
-                                if (root == DeckRoot.PAGINA) {
-                                    pageState = pageStates[id] ?: pageState
-                                }
-                            },
-                            openWizard = { root ->
-                                wizardTarget = root
-                                wizardVisible = true
-                            }
+                            openChild = { root -> classicEditing = true; editingClass = root; deckOpen = null },
+                            openWizard = { root -> wizardTarget = root; wizardVisible = true }
                         ),
+
                         LocalDeckItems provides deckItems.mapValues { entry -> entry.value.toList() }
                     ) {
                         MainMenuBar(
@@ -1605,17 +1426,8 @@ fun EditorMenusOnly(
                     target  = wizardTarget,
                     existingIds = deckItems.values.flatten().toSet(),   // • tutti gli ID esistenti
                     onDismiss = { wizardVisible = false },
-                    onCreate = { wr ->
+                    onCreate  = { wr ->
                         deckItems.getOrPut(wr.root) { mutableStateListOf() }.add(wr.id)
-
-                        // salva metadati
-                        elementMeta[wr.id] = ElementMeta(
-                            root = wr.root,
-                            id = wr.id,
-                            title = wr.name,
-                            description = wr.description
-                        )
-
                         wizardVisible = false
 
                         deckOpen = when (wr.root) {
@@ -1626,16 +1438,15 @@ fun EditorMenusOnly(
                         }
 
                         if (wr.root == DeckRoot.PAGINA) {
-                            val ps = PageState(
+                            pageState = PageState(
                                 id = wr.id,
                                 scroll = wr.scroll,
                                 gridDensity = 6,
                                 currentLevel = 0
                             )
-                            pageStates[wr.id] = ps
-                            pageState = ps
+
+                            // entra nella “pagina figlia” appena creata (seconda barra in Classic)
                             editingClass   = DeckRoot.PAGINA
-                            editingId      = wr.id
                             classicEditing = true
                         } else {
                             classicEditing = false
@@ -1814,12 +1625,6 @@ fun EditorMenusOnly(
                                 if (rect != null) {
                                     val dpVal = keyToDp(value)
                                     val cur = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
-                                    rectCorners[rect] = com.example.appbuilder.canvas.CornerRadii(
-                                        tl = if (label=="ic_as") dp else cur.tl,
-                                        tr = if (label=="ic_ad") dp else cur.tr,
-                                        bl = if (label=="ic_bs") dp else cur.bl,
-                                        br = if (label=="ic_bd") dp else cur.br
-                                    )
                                     val upd = when (label) {
                                         "ic_as" -> cur.copy(tl = dpVal)
                                         "ic_ad" -> cur.copy(tr = dpVal)
@@ -1886,13 +1691,7 @@ fun EditorMenusOnly(
                                             pageState?.let { ps ->
                                                 val ix = ps.items.indexOf(it)
                                                 if (ix >= 0) {
-                                                val updated = DrawItem.RectItem(
-                                                    level = it.level, r0 = it.r0, c0 = it.c0, r1 = it.r1, c1 = it.c1,
-                                                    borderWidth = dp,
-                                                    borderColor = it.borderColor,
-                                                    fillColor = it.fillColor
-                                                )
-
+                                                    val updated = it.copy(borderWidth = dp)
                                                     ps.items[ix] = updated
                                                     selectedRect = updated
                                                 }
@@ -2082,43 +1881,46 @@ fun EditorMenusOnly(
                 visible = showColorPicker,
                 initialColor = colorPickInitial,
                 onDismiss = { showColorPicker = false },
-                onPick = { picked: Color ->
+                onPick = { picked: Color ->    // ⬅️ tipo esplicito
                     val hex = picked.toHex()
-
                     when (val tgt = colorPickTarget) {
                         ColorTarget.Border -> {
-                            // Aggiorna il bordo senza scrivere 'copy' qui
-                            replaceSelectedRect { it.withBorderColor(picked) }
-                            menuSelections[(listOf("Contenitore") + "b_color").joinToString(" / ")] = hex
-                        }
-
-                        is ColorTarget.ContainerFill -> {
-                            // Slot 1: puoi scegliere se tenere il colore nel Rect o nella mappa fillStyles
                             selectedRect?.let { rect ->
-                                if (tgt.slot == 1) {
-                                    // A) via Rect (immutabile) — sempre passando per l’helper
-                                    replaceSelectedRect { it.withFillColor(picked) }
-
-                                    // IN ALTERNATIVA (B): via mappa fillStyles senza toccare il Rect
-                                    // val cur = rectFillStyles[rect] ?: com.example.appbuilder.canvas.FillStyle(col1 = rect.fillColor)
-                                    // rectFillStyles[rect] = cur.copy(col1 = picked)
-                                } else {
-                                    // slot 2: solo stato di menu (come già avevi)
-                                    // oppure, se usi FillStyle, puoi fare analogamente col 'col2'
-                                    // val cur = rectFillStyles[rect] ?: com.example.appbuilder.canvas.FillStyle(col1 = rect.fillColor)
-                                    // rectFillStyles[rect] = cur.copy(col2 = picked)
+                                pageState?.let { ps ->
+                                    val i = ps.items.indexOf(rect)
+                                    if (i >= 0) {
+                                        val updated = rect.copy(borderColor = picked)
+                                        ps.items[i] = updated
+                                        selectedRect = updated
+                                    }
                                 }
                             }
-                            // Aggiorna le preferenze UI
-                            val key = (listOf("Contenitore","Colore") + if (tgt.slot == 1) "col1" else "col2").joinToString(" / ")
-                            menuSelections[key] = hex
+                            menuSelections[(listOf("Contenitore") + "b_color").joinToString(" / ")] = hex
                         }
-
+                        is ColorTarget.ContainerFill -> {
+                            selectedRect?.let { rect ->
+                                if (tgt.slot == 1) {
+                                    pageState?.let { ps ->
+                                        val i = ps.items.indexOf(rect)
+                                        if (i >= 0) {
+                                            val updated = rect.copy(fillColor = picked)
+                                            ps.items[i] = updated
+                                            selectedRect = updated
+                                        }
+                                    }
+                                    menuSelections[(listOf("Contenitore","Colore") + "col1").joinToString(" / ")] = hex
+                                } else {
+                                    menuSelections[(listOf("Contenitore","Colore") + "col2").joinToString(" / ")] = hex
+                                }
+                            } ?: run {
+                                val key = (listOf("Contenitore","Colore") + if (tgt.slot==1) "col1" else "col2").joinToString(" / ")
+                                menuSelections[key] = hex
+                            }
+                        }
                         is ColorTarget.LayoutFill -> {
-                            val key = (listOf("Layout","Colore") + if (tgt.slot == 1) "col1" else "col2").joinToString(" / ")
+                            val key = (listOf("Layout","Colore") + if (tgt.slot==1) "col1" else "col2").joinToString(" / ")
                             menuSelections[key] = hex
                         }
-
                         ColorTarget.Text -> {
                             val key = (listOf("Testo") + "Colore").joinToString(" / ")
                             menuSelections[key] = hex
@@ -2172,38 +1974,6 @@ fun EditorMenusOnly(
                     cropOverlayVisible = false
                 }
             )
-            // Overlay "Info elemento"
-            ElementInfoOverlay(
-                visible = infoOverlayVisible,
-                meta = elementMeta[editingId ?: ""],
-                onDismiss = { infoOverlayVisible = false },
-                onEdit = {
-                    infoOverlayVisible = false
-                    editMetaVisible = true
-                }
-            )
-
-            // Overlay "Modifica metadati"
-            EditMetaOverlay(
-                visible = editMetaVisible,
-                initial = elementMeta[editingId ?: ""],
-                existingIds = deckItems.values.flatten().filter { it != editingId }.toSet(),
-                onDismiss = { editMetaVisible = false },
-                onSave = { newId, newTitle, newDescription ->
-                    val root = editingClass ?: return@EditMetaOverlay
-                    val oldId = editingId ?: return@EditMetaOverlay
-
-                    if (newId != oldId) renameElement(root, oldId, newId)
-
-                    val m = elementMeta[newId] ?: ElementMeta(root, newId, newTitle, newDescription)
-                    m.title = newTitle
-                    m.description = newDescription
-                    elementMeta[newId] = m
-
-                    editMetaVisible = false
-                }
-            )
-
             // 2) Toast informativo (in alto, scompare con fade)
             InfoToastCard(
                 visible = infoCardVisible && infoCard != null,
@@ -2213,187 +1983,6 @@ fun EditorMenusOnly(
             )
             if (showUpsell) {
                 ProUpsellSheet(onClose = { showUpsell = false })
-            }
-        }
-    }
-}
-
-@Composable
-private fun BoxScope.ElementInfoOverlay(
-    visible: Boolean,
-    meta: ElementMeta?,
-    onDismiss: () -> Unit,
-    onEdit: () -> Unit
-) {
-    if (!visible) return
-    Surface(
-        modifier = Modifier.fillMaxSize().align(Alignment.Center),
-        color = Color(0xCC0D1117),
-        contentColor = Color.White
-    ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Surface(
-                color = Color(0xFF131A24),
-                contentColor = Color.White,
-                shape = RoundedCornerShape(14.dp),
-                tonalElevation = 10.dp,
-                shadowElevation = 10.dp,
-                modifier = Modifier.padding(16.dp).widthIn(max = 520.dp)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Info elemento", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                    val subtitle = when (meta?.root) {
-                        DeckRoot.PAGINA -> "Pagina"
-                        DeckRoot.MENU_LATERALE -> "Menù laterale"
-                        DeckRoot.MENU_CENTRALE -> "Menù centrale"
-                        DeckRoot.AVVISO -> "Avviso"
-                        else -> "—"
-                    }
-                    Text(subtitle, color = Color(0xFF9BA3AF), fontSize = 12.sp)
-
-                    ElevatedCard {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Titolo", fontSize = 11.sp, color = Color(0xFF9BA3AF))
-                            Text(meta?.title.orEmpty(), fontWeight = FontWeight.Medium)
-
-                            Spacer(Modifier.height(8.dp))
-                            Text("ID", fontSize = 11.sp, color = Color(0xFF9BA3AF))
-                            Text(meta?.id.orEmpty(), fontFamily = MaterialTheme.typography.bodySmall.fontFamily)
-
-                            Spacer(Modifier.height(8.dp))
-                            Text("Descrizione", fontSize = 11.sp, color = Color(0xFF9BA3AF))
-                            Text(meta?.description.orEmpty())
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = onDismiss,
-                            border = BorderStroke(1.dp, WIZ_AZURE),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
-                            modifier = Modifier.weight(1f)
-                        ) { Text("Chiudi") }
-
-                        Button(
-                            onClick = onEdit,
-                            colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black),
-                            modifier = Modifier.weight(1f)
-                        ) { Text("Modifica") }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BoxScope.EditMetaOverlay(
-    visible: Boolean,
-    initial: ElementMeta?,
-    existingIds: Set<String>,
-    onDismiss: () -> Unit,
-    onSave: (newId: String, newTitle: String, newDescription: String) -> Unit
-) {
-    if (!visible || initial == null) return
-
-    var title by remember(initial) { mutableStateOf(initial.title) }
-    var desc  by remember(initial) { mutableStateOf(initial.description) }
-    var id    by remember(initial) { mutableStateOf(initial.id) }
-    var idErr by remember { mutableStateOf<String?>(null) }
-
-    fun sanitizeId(s: String) = s.lowercase()
-        .replace(' ', '_')
-        .filter { it.isLetterOrDigit() || it == '-' || it == '_' }
-        .take(15)
-
-    Surface(
-        modifier = Modifier.fillMaxSize().align(Alignment.Center),
-        color = Color(0xCC0D1117),
-        contentColor = Color.White
-    ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Surface(
-                color = Color(0xFF131A24),
-                contentColor = Color.White,
-                shape = RoundedCornerShape(14.dp),
-                tonalElevation = 10.dp,
-                shadowElevation = 10.dp,
-                modifier = Modifier.padding(16.dp).widthIn(max = 520.dp)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Modifica metadati", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        singleLine = true,
-                        label = { Text("Titolo") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = TextFieldDefaults.colors(
-                            focusedTextColor = Color.Black,
-                            unfocusedTextColor = Color.Black,
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            cursorColor = WIZ_AZURE
-                        )
-                    )
-
-                    OutlinedTextField(
-                        value = id,
-                        onValueChange = {
-                            id = sanitizeId(it)
-                            idErr = null
-                        },
-                        singleLine = true,
-                        label = { Text("ID") },
-                        isError = idErr != null,
-                        supportingText = { idErr?.let { Text(it) } },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = TextFieldDefaults.colors(
-                            focusedTextColor = Color.Black,
-                            unfocusedTextColor = Color.Black,
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            cursorColor = WIZ_AZURE
-                        )
-                    )
-
-                    OutlinedTextField(
-                        value = desc,
-                        onValueChange = { desc = it },
-                        label = { Text("Descrizione") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = TextFieldDefaults.colors(
-                            focusedTextColor = Color.Black,
-                            unfocusedTextColor = Color.Black,
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            cursorColor = WIZ_AZURE
-                        )
-                    )
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = onDismiss,
-                            border = BorderStroke(1.dp, WIZ_AZURE),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WIZ_AZURE),
-                            modifier = Modifier.weight(1f)
-                        ) { Text("Annulla") }
-
-                        Button(
-                            onClick = {
-                                val newId = sanitizeId(id)
-                                if (newId.isBlank()) { idErr = "L'ID non può essere vuoto"; return@Button }
-                                if (newId != initial.id && existingIds.contains(newId)) {
-                                    idErr = "ID già esistente"
-                                    return@Button
-                                }
-                                onSave(newId, title.trim(), desc.trim())
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = WIZ_AZURE, contentColor = Color.Black),
-                            modifier = Modifier.weight(1f)
-                        ) { Text("Salva") }
-                    }
-                }
             }
         }
     }
@@ -2930,8 +2519,7 @@ private fun BoxScope.MainMenuBar(
     onContainer: () -> Unit,
     onText: () -> Unit,
     onAdd: () -> Unit,
-    bottomBarHeightPx: Int,
-    onInfo: () -> Unit = {} 
+    bottomBarHeightPx: Int
 ) {
     val dy = with(LocalDensity.current) {
         (if (bottomBarHeightPx > 0) bottomBarHeightPx.toDp() else BOTTOM_BAR_HEIGHT) +
@@ -2963,52 +2551,30 @@ private fun BoxScope.MainMenuBar(
         ) {
             when (LocalSecondBarMode.current) {
                 SecondBarMode.Classic -> {
-                    LocalExitClassic.current?.let {
+                    LocalExitClassic.current?.let { exitClassic ->
                         ToolbarIconButton(
                             icon = Icons.Outlined.ArrowBack,
                             contentDescription = "Indietro",
-                            onClick = it
+                            onClick = LocalExitClassic.current
                         )
                     }
 
+                    ToolbarIconButton(EditorIcons.Text, "Testo", onClick = onText,
+                        infoTitle = "Testo", infoBody = "Stili e proprietà  del testo", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Container, "Contenitore", onClick = onContainer,
+                        infoTitle = "Contenitore", infoBody = "Aspetto e comportamenti del contenitore", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Layout, "Layout", onClick = onLayout,
+                        infoTitle = "Layout", infoBody = "Colori/immagini ed effetti dell'area", allowLongPressInInfo = false)
+                    ToolbarIconButton(EditorIcons.Insert, "Aggiungi", onClick = onAdd,
+                        infoTitle = "Aggiungi", infoBody = "Inserisci nuovi elementi", allowLongPressInInfo = false)
                     ToolbarIconButton(
-                        icon = EditorIcons.Text, contentDescription = "Testo",
-                        onClick = onText,
-                        infoTitle = "Testo",
-                        infoBody = "Stili e proprietà del testo",
-                        allowLongPressInInfo = false
-                    )
-                    ToolbarIconButton(
-                        icon = EditorIcons.Container, contentDescription = "Contenitore",
-                        onClick = onContainer,
-                        infoTitle = "Contenitore",
-                        infoBody = "Aspetto e comportamenti del contenitore",
-                        allowLongPressInInfo = false
-                    )
-                    ToolbarIconButton(
-                        icon = EditorIcons.Layout, contentDescription = "Layout",
-                        onClick = onLayout,
-                        infoTitle = "Layout",
-                        infoBody = "Colori/immagini ed effetti dell'area",
-                        allowLongPressInInfo = false
-                    )
-                    ToolbarIconButton(
-                        icon = EditorIcons.Insert, contentDescription = "Aggiungi",
-                        onClick = onAdd,
-                        infoTitle = "Aggiungi",
-                        infoBody = "Inserisci nuovi elementi",
-                        allowLongPressInInfo = false
-                    )
-                    // ← ICONA "?" accanto ad Aggiungi che apre l'overlay Info
-                    ToolbarIconButton(
-                        icon = Icons.Outlined.HelpOutline,
-                        contentDescription = "Info elemento",
-                        onClick = onInfo,
-                        infoTitle = "Cosa trovi qui",
-                        infoBody = "Visualizza e modifica Titolo, ID e Descrizione dell'elemento corrente",
-                        allowLongPressInInfo = false
+                        icon = ImageVector.vectorResource(id = R.drawable.ic_question),
+                        contentDescription = "Info",
+                        onClick = { /* stub */ },
+                        infoTitle = "Info elemento", infoBody = "Dati descrittivi (stub)", allowLongPressInInfo = false
                     )
                 }
+
                 SecondBarMode.Deck -> {
 // NUOVA ROOT — MADRI + CLUSTER, con hiding delle madri a destra
                     val deck = LocalDeckState.current
@@ -3058,7 +2624,7 @@ private fun BoxScope.MainMenuBar(
                                     ChildIconWithBadge(
                                         icon = ImageVector.vectorResource(id = m.iconRes),
                                         id = childId,
-                                        onClick = { controller.openChild(m.root, childId) }, // ⬅️ prima passava solo la classe
+                                        onClick = { controller.openChild(m.root) }, // long-press lo richiama comunque
                                         badgeBg = DECK_BADGE_BG,
                                         badgeTxt = DECK_BADGE_TXT
                                     )
@@ -3598,6 +3164,7 @@ private fun ContainerLevel(
                 options = listOf("Rettangolo", "Cerchio", "Pillola", "Diamante"),
                 onSelected = { onPick("shape", it) }
             )
+
             IconDropdown(
                 EditorIcons.LineWeight,
                 "Spessore bordo",                  // ← solo label visuale
@@ -4485,12 +4052,6 @@ private data class WizardResult(
     val side: String? = null
 )
 
-private data class ElementMeta(
-    val root: DeckRoot,
-    var id: String,
-    var title: String,
-    var description: String
-)
 
 // Piccolo dropdown "scuro" in linea con lo stile
 @Composable
