@@ -929,9 +929,7 @@ fun EditorMenusOnly(
         return n.dp
     }
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
-        // spessore (già esistente)
-        menuSelections[(listOf("Contenitore") + "b_thick").joinToString(" / ")] = dpToKey(rect.borderWidth)
-        
+ 
         // shape
         val s = when (rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect) {
             com.example.appbuilder.canvas.ShapeKind.Rect    -> "Rettangolo"
@@ -1137,7 +1135,6 @@ fun EditorMenusOnly(
             "Contenitore" -> listOf(
                 k("Contenitore","scroll") to "Assente",
                 k("Contenitore","shape") to "Rettangolo",
-                k("Contenitore","b_thick") to "1dp",
                 k("Contenitore","tipo") to "Normale",
                 k("Contenitore","Colore","col1") to "Bianco",
                 k("Contenitore","Colore","col2") to "Grigio chiaro",
@@ -1255,7 +1252,6 @@ fun EditorMenusOnly(
         ensure("Contenitore", "Card base", mapOf(
             key(listOf("Contenitore"),"scroll") to "Assente",
             key(listOf("Contenitore"),"shape") to "Rettangolo",
-            key(listOf("Contenitore"),"b_thick") to "1dp",
             key(listOf("Contenitore","Colore"),"col1") to "Bianco",
             key(listOf("Contenitore","Colore"),"col2") to "Grigio chiaro",
         ))
@@ -1682,20 +1678,6 @@ fun EditorMenusOnly(
                                                 else        -> com.example.appbuilder.canvas.ShapeKind.Rect
                                             }
                                             rectShapes[it] = s
-                                        }
-                                    }
-                                    // Spessore bordo
-                                    "b_thick" -> {
-                                        rect?.let {
-                                            val dp = keyToDp(value) // "0dp","1dp"... -> Dp
-                                            pageState?.let { ps ->
-                                                val ix = ps.items.indexOf(it)
-                                                if (ix >= 0) {
-                                                    val updated = it.copy(borderWidth = dp)
-                                                    ps.items[ix] = updated
-                                                    selectedRect = updated
-                                                }
-                                            }
                                         }
                                     }
 
@@ -3165,13 +3147,6 @@ private fun ContainerLevel(
                 onSelected = { onPick("shape", it) }
             )
 
-            IconDropdown(
-                EditorIcons.LineWeight,
-                "Spessore bordo",                  // ← solo label visuale
-                current = get("b_thick") ?: "1dp",
-                options = listOf("0dp", "1dp", "2dp", "3dp"),
-                onSelected = { onPick("b_thick", it) }   // ← la chiave resta "b_thick"
-            )
             IconDropdown(EditorIcons.SwipeRight, "Tipo",
                 current = get("tipo") ?: "Normale",
                 options = listOf("Normale", "Sfogliabile", "Tab"),
