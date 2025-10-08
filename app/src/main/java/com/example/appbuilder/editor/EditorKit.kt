@@ -930,7 +930,7 @@ fun EditorMenusOnly(
         return n.dp
     }
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
- 
+
         // shape
         val s = when (rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect) {
             com.example.appbuilder.canvas.ShapeKind.Rect    -> "Rettangolo"
@@ -970,13 +970,14 @@ fun EditorMenusOnly(
             com.example.appbuilder.canvas.FxKind.Stripes    -> "Strisce"
         }
         menuSelections[(listOf("Contenitore","Colore") + "fx").joinToString(" / ")] = fx
-        }
         val bs = rectBorderSides[rect] ?: com.example.appbuilder.canvas.BorderSides()
         menuSelections["Contenitore / Bordi / ic_leftb"]  = bs.left
         menuSelections["Contenitore / Bordi / ic_upb"]    = bs.top
         menuSelections["Contenitore / Bordi / ic_downb"]  = bs.bottom
         menuSelections["Contenitore / Bordi / ic_rightb"] = bs.right
     }
+
+
 
     // Griglia
     var gridPanelOpen by remember { mutableStateOf(false) }
@@ -1343,8 +1344,9 @@ fun EditorMenusOnly(
                             // 2) Sposta le decorazioni SOLO se esistono (niente early return)
                             rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
                             rectImages.remove(old)?.let     { rectImages[updated]     = it }
-                            rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
                             rectBorderSides.remove(old)?.let { rectBorderSides[updated] = it }
+                            rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
+
                             // (consigliato) sposta anche queste, così non perdi shape/fx durante il drag
                             rectShapes.remove(old)?.let   { rectShapes[updated]   = it }
                             rectFx.remove(old)?.let       { rectFx[updated]       = it }
@@ -1353,9 +1355,9 @@ fun EditorMenusOnly(
 
                     // mappe
                     fillStyles   = rectFillStyles,
-                    borderSides = rectBorderSides,
                     shapes       = rectShapes,
                     corners      = rectCorners,
+                    borderSides  = rectBorderSides,
                     fx           = rectFx,
                     imageStyles  = rectImages
                 )
@@ -1606,6 +1608,7 @@ fun EditorMenusOnly(
                                 }
                             }
                         },
+
                         onPick = pick@{ label, value ->
                             // --- Intercetta e apre la palette flottante al posto del dropdown ---
                             run {
@@ -3152,6 +3155,8 @@ private fun ContainerLevel(
     onFreeGate: () -> Unit
 ) {
     val isFree = LocalIsFree.current
+    var selectedRect by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+    val rectShapes   = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ShapeKind>() }
     fun get(keyLeaf: String) = selections[key(path, keyLeaf)] as? String
     when (path.getOrNull(1)) {
         null -> {
@@ -3169,12 +3174,10 @@ private fun ContainerLevel(
                 options = listOf("Assente", "Verticale", "Orizzontale"),
                 onSelected = { onPick("scroll", it) }
             )
-
             ToolbarIconButton(
                 icon = safeVector(R.drawable.ic_border_choose, EditorIcons.Square),
                 contentDescription = "Bordi"
             ) { onEnter("Bordi") }
-
             IconDropdown(EditorIcons.Square, "Shape",
                 current = get("shape") ?: "Rettangolo",
                 options = listOf("Rettangolo", "Cerchio", "Pillola", "Diamante"),
@@ -3276,7 +3279,6 @@ private fun ContainerLevel(
                 onSelected = { onPick("ic_as", it) }
             )
         }
-
         "Bordi" -> {
             // Abilita i toggle solo su rettangoli
             val rect = selectedRect
@@ -3331,7 +3333,6 @@ private fun ContainerLevel(
                 onSelected = { onPick("Colore", it) }
             )
         }
-
         "Immagini" -> {
             when (path.getOrNull(2)) {
                 null -> {
