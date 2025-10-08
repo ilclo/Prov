@@ -345,37 +345,53 @@ private fun listToRect(lst: List<Any>): com.example.appbuilder.canvas.DrawItem.R
 }
 
 
-private fun pageStateSaver(): Saver<MutableState<PageState?>, Any> =
+// --- TOP-LEVEL (fuori dai composable): unico saver per MutableState<PageState?> ---
+private fun mutablePageStateSaver(): Saver<MutableState<PageState?>, Any> =
     listSaver(
         save = { st ->
             val ps = st.value ?: return@listSaver emptyList<Any>()
-            val itemsFlat = ps.items.map { item ->
+            val itemsFlat: List<List<Any>> = ps.items.map { item ->
                 when (item) {
                     is DrawItem.RectItem -> listOf(
-                        "R", item.level, item.r0, item.c0, item.r1, item.c1,
+                        "R",
+                        item.level,
+                        item.r0, item.c0, item.r1, item.c1,
                         item.borderWidth.value,
                         colorToHex(item.borderColor),
                         colorToHex(item.fillColor)
                     )
                     is DrawItem.LineItem -> listOf(
-                        "L", item.level, item.r0, item.c0, item.r1, item.c1,
+                        "L",
+                        item.level,
+                        item.r0, item.c0, item.r1, item.c1,
                         item.width.value,
                         colorToHex(item.color)
                     )
                 }
             }
-            listOf(ps.id ?: "", ps.scroll ?: "Assente", ps.gridDensity, ps.currentLevel, itemsFlat)
+            listOf(
+                ps.id ?: "",
+                ps.scroll ?: "Assente",
+                ps.gridDensity,
+                ps.currentLevel,
+                itemsFlat
+            )
         },
         restore = { lst ->
             if (lst.isEmpty()) mutableStateOf<PageState?>(null) else {
-                val ps = PageState(
-                    id = lst[0] as String,
-                    scroll = lst[1] as String,
-                    gridDensity = lst[2] as Int,
-                    currentLevel = lst[3] as Int
-                )
+                val id     = lst[0] as String
+                val scroll = lst[1] as String
+                val grid   = lst[2] as Int
+                val level  = lst[3] as Int
                 @Suppress("UNCHECKED_CAST")
                 val itemsFlat = lst[4] as List<List<*>>
+
+                val ps = PageState(
+                    id = id,
+                    scroll = scroll,
+                    gridDensity = grid,
+                    currentLevel = level
+                )
                 itemsFlat.forEach { it ->
                     when (it[0] as String) {
                         "R" -> ps.items.add(
@@ -384,8 +400,7 @@ private fun pageStateSaver(): Saver<MutableState<PageState?>, Any> =
                                 r0 = it[2] as Int, c0 = it[3] as Int,
                                 r1 = it[4] as Int, c1 = it[5] as Int,
                                 borderWidth = ((it[6] as Number).toFloat()).dp,
-                                borderColor = hexToColorSafe(it[7] as String),
-                                // fill con fallback trasparente:
+                                borderColor = hexToColor(it[7] as String) ?: Color.Black,
                                 fillColor   = hexToColor(it[8] as String) ?: Color.Transparent
                             )
                         )
@@ -395,7 +410,7 @@ private fun pageStateSaver(): Saver<MutableState<PageState?>, Any> =
                                 r0 = it[2] as Int, c0 = it[3] as Int,
                                 r1 = it[4] as Int, c1 = it[5] as Int,
                                 width = ((it[6] as Number).toFloat()).dp,
-                                color = hexToColorSafe(it[7] as String)
+                                color = hexToColor(it[7] as String) ?: Color.Black
                             )
                         )
                     }
@@ -404,6 +419,7 @@ private fun pageStateSaver(): Saver<MutableState<PageState?>, Any> =
             }
         }
     )
+
 
 
 
@@ -956,6 +972,7 @@ fun EditorMenusOnly(
     val elementMeta = remember { mutableStateMapOf<String, ElementMeta>() }
     val pageStates  = remember { mutableStateMapOf<String, PageState>() }
 
+
     // Quale figlia è in editing nella barra "classica"
     var editingId by remember { mutableStateOf<String?>(null) }
 
@@ -1039,10 +1056,10 @@ fun EditorMenusOnly(
         (blue * 255).toInt().coerceIn(0,255)
     )
 
-
-    var pageState by rememberSaveable(stateSaver = pageStateSaver()) {
+    var pageState by rememberSaveable(stateSaver = mutablePageStateSaver()) {
         mutableStateOf<PageState?>(null)
-}
+    }
+
 
     fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
     fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
@@ -1487,10 +1504,10 @@ fun EditorMenusOnly(
                         }
                     },
                     onUpdateItem = { old, updated ->
-                        val items = pageState?.items ?: return@CanvasStage
-                        val ix = items.indexOf(old)
+                        val pageItems = pageState?.items ?: return@CanvasStage
+                        val ix = pageItems.indexOf(old)
                         if (ix >= 0) {
-                            items[ix] = updated
+                            pageItems[ix] = updated
 
                             // 1) Aggiorna SUBITO la selezione per evitare ghost del bordo
                             if (selectedRect == old) {
@@ -1626,7 +1643,6 @@ fun EditorMenusOnly(
                             )
                             pageStates[wr.id] = ps
                             pageState = ps
-
                             editingClass   = DeckRoot.PAGINA
                             editingId      = wr.id
                             classicEditing = true
@@ -1807,6 +1823,12 @@ fun EditorMenusOnly(
                                 if (rect != null) {
                                     val dpVal = keyToDp(value)
                                     val cur = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
+                                    rectCorners[rect] = com.example.appbuilder.canvas.CornerRadii(
+                                        tl = if (label=="ic_as") dp else cur.tl,
+                                        tr = if (label=="ic_ad") dp else cur.tr,
+                                        bl = if (label=="ic_bs") dp else cur.bl,
+                                        br = if (label=="ic_bd") dp else cur.br
+                                    )
                                     val upd = when (label) {
                                         "ic_as" -> cur.copy(tl = dpVal)
                                         "ic_ad" -> cur.copy(tr = dpVal)
@@ -1886,7 +1908,13 @@ fun EditorMenusOnly(
                                             pageState?.let { ps ->
                                                 val ix = ps.items.indexOf(it)
                                                 if (ix >= 0) {
-                                                    val updated = it.copy(borderWidth = dp)
+                                                val updated = DrawItem.RectItem(
+                                                    level = it.level, r0 = it.r0, c0 = it.c0, r1 = it.r1, c1 = it.c1,
+                                                    borderWidth = dp,
+                                                    borderColor = it.borderColor,
+                                                    fillColor = it.fillColor
+                                                )
+
                                                     ps.items[ix] = updated
                                                     selectedRect = updated
                                                 }
