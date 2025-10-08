@@ -172,7 +172,8 @@ private val LocalIsFree = staticCompositionLocalOf { true }
 private const val codiceprofree = 12345
 private val LocalDeckItems =
     staticCompositionLocalOf<Map<DeckRoot, List<String>>> { emptyMap() }
-
+private fun DrawItem.RectItem.withBorderColor(c: Color) = copy(borderColor = c)
+private fun DrawItem.RectItem.withFillColor(c: Color)   = copy(fillColor = c)
 /* ---- BARS: altezze fisse + gap ---- */
 private val BOTTOM_BAR_HEIGHT = 56.dp        // barra inferiore (base)
 private val BOTTOM_BAR_EXTRA = 8.dp          // extra altezza barra inferiore (stessa in Home e Submenu)
@@ -249,6 +250,10 @@ private fun hexToColor(s: String?): Color? {
         else -> null
     }
 }
+
+private fun DrawItem.RectItem.withBorderColor(c: Color) = copy(borderColor = c)
+private fun DrawItem.RectItem.withFillColor(c: Color)   = copy(fillColor = c)
+
 
 private val FILTER_NAMES = listOf(
     "Nessuno","B/N","Seppia","Vivido","Desatura","Caldo","Freddo","Luminoso","Scuro",
@@ -2104,46 +2109,43 @@ fun EditorMenusOnly(
                 visible = showColorPicker,
                 initialColor = colorPickInitial,
                 onDismiss = { showColorPicker = false },
-                onPick = { picked: Color ->    // ⬅️ tipo esplicito
+                onPick = { picked: Color ->
                     val hex = picked.toHex()
+
                     when (val tgt = colorPickTarget) {
                         ColorTarget.Border -> {
-                            selectedRect?.let { rect ->
-                                pageState?.let { ps ->
-                                    val i = ps.items.indexOf(rect)
-                                    if (i >= 0) {
-                                        val updated = rect.copy(borderColor = picked)
-                                        ps.items[i] = updated
-                                        selectedRect = updated
-                                    }
-                                }
-                            }
+                            // Aggiorna il bordo senza scrivere 'copy' qui
+                            replaceSelectedRect { it.withBorderColor(picked) }
                             menuSelections[(listOf("Contenitore") + "b_color").joinToString(" / ")] = hex
                         }
+
                         is ColorTarget.ContainerFill -> {
+                            // Slot 1: puoi scegliere se tenere il colore nel Rect o nella mappa fillStyles
                             selectedRect?.let { rect ->
                                 if (tgt.slot == 1) {
-                                    pageState?.let { ps ->
-                                        val i = ps.items.indexOf(rect)
-                                        if (i >= 0) {
-                                            val updated = rect.copy(fillColor = picked)
-                                            ps.items[i] = updated
-                                            selectedRect = updated
-                                        }
-                                    }
-                                    menuSelections[(listOf("Contenitore","Colore") + "col1").joinToString(" / ")] = hex
+                                    // A) via Rect (immutabile) — sempre passando per l’helper
+                                    replaceSelectedRect { it.withFillColor(picked) }
+
+                                    // IN ALTERNATIVA (B): via mappa fillStyles senza toccare il Rect
+                                    // val cur = rectFillStyles[rect] ?: com.example.appbuilder.canvas.FillStyle(col1 = rect.fillColor)
+                                    // rectFillStyles[rect] = cur.copy(col1 = picked)
                                 } else {
-                                    menuSelections[(listOf("Contenitore","Colore") + "col2").joinToString(" / ")] = hex
+                                    // slot 2: solo stato di menu (come già avevi)
+                                    // oppure, se usi FillStyle, puoi fare analogamente col 'col2'
+                                    // val cur = rectFillStyles[rect] ?: com.example.appbuilder.canvas.FillStyle(col1 = rect.fillColor)
+                                    // rectFillStyles[rect] = cur.copy(col2 = picked)
                                 }
-                            } ?: run {
-                                val key = (listOf("Contenitore","Colore") + if (tgt.slot==1) "col1" else "col2").joinToString(" / ")
-                                menuSelections[key] = hex
                             }
-                        }
-                        is ColorTarget.LayoutFill -> {
-                            val key = (listOf("Layout","Colore") + if (tgt.slot==1) "col1" else "col2").joinToString(" / ")
+                            // Aggiorna le preferenze UI
+                            val key = (listOf("Contenitore","Colore") + if (tgt.slot == 1) "col1" else "col2").joinToString(" / ")
                             menuSelections[key] = hex
                         }
+
+                        is ColorTarget.LayoutFill -> {
+                            val key = (listOf("Layout","Colore") + if (tgt.slot == 1) "col1" else "col2").joinToString(" / ")
+                            menuSelections[key] = hex
+                        }
+
                         ColorTarget.Text -> {
                             val key = (listOf("Testo") + "Colore").joinToString(" / ")
                             menuSelections[key] = hex
