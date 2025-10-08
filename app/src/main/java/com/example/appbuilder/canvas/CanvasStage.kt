@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import kotlin.math.roundToInt
+import androidx.compose.ui.graphics.drawscope.clipRect
 
 // Variante di rendering del contenitore
 enum class Variant { Full, Outlined, Text, TopBottom }
@@ -68,6 +69,13 @@ data class ImageCrop(
     val top: Float,    // 0..1
     val right: Float,  // 0..1
     val bottom: Float  // 0..1
+)
+
+data class BorderSides(
+    val left: Boolean = true,
+    val top: Boolean = true,
+    val right: Boolean = true,
+    val bottom: Boolean = true
 )
 
 // Effetti grafici opzionali
@@ -178,7 +186,7 @@ fun CanvasStage(
     onAddItem: (DrawItem) -> Unit,
     onRequestEdit: (DrawItem.RectItem?) -> Unit = {},
     onUpdateItem: (DrawItem.RectItem, DrawItem.RectItem) -> Unit = { _, _ -> },
-
+    borderSides: Map<DrawItem.RectItem, BorderSides> = emptyMap(),
     // già presente nella tua “attuale”:
     fillStyles: Map<DrawItem.RectItem, FillStyle> = emptyMap(),
 
@@ -738,8 +746,49 @@ fun CanvasStage(
                                         }
                                     }
                             }
-                            // 3) BORDO — sempre completo
-                            drawPath(path = path, color = item.borderColor, style = Stroke(width = item.borderWidth.toPx()))
+                            // --- BORDO (per-lato solo se Rect) ---
+                            val stroke = Stroke(item.borderWidth.toPx())
+                            val sides = borderSides[item]
+                            val isRectShape = (shapes[item] ?: ShapeKind.Rect) == ShapeKind.Rect
+
+                            if (!isRectShape || sides == null || (sides.left && sides.top && sides.right && sides.bottom)) {
+                                // Forma non-Rect → bordo intero
+                                // Oppure nessuna preferenza registrata → bordo intero
+                                // Oppure tutti i lati ON → bordo intero
+                                drawPath(
+                                    path = borderPath,                    // il path che già usi per il contorno
+                                    color = item.borderColor,
+                                    style = stroke
+                                )
+                            } else {
+                                // Disegno per-lato con clip: ciascun lato ritaglia metà area adiacente.
+                                val halfW = w / 2f
+                                val halfH = h / 2f
+                                // TOP
+                                if (sides.top) {
+                                    clipRect(left, top, left + w, top + halfH) {
+                                        drawPath(borderPath, item.borderColor, stroke)
+                                    }
+                                }
+                                // BOTTOM
+                                if (sides.bottom) {
+                                    clipRect(left, top + halfH, left + w, top + h) {
+                                        drawPath(borderPath, item.borderColor, stroke)
+                                    }
+                                }
+                                // LEFT
+                                if (sides.left) {
+                                    clipRect(left, top, left + halfW, top + h) {
+                                        drawPath(borderPath, item.borderColor, stroke)
+                                    }
+                                }
+                                // RIGHT
+                                if (sides.right) {
+                                    clipRect(left + halfW, top, left + w, top + h) {
+                                        drawPath(borderPath, item.borderColor, stroke)
+                                    }
+                                }
+                            }
                         }
 
                         is DrawItem.LineItem -> {

@@ -847,6 +847,7 @@ fun EditorMenusOnly(
         mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FillStyle>()
     }
     // Stili aggiuntivi per RectItem
+    val rectBorderSides = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.BorderSides>() }
     val rectShapes   = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ShapeKind>() }
     val rectCorners  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.CornerRadii>() }
     val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FxKind>() }
@@ -969,9 +970,13 @@ fun EditorMenusOnly(
             com.example.appbuilder.canvas.FxKind.Stripes    -> "Strisce"
         }
         menuSelections[(listOf("Contenitore","Colore") + "fx").joinToString(" / ")] = fx
+        }
+        val bs = rectBorderSides[rect] ?: com.example.appbuilder.canvas.BorderSides()
+        menuSelections["Contenitore / Bordi / ic_leftb"]  = bs.left
+        menuSelections["Contenitore / Bordi / ic_upb"]    = bs.top
+        menuSelections["Contenitore / Bordi / ic_downb"]  = bs.bottom
+        menuSelections["Contenitore / Bordi / ic_rightb"] = bs.right
     }
-
-
 
     // Griglia
     var gridPanelOpen by remember { mutableStateOf(false) }
@@ -1339,7 +1344,7 @@ fun EditorMenusOnly(
                             rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
                             rectImages.remove(old)?.let     { rectImages[updated]     = it }
                             rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
-
+                            rectBorderSides.remove(old)?.let { rectBorderSides[updated] = it }
                             // (consigliato) sposta anche queste, così non perdi shape/fx durante il drag
                             rectShapes.remove(old)?.let   { rectShapes[updated]   = it }
                             rectFx.remove(old)?.let       { rectFx[updated]       = it }
@@ -1348,6 +1353,7 @@ fun EditorMenusOnly(
 
                     // mappe
                     fillStyles   = rectFillStyles,
+                    borderSides = rectBorderSides,
                     shapes       = rectShapes,
                     corners      = rectCorners,
                     fx           = rectFx,
@@ -1571,11 +1577,33 @@ fun EditorMenusOnly(
                             menuSelections[key(menuPath, label)] = value
                             lastChanged = "$label: ${if (value) "ON" else "OFF"}"
                             dirty = true
-// qualsiasi modifica manuale annulla lo STILE (Default resta)
+
+                            // annulla stile attivo, come già fai
                             val styleKey = key(listOf(root), "style")
                             val styleVal = (menuSelections[styleKey] as? String).orEmpty()
                             if (styleVal.isNotEmpty() && !styleVal.equals("Nessuno", true)) {
                                 menuSelections[styleKey] = "Nessuno"
+                            }
+
+                            // --- NUOVO: aggiorna i lati per rettangoli ---
+                            val inContainer = (menuPath.firstOrNull() ?: "") == "Contenitore"
+                            val inBorders   = menuPath.contains("Bordi")
+                            val isBorderToggle = label in setOf("ic_leftb","ic_upb","ic_downb","ic_rightb")
+                            val rect = selectedRect
+
+                            if (inContainer && inBorders && isBorderToggle && rect != null) {
+                                val shape = rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect
+                                if (shape == com.example.appbuilder.canvas.ShapeKind.Rect) {
+                                    val cur = rectBorderSides[rect] ?: com.example.appbuilder.canvas.BorderSides()
+                                    val upd = when (label) {
+                                        "ic_leftb"  -> cur.copy(left = value)
+                                        "ic_upb"    -> cur.copy(top = value)
+                                        "ic_downb"  -> cur.copy(bottom = value)
+                                        "ic_rightb" -> cur.copy(right = value)
+                                        else -> cur
+                                    }
+                                    rectBorderSides[rect] = upd
+                                }
                             }
                         },
                         onPick = pick@{ label, value ->
@@ -3141,6 +3169,12 @@ private fun ContainerLevel(
                 options = listOf("Assente", "Verticale", "Orizzontale"),
                 onSelected = { onPick("scroll", it) }
             )
+
+            ToolbarIconButton(
+                icon = safeVector(R.drawable.ic_border_choose, EditorIcons.Square),
+                contentDescription = "Bordi"
+            ) { onEnter("Bordi") }
+
             IconDropdown(EditorIcons.Square, "Shape",
                 current = get("shape") ?: "Rettangolo",
                 options = listOf("Rettangolo", "Cerchio", "Pillola", "Diamante"),
@@ -3240,6 +3274,61 @@ private fun ContainerLevel(
                 current = get("ic_as") ?: "0dp",
                 options = dpOpts,
                 onSelected = { onPick("ic_as", it) }
+            )
+        }
+
+        "Bordi" -> {
+            // Abilita i toggle solo su rettangoli
+            val rect = selectedRect
+            val isRect = rect != null && (rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect) == com.example.appbuilder.canvas.ShapeKind.Rect
+
+            // Helper per default ON
+            fun isOn(label: String): Boolean =
+                (selections[key(path, label)] as? Boolean) ?: true
+
+            // LEFT
+            ToggleIcon(
+                selected = isOn("ic_leftb"),
+                onClick = {
+                    if (isRect) onToggle("ic_leftb", !isOn("ic_leftb"))
+                },
+                icon = safeVector(R.drawable.ic_leftb, EditorIcons.Square)
+            )
+
+            // UP
+            ToggleIcon(
+                selected = isOn("ic_upb"),
+                onClick = {
+                    if (isRect) onToggle("ic_upb", !isOn("ic_upb"))
+                },
+                icon = safeVector(R.drawable.ic_upb, EditorIcons.Square)
+            )
+
+            // DOWN
+            ToggleIcon(
+                selected = isOn("ic_downb"),
+                onClick = {
+                    if (isRect) onToggle("ic_downb", !isOn("ic_downb"))
+                },
+                icon = safeVector(R.drawable.ic_downb, EditorIcons.Square)
+            )
+
+            // RIGHT
+            ToggleIcon(
+                selected = isOn("ic_rightb"),
+                onClick = {
+                    if (isRect) onToggle("ic_rightb", !isOn("ic_rightb"))
+                },
+                icon = safeVector(R.drawable.ic_rightb, EditorIcons.Square)
+            )
+
+            // Colore bordo (riusa la palette flottante già intercettata come "Contenitore / Bordi / Colore")
+            IconDropdown(
+                icon = EditorIcons.Brush,
+                contentDescription = "Colore",
+                current = (selections[key(path, "Colore")] as? String) ?: "Palette…",
+                options = listOf("Palette…"),
+                onSelected = { onPick("Colore", it) }
             )
         }
 
