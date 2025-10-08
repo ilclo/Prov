@@ -38,8 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import kotlin.math.roundToInt
 
-// Variante di rendering del contenitore
-enum class Variant { Full, Outlined, Text, TopBottom }
+
 
 // Forme supportate (rettangolo con raggi, cerchio, pillola/stadium, diamante)
 enum class ShapeKind { Rect, Circle, Pill, Diamond }
@@ -51,7 +50,7 @@ data class ImageStyle(
     val uri: Uri,
     val fit: ImageFit = ImageFit.Cover,
     val filter: ImageFilter = ImageFilter.None,
-    val crop: ImageCrop? = null,    
+    val crop: ImageCrop? = null,
     val cropToShape: Boolean = true
 )
 
@@ -184,7 +183,6 @@ fun CanvasStage(
 
     // NUOVO – tutti con default per non toccare EditorMenusOnly:
     images  : Map<DrawItem.RectItem, ImageStyle> = emptyMap(),
-    variants: Map<DrawItem.RectItem, Variant> = emptyMap(),
     shapes  : Map<DrawItem.RectItem, ShapeKind> = emptyMap(),
     corners : Map<DrawItem.RectItem, CornerRadii> = emptyMap(),
     fx      : Map<DrawItem.RectItem, FxKind> = emptyMap(),
@@ -583,7 +581,6 @@ fun CanvasStage(
 
                             // look-up con default che riproducono il comportamento attuale
                             val kind   = shapes[item]   ?: ShapeKind.Rect
-                            val varnt  = variants[item] ?: Variant.Full
                             val fxKind = fx[item]       ?: FxKind.None
                             val rad    = corners[item]  ?: CornerRadii()
                             val style  = fillStyles[item]  // può essere null (=> tinta piena)
@@ -623,153 +620,112 @@ fun CanvasStage(
                                 p
                             }
 
-                            // 1) FILL (solo se non "Text")
-                            if (varnt != Variant.Text) {
-                                if (varnt == Variant.Full) {
-                                    val imgStyle = imageStyles[item]
-                                    val imgBitmap = loadBitmap(imgStyle?.uri)
-                                    if (imgStyle != null && imgBitmap != null) {
-                                        val srcW = imgBitmap.width
-                                        val srcH = imgBitmap.height
-
-                                        // ⬇️ usa il crop normalizzato (se mancante: piena immagine)
-                                        val c = imgStyle.crop
-                                        val srcLeft   = (((c?.left ?: 0f) * srcW).roundToInt()).coerceIn(0, srcW)
-                                        val srcTop    = (((c?.top  ?: 0f) * srcH).roundToInt()).coerceIn(0, srcH)
-                                        val srcRight  = (((c?.right?: 1f) * srcW).roundToInt()).coerceIn(srcLeft, srcW)
-                                        val srcBottom = (((c?.bottom?: 1f) * srcH).roundToInt()).coerceIn(srcTop, srcH)
-                                        val srcSizeW = max(1, srcRight - srcLeft)
-                                        val srcSizeH = max(1, srcBottom - srcTop)
-
-                                        // adattamento (Cover/Contain/Stretch) sulla regione croppata
-                                        val s = when (imgStyle.fit) {
-                                            ImageFit.Cover   -> max(w / srcSizeW.toFloat(), h / srcSizeH.toFloat())
-                                            ImageFit.Contain -> min(w / srcSizeW.toFloat(), h / srcSizeH.toFloat())
-                                            ImageFit.Stretch -> Float.NaN // gestito sotto
+                            // 1) FILL — sempre attivo (immagine, gradiente o tinta)
+                            run {
+                                val imgStyle = imageStyles[item]
+                                val imgBitmap = loadBitmap(imgStyle?.uri)
+                                if (imgStyle != null && imgBitmap != null) {
+                                    val srcW = imgBitmap.width
+                                    val srcH = imgBitmap.height
+                                    val c = imgStyle.crop
+                                    val srcLeft   = (((c?.left ?: 0f) * srcW).roundToInt()).coerceIn(0, srcW)
+                                    val srcTop    = (((c?.top  ?: 0f) * srcH).roundToInt()).coerceIn(0, srcH)
+                                    val srcRight  = (((c?.right?: 1f) * srcW).roundToInt()).coerceIn(srcLeft, srcW)
+                                    val srcBottom = (((c?.bottom?: 1f) * srcH).roundToInt()).coerceIn(srcTop, srcH)
+                                    val srcSizeW = max(1, srcRight - srcLeft)
+                                    val srcSizeH = max(1, srcBottom - srcTop)
+                                    val s = when (imgStyle.fit) {
+                                        ImageFit.Cover   -> max(w / srcSizeW.toFloat(), h / srcSizeH.toFloat())
+                                        ImageFit.Contain -> min(w / srcSizeW.toFloat(), h / srcSizeH.toFloat())
+                                        ImageFit.Stretch -> Float.NaN // gestito sotto
+                                    }
+                                    val dstW = if (imgStyle.fit == ImageFit.Stretch) w else srcSizeW * s
+                                    val dstH = if (imgStyle.fit == ImageFit.Stretch) h else srcSizeH * s
+                                    val dx = left + (w - dstW) / 2f
+                                    val dy = top  + (h - dstH) / 2f
+                                    val drawImageBlock: DrawScope.() -> Unit = {
+                                        drawImage(
+                                            image = imgBitmap,
+                                            srcOffset = IntOffset(srcLeft, srcTop),
+                                            srcSize   = IntSize(srcSizeW, srcSizeH),
+                                            dstOffset = IntOffset(dx.roundToInt(), dy.roundToInt()),
+                                            dstSize   = IntSize(dstW.roundToInt(), dstH.roundToInt()),
+                                            filterQuality = FilterQuality.Low,
+                                            colorFilter = colorFilterFor(imgStyle.filter)
+                                        )
+                                    }
+                                    if (imgStyle.cropToShape) { clipPath(path) { drawImageBlock() } } else { drawImageBlock() }
+                                } else {
+                                    if (style != null && style.dir != GradientDir.Monocolore && style.col2 != null) {
+                                        val (start, end) = when (style.dir) {
+                                            GradientDir.Orizzontale -> Offset(left, top + h/2f)    to Offset(left + w, top + h/2f)
+                                            GradientDir.Verticale   -> Offset(left + w/2f, top)    to Offset(left + w/2f, top + h)
+                                            GradientDir.DiagTL_BR   -> Offset(left, top)           to Offset(left + w, top + h)
+                                            GradientDir.DiagTR_BL   -> Offset(left + w, top)       to Offset(left, top + h)
+                                            else -> Offset(left, top) to Offset(left, top)
                                         }
-                                        val dstW = if (imgStyle.fit == ImageFit.Stretch) w else srcSizeW * s
-                                        val dstH = if (imgStyle.fit == ImageFit.Stretch) h else srcSizeH * s
-
-                                        val dx = left + (w - dstW) / 2f
-                                        val dy = top  + (h - dstH) / 2f
-
-                                        val drawImageBlock: DrawScope.() -> Unit = {
-                                            drawImage(
-                                                image = imgBitmap,
-                                                srcOffset = IntOffset(srcLeft, srcTop),
-                                                srcSize   = IntSize(srcSizeW, srcSizeH),
-                                                dstOffset = IntOffset(dx.roundToInt(), dy.roundToInt()),
-                                                dstSize   = IntSize(dstW.roundToInt(), dstH.roundToInt()),
-                                                filterQuality = FilterQuality.Low,
-                                                colorFilter = colorFilterFor(imgStyle.filter)
+                                        clipPath(path) {
+                                            drawRect(
+                                                brush = Brush.linearGradient(listOf(style.col1, style.col2), start = start, end = end),
+                                                topLeft = Offset(left, top),
+                                                size = Size(w, h)
                                             )
                                         }
-
-                                        if (imgStyle.cropToShape) {
-                                            clipPath(path) { drawImageBlock() }
-                                        } else {
-                                            drawImageBlock()
-                                        }
-                                        // opzionale: applica FX sopra l’immagine (mantieni la tua logica fxKind)
                                     } else {
-                                        // gradiente se definito, altrimenti tinta
-                                        if (style != null && style.dir != GradientDir.Monocolore && style.col2 != null) {
-                                            val (start, end) = when (style.dir) {
-                                                GradientDir.Orizzontale -> Offset(left, top + h/2f)    to Offset(left + w, top + h/2f)
-                                                GradientDir.Verticale   -> Offset(left + w/2f, top)    to Offset(left + w/2f, top + h)
-                                                GradientDir.DiagTL_BR   -> Offset(left, top)           to Offset(left + w, top + h)
-                                                GradientDir.DiagTR_BL   -> Offset(left + w, top)       to Offset(left, top + h)
-                                                else -> Offset(left, top) to Offset(left, top)
-                                            }
-                                            clipPath(path) {
-                                                drawRect(
-                                                    brush = Brush.linearGradient(listOf(style.col1, style.col2), start = start, end = end),
-                                                    topLeft = Offset(left, top),
-                                                    size = Size(w, h)
-                                                )
-                                            }
-                                        } else {
-                                            drawPath(path = path, color = item.fillColor, style = Fill)
-                                        }
+                                        drawPath(path = path, color = item.fillColor, style = Fill)
                                     }
                                 }
-                                // 2) FX opzionali (clip alla forma)
-                                if (fxKind != FxKind.None) {
-                                    clipPath(path) {
-                                        when (fxKind) {
-                                            FxKind.Vignette -> {
-                                                val center = Offset(left + w/2f, top + h/2f)
-                                                val radius = kotlin.math.max(w, h) * 0.6f
-                                                drawRect(
-                                                    brush = Brush.radialGradient(
-                                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.18f)),
-                                                        center = center, radius = radius
-                                                    ),
-                                                    topLeft = Offset(left, top), size = Size(w, h)
-                                                )
-                                            }
-                                            FxKind.Noise -> {
-                                                val step = 6.dp.toPx()
-                                                var y = top
-                                                while (y < top + h) {
-                                                    var x = left + ((y.toInt() % 2) * step / 2f)
-                                                    while (x < left + w) {
-                                                        drawRect(
-                                                            color = Color.White.copy(alpha = 0.015f),
-                                                            topLeft = Offset(x, y), size = Size(1f, 1f)
-                                                        )
-                                                        x += step
-                                                    }
-                                                    y += step
-                                                }
-                                            }
-                                            FxKind.Stripes -> {
-                                                val spacing = 8.dp.toPx()
-                                                var x = left - h
-                                                while (x < left + w + h) {
-                                                    drawLine(
-                                                        color = Color.Black.copy(alpha = 0.08f),
-                                                        start = Offset(x, top),
-                                                        end   = Offset(x + h, top + h),
-                                                        strokeWidth = 1.dp.toPx()
+                            }
+                            // 2) FX opzionali (clip alla forma)
+                            if (fxKind != FxKind.None) {
+                                clipPath(path) {
+                                    when (fxKind) {
+                                        FxKind.Vignette -> {
+                                            val center = Offset(left + w/2f, top + h/2f)
+                                            val radius = kotlin.math.max(w, h) * 0.6f
+                                            drawRect(
+                                                brush = Brush.radialGradient(
+                                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.18f)),
+                                                    center = center, radius = radius
+                                                ),
+                                                topLeft = Offset(left, top), size = Size(w, h)
+                                            )
+                                        }
+                                        FxKind.Noise -> {
+                                            val step = 6.dp.toPx()
+                                            var y = top
+                                            while (y < top + h) {
+                                                var x = left + ((y.toInt() % 2) * step / 2f)
+                                                while (x < left + w) {
+                                                    drawRect(
+                                                        color = Color.White.copy(alpha = 0.015f),
+                                                        topLeft = Offset(x, y), size = Size(1f, 1f)
                                                     )
-                                                    x += spacing
+                                                    x += step
                                                 }
+                                                y += step
                                             }
-                                            else -> Unit
                                         }
+                                        FxKind.Stripes -> {
+                                            val spacing = 8.dp.toPx()
+                                            var x = left - h
+                                            while (x < left + w + h) {
+                                                drawLine(
+                                                    color = Color.Black.copy(alpha = 0.08f),
+                                                    start = Offset(x, top),
+                                                    end   = Offset(x + h, top + h),
+                                                    strokeWidth = 1.dp.toPx()
+                                                )
+                                                x += spacing
+                                            }
+                                        }
+                                        else -> Unit
                                     }
                                 }
                             }
-                            // 3) BORDI in base a variant
-                            when (varnt) {
-                                Variant.Text -> Unit // niente bordi, niente fill
-                                Variant.TopBottom -> {
-                                    // per forme non rettangolari → bordo completo
-                                    if (kind == ShapeKind.Rect) {
-                                        drawLine(
-                                            color = item.borderColor,
-                                            start = Offset(left, top),
-                                            end   = Offset(left + w, top),
-                                            strokeWidth = item.borderWidth.toPx()
-                                        )
-                                        drawLine(
-                                            color = item.borderColor,
-                                            start = Offset(left, top + h),
-                                            end   = Offset(left + w, top + h),
-                                            strokeWidth = item.borderWidth.toPx()
-                                        )
-                                    } else {
-                                        drawPath(path = path, color = item.borderColor, style = Stroke(width = item.borderWidth.toPx()))
-                                    }
-                                }
-                                else -> {
-                                    // Full + Outlined → bordi completi
-                                    drawPath(path = path, color = item.borderColor, style = Stroke(width = item.borderWidth.toPx()))
-                                }
-                            }
+                            // 3) BORDO — sempre completo
+                            drawPath(path = path, color = item.borderColor, style = Stroke(width = item.borderWidth.toPx()))
                         }
-
                         is DrawItem.LineItem -> {
                             if (item.r0 == item.r1) {
                                 val row = item.r0

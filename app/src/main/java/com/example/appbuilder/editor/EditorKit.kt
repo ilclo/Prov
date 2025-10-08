@@ -965,7 +965,6 @@ fun EditorMenusOnly(
         mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FillStyle>()
     }
     // Stili aggiuntivi per RectItem
-    val rectVariants = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.Variant>() }
     val rectShapes   = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.ShapeKind>() }
     val rectCorners  = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.CornerRadii>() }
     val rectFx       = remember { mutableStateMapOf<DrawItem.RectItem, com.example.appbuilder.canvas.FxKind>() }
@@ -1074,15 +1073,6 @@ fun EditorMenusOnly(
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
         // spessore (già esistente)
         menuSelections[(listOf("Contenitore") + "b_thick").joinToString(" / ")] = dpToKey(rect.borderWidth)
-
-        // variant
-        val v = when (rectVariants[rect] ?: com.example.appbuilder.canvas.Variant.Full) {
-            com.example.appbuilder.canvas.Variant.Full      -> "Full"
-            com.example.appbuilder.canvas.Variant.Outlined  -> "Outlined"
-            com.example.appbuilder.canvas.Variant.Text      -> "Text"
-            com.example.appbuilder.canvas.Variant.TopBottom -> "TopBottom"
-        }
-        menuSelections[(listOf("Contenitore") + "variant").joinToString(" / ")] = v
 
         // shape
         val s = when (rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect) {
@@ -1315,7 +1305,6 @@ fun EditorMenusOnly(
             "Contenitore" -> listOf(
                 k("Contenitore","scroll") to "Assente",
                 k("Contenitore","shape") to "Rettangolo",
-                k("Contenitore","variant") to "Full",
                 k("Contenitore","b_thick") to "1dp",
                 k("Contenitore","tipo") to "Normale",
                 k("Contenitore","Colore","col1") to "Bianco",
@@ -1434,13 +1423,11 @@ fun EditorMenusOnly(
         ensure("Contenitore", "Card base", mapOf(
             key(listOf("Contenitore"),"scroll") to "Assente",
             key(listOf("Contenitore"),"shape") to "Rettangolo",
-            key(listOf("Contenitore"),"variant") to "Outlined",
             key(listOf("Contenitore"),"b_thick") to "1dp",
             key(listOf("Contenitore","Colore"),"col1") to "Bianco",
             key(listOf("Contenitore","Colore"),"col2") to "Grigio chiaro",
         ))
         ensure("Contenitore", "Hero", mapOf(
-            key(listOf("Contenitore"),"variant") to "Full",
             key(listOf("Contenitore","Colore"),"col1") to "Ciano",
             key(listOf("Contenitore","Colore"),"grad") to "Orizzontale",
         ))
@@ -1525,16 +1512,15 @@ fun EditorMenusOnly(
                             rectImages.remove(old)?.let     { rectImages[updated]     = it }
                             rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
 
-                            // (consigliato) sposta anche queste, così non perdi variant/shape/fx durante il drag
-                            rectVariants.remove(old)?.let { rectVariants[updated] = it }
+                            // sposta shape/fx per non perdere decorazioni durante il drag
                             rectShapes.remove(old)?.let   { rectShapes[updated]   = it }
                             rectFx.remove(old)?.let       { rectFx[updated]       = it }
+                            
                         }
                     },
 
                     // mappe
                     fillStyles   = rectFillStyles,
-                    variants     = rectVariants,
                     shapes       = rectShapes,
                     corners      = rectCorners,
                     fx           = rectFx,
@@ -1876,19 +1862,6 @@ fun EditorMenusOnly(
                                 val rect = selectedRect
 
                                 when (label) {
-                                    // Variant
-                                    "variant" -> {
-                                        rect?.let {
-                                            val v = when ((value as? String)?.lowercase()?.trim()) {
-                                                "full"       -> com.example.appbuilder.canvas.Variant.Full
-                                                "outlined"   -> com.example.appbuilder.canvas.Variant.Outlined
-                                                "text"       -> com.example.appbuilder.canvas.Variant.Text
-                                                "topbottom"  -> com.example.appbuilder.canvas.Variant.TopBottom
-                                                else         -> com.example.appbuilder.canvas.Variant.Full
-                                            }
-                                            rectVariants[it] = v
-                                        }
-                                    }
 
                                     // Shape (blocco "cerchio" se non è quadrato)
                                     "shape" -> {
@@ -3624,12 +3597,6 @@ private fun ContainerLevel(
                 current = get("shape") ?: "Rettangolo",
                 options = listOf("Rettangolo", "Cerchio", "Pillola", "Diamante"),
                 onSelected = { onPick("shape", it) }
-            )
-
-            IconDropdown(EditorIcons.Variant, "Variant",
-                current = get("variant") ?: "Full",
-                options = listOf("Full", "Outlined", "Text", "TopBottom"),
-                onSelected = { onPick("variant", it) }
             )
             IconDropdown(
                 EditorIcons.LineWeight,
