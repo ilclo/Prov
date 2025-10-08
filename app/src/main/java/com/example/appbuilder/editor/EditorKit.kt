@@ -345,56 +345,37 @@ private fun listToRect(lst: List<Any>): com.example.appbuilder.canvas.DrawItem.R
 }
 
 
-// ---------------------- SAVE/RESTORE PAGESTATE (rettangoli + linee) ----------------------
 private fun pageStateSaver(): Saver<MutableState<PageState?>, Any> =
     listSaver(
         save = { st ->
             val ps = st.value ?: return@listSaver emptyList<Any>()
-            // Serializza sia R(ect) che L(ine) con un discriminante
-            val itemsFlat: List<List<Any>> = ps.items.map { item ->
+            val itemsFlat = ps.items.map { item ->
                 when (item) {
                     is DrawItem.RectItem -> listOf(
-                        "R",
-                        item.level,
-                        item.r0, item.c0, item.r1, item.c1,
-                        item.borderWidth.value,          // Float
-                        colorToHex(item.borderColor),    // String
-                        colorToHex(item.fillColor)       // String
+                        "R", item.level, item.r0, item.c0, item.r1, item.c1,
+                        item.borderWidth.value,
+                        colorToHex(item.borderColor),
+                        colorToHex(item.fillColor)
                     )
                     is DrawItem.LineItem -> listOf(
-                        "L",
-                        item.level,
-                        item.r0, item.c0, item.r1, item.c1,
-                        item.width.value,                // Float
-                        colorToHex(item.color)           // String
+                        "L", item.level, item.r0, item.c0, item.r1, item.c1,
+                        item.width.value,
+                        colorToHex(item.color)
                     )
                 }
             }
-            listOf(
-                ps.id ?: "",                 // 0
-                ps.scroll ?: "Assente",      // 1
-                ps.gridDensity,              // 2
-                ps.currentLevel,             // 3
-                itemsFlat                    // 4
-            )
+            listOf(ps.id ?: "", ps.scroll ?: "Assente", ps.gridDensity, ps.currentLevel, itemsFlat)
         },
         restore = { lst ->
             if (lst.isEmpty()) mutableStateOf<PageState?>(null) else {
-                val id     = lst[0] as String
-                val scroll = lst[1] as String
-                val grid   = lst[2] as Int
-                val level  = lst[3] as Int
+                val ps = PageState(
+                    id = lst[0] as String,
+                    scroll = lst[1] as String,
+                    gridDensity = lst[2] as Int,
+                    currentLevel = lst[3] as Int
+                )
                 @Suppress("UNCHECKED_CAST")
                 val itemsFlat = lst[4] as List<List<*>>
-
-                val ps = PageState(
-                    id = id,
-                    scroll = scroll,
-                    gridDensity = grid,
-                    currentLevel = level
-                )
-
-                // Ricostruisci sia R(ect) che L(ine)
                 itemsFlat.forEach { it ->
                     when (it[0] as String) {
                         "R" -> ps.items.add(
@@ -404,7 +385,8 @@ private fun pageStateSaver(): Saver<MutableState<PageState?>, Any> =
                                 r1 = it[4] as Int, c1 = it[5] as Int,
                                 borderWidth = ((it[6] as Number).toFloat()).dp,
                                 borderColor = hexToColorSafe(it[7] as String),
-                                fillColor   = hexToColorSafe(it[8] as String)
+                                // fill con fallback trasparente:
+                                fillColor   = hexToColor(it[8] as String) ?: Color.Transparent
                             )
                         )
                         "L" -> ps.items.add(
@@ -528,6 +510,11 @@ private fun FilterDropdown(
 }
 
 
+// vicino a colorToHex(...) e hexToColor(...)
+private fun hexToColorSafe(s: String?): Color {
+    // riusa il tuo hexToColor top-level, con fallback sicuro
+    return hexToColor(s) ?: Color.Black
+}
 
 
 
@@ -1051,120 +1038,11 @@ fun EditorMenusOnly(
         (green * 255).toInt().coerceIn(0,255),
         (blue * 255).toInt().coerceIn(0,255)
     )
-    fun hexToColorSafe(s: String?): Color {
-        val t = s?.trim()?.removePrefix("#") ?: return Color.Black
-        val v = t.toLongOrNull(16) ?: return Color.Black
-        return when (t.length) {
-            6 -> {
-                val r = ((v shr 16) and 0xFF).toInt() / 255f
-                val g = ((v shr  8) and 0xFF).toInt() / 255f
-                val b = ( v        and 0xFF).toInt() / 255f
-                Color(r, g, b, 1f)
-            }
-            8 -> {
-                val a = ((v shr 24) and 0xFF).toInt() / 255f
-                val r = ((v shr 16) and 0xFF).toInt() / 255f
-                val g = ((v shr  8) and 0xFF).toInt() / 255f
-                val b = ( v         and 0xFF).toInt() / 255f
-                Color(r, g, b, a)
-            }
-            else -> Color.Black
-        }
-    }
 
-    // Saver compatto: id, scroll, grid, level, flat list di items
-    val pageStateSaver = listSaver<PageState?, Any>(
-        save = { ps ->
-            if (ps == null) emptyList()
-            else {
-                // “appiattisco” gli items in liste primitive compatibili con SavedState
-                val itemsFlat: List<List<Any>> = ps.items.map { item ->
-                    when (item) {
-                        is DrawItem.RectItem -> listOf(
-                            "R",                        // tipo
-                            item.level,
-                            item.r0, item.c0, item.r1, item.c1,
-                            item.borderWidth.value,     // Float
-                            item.borderColor.toHex(),   // String
-                            item.fillColor.toHex()      // String
-                        )
-                        is DrawItem.LineItem -> listOf(
-                            "L",
-                            item.level,
-                            item.r0, item.c0, item.r1, item.c1,
-                            item.width.value,           // Float
-                            item.color.toHex()          // String
-                        )
-                    }
-                }
-                listOf(
-                    ps.id ?: "",                       // 0
-                    ps.scroll ?: "Assente",            // 1
-                    ps.gridDensity,                    // 2
-                    ps.currentLevel,                   // 3
-                    itemsFlat                          // 4
-                )
-            }
-        },
-        restore = { lst ->
-            if (lst.isEmpty()) null
-            else {
-                val id     = lst[0] as String
-                val scroll = lst[1] as String
-                val grid   = lst[2] as Int
-                val level  = lst[3] as Int
-                @Suppress("UNCHECKED_CAST")
-                val itemsFlat = lst[4] as List<List<*>>
 
-                // Ricreo PageState col suo costruttore “ufficiale”
-                // (in wizard tu crei PageState(id, scroll, gridDensity, currentLevel) — vedi sotto)
-                val ps = PageState(
-                    id = id,
-                    scroll = scroll,
-                    gridDensity = grid,
-                    currentLevel = level
-                )
-
-                // Ricostruisco gli items
-                itemsFlat.forEach { it ->
-                    val t = it[0] as String
-                    if (t == "R") {
-                        val lvl = it[1] as Int
-                        val r0  = it[2] as Int
-                        val c0  = it[3] as Int
-                        val r1  = it[4] as Int
-                        val c1  = it[5] as Int
-                        val bw  = (it[6] as Number).toFloat().dp
-                        val bc  = hexToColorSafe(it[7] as String)
-                        val fc  = hexToColorSafe(it[8] as String)
-                        ps.items.add(
-                            DrawItem.RectItem(
-                                level = lvl, r0 = r0, c0 = c0, r1 = r1, c1 = c1,
-                                borderColor = bc, borderWidth = bw, fillColor = fc
-                            )
-                        )
-                    } else { // "L"
-                        val lvl = it[1] as Int
-                        val r0  = it[2] as Int
-                        val c0  = it[3] as Int
-                        val r1  = it[4] as Int
-                        val c1  = it[5] as Int
-                        val w   = (it[6] as Number).toFloat().dp
-                        val col = hexToColorSafe(it[7] as String)
-                        ps.items.add(
-                            DrawItem.LineItem(
-                                level = lvl, r0 = r0, c0 = c0, r1 = r1, c1 = c1,
-                                color = col, width = w
-                            )
-                        )
-                    }
-                }
-                ps
-            }
-        }
-    )
-
-    var pageState by rememberSaveable(stateSaver = pageStateSaver()) { mutableStateOf<PageState?>(null) }
+    var pageState by rememberSaveable(stateSaver = pageStateSaver()) {
+        mutableStateOf<PageState?>(null)
+}
 
     fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
     fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
