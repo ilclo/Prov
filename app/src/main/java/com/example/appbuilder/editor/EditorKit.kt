@@ -344,29 +344,80 @@ private fun listToRect(lst: List<Any>): com.example.appbuilder.canvas.DrawItem.R
     )
 }
 
-/**
- * Saver per ricordare PageState su rotazione/recreate.
- * Serializza:
- *  [0]=id:String, [1]=scroll:String, [2]=grid:Int, [3]=currentLevel:Int, [4]=items:List<List<Any>>
- * Al momento serializziamo i soli RectItem (gli elementi che usi per i contenitori).
- */
-// ESEMPIO di implementazione corretta del Saver (estratto)
+
+// ---------------------- SAVE/RESTORE PAGESTATE (rettangoli + linee) ----------------------
 private fun pageStateSaver(): Saver<MutableState<PageState?>, Any> =
     listSaver(
         save = { st ->
-            val ps = st.value ?: return@listSaver emptyList<Any>() // <-- tipizza!
-            val items: List<List<Any>> = ps.items.map(::rectToList)
-            listOf(ps.id, ps.scroll, ps.gridDensity, ps.currentLevel, items)
+            val ps = st.value ?: return@listSaver emptyList<Any>()
+            // Serializza sia R(ect) che L(ine) con un discriminante
+            val itemsFlat: List<List<Any>> = ps.items.map { item ->
+                when (item) {
+                    is DrawItem.RectItem -> listOf(
+                        "R",
+                        item.level,
+                        item.r0, item.c0, item.r1, item.c1,
+                        item.borderWidth.value,          // Float
+                        colorToHex(item.borderColor),    // String
+                        colorToHex(item.fillColor)       // String
+                    )
+                    is DrawItem.LineItem -> listOf(
+                        "L",
+                        item.level,
+                        item.r0, item.c0, item.r1, item.c1,
+                        item.width.value,                // Float
+                        colorToHex(item.color)           // String
+                    )
+                }
+            }
+            listOf(
+                ps.id ?: "",                 // 0
+                ps.scroll ?: "Assente",      // 1
+                ps.gridDensity,              // 2
+                ps.currentLevel,             // 3
+                itemsFlat                    // 4
+            )
         },
-        restore = { list ->
-            if (list.isEmpty()) mutableStateOf<PageState?>(null) else {
-                val id           = list[0] as String
-                val scroll       = list[1] as String
-                val gridDensity  = list[2] as Int
-                val currentLevel = list[3] as Int
-                val itemsData    = list[4] as List<List<Any>>
-                val ps = PageState(id = id, scroll = scroll, gridDensity = gridDensity, currentLevel = currentLevel)
-                itemsData.map(::listToRect).forEach { ps.items.add(it) }
+        restore = { lst ->
+            if (lst.isEmpty()) mutableStateOf<PageState?>(null) else {
+                val id     = lst[0] as String
+                val scroll = lst[1] as String
+                val grid   = lst[2] as Int
+                val level  = lst[3] as Int
+                @Suppress("UNCHECKED_CAST")
+                val itemsFlat = lst[4] as List<List<*>>
+
+                val ps = PageState(
+                    id = id,
+                    scroll = scroll,
+                    gridDensity = grid,
+                    currentLevel = level
+                )
+
+                // Ricostruisci sia R(ect) che L(ine)
+                itemsFlat.forEach { it ->
+                    when (it[0] as String) {
+                        "R" -> ps.items.add(
+                            DrawItem.RectItem(
+                                level = it[1] as Int,
+                                r0 = it[2] as Int, c0 = it[3] as Int,
+                                r1 = it[4] as Int, c1 = it[5] as Int,
+                                borderWidth = ((it[6] as Number).toFloat()).dp,
+                                borderColor = hexToColorSafe(it[7] as String),
+                                fillColor   = hexToColorSafe(it[8] as String)
+                            )
+                        )
+                        "L" -> ps.items.add(
+                            DrawItem.LineItem(
+                                level = it[1] as Int,
+                                r0 = it[2] as Int, c0 = it[3] as Int,
+                                r1 = it[4] as Int, c1 = it[5] as Int,
+                                width = ((it[6] as Number).toFloat()).dp,
+                                color = hexToColorSafe(it[7] as String)
+                            )
+                        )
+                    }
+                }
                 mutableStateOf(ps)
             }
         }
@@ -1113,7 +1164,7 @@ fun EditorMenusOnly(
         }
     )
 
-    var pageState by rememberSaveable(stateSaver = pageStateSaver) { mutableStateOf<PageState?>(null) }
+    var pageState by rememberSaveable(stateSaver = pageStateSaver()) { mutableStateOf<PageState?>(null) }
 
     fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
     fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
