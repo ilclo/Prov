@@ -318,6 +318,7 @@ private fun FilterSwatch(name: String, modifier: Modifier = Modifier) {
     }
 }
 
+
 @Composable
 private fun FilterDropdown(
     icon: ImageVector,
@@ -929,6 +930,8 @@ fun EditorMenusOnly(
         val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 1f
         return n.dp
     }
+
+
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
 
         // shape
@@ -977,7 +980,28 @@ fun EditorMenusOnly(
         menuSelections["Contenitore / Bordi / ic_rightb"] = bs.right
     }
 
+    // EditorMenusOnly — utility centrale
+    fun replaceRectKeepingMaps(
+        old: DrawItem.RectItem,
+        updated: DrawItem.RectItem
+    ) {
+        val ps = pageState ?: return
+        val i = ps.items.indexOf(old)
+        if (i >= 0) ps.items[i] = updated
 
+        // Migra tutte le mappe per-rect
+        rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
+        rectImages.remove(old)?.let     { rectImages[updated]     = it }
+        rectBorderSides.remove(old)?.let{ rectBorderSides[updated]= it }
+        rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
+        rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
+        rectFx.remove(old)?.let         { rectFx[updated]         = it }
+
+        if (selectedRect == old) {
+            selectedRect = updated
+            applyContainerMenuFromRect(updated) // mantiene le label coerenti
+        }
+    }
 
     // Griglia
     var gridPanelOpen by remember { mutableStateOf(false) }
@@ -1902,9 +1926,9 @@ fun EditorMenusOnly(
                                 pageState?.let { ps ->
                                     val i = ps.items.indexOf(rect)
                                     if (i >= 0) {
-                                        val updated = rect.copy(borderColor = picked)
-                                        ps.items[i] = updated
-                                        selectedRect = updated
+                                        selectedRect?.let { rect ->
+                                            replaceRectKeepingMaps(rect, rect.copy(borderColor = picked))
+                                        }
                                     }
                                 }
                             }
@@ -1916,9 +1940,9 @@ fun EditorMenusOnly(
                                     pageState?.let { ps ->
                                         val i = ps.items.indexOf(rect)
                                         if (i >= 0) {
-                                            val updated = rect.copy(fillColor = picked)
-                                            ps.items[i] = updated
-                                            selectedRect = updated
+                                            selectedRect?.let { rect ->
+                                                replaceRectKeepingMaps(rect, rect.copy(fillColor = picked))
+                                            }
                                         }
                                     }
                                     menuSelections[(listOf("Contenitore","Colore") + "col1").joinToString(" / ")] = hex
@@ -3291,9 +3315,7 @@ private fun ContainerLevel(
             // LEFT
             ToggleIcon(
                 selected = isOn("ic_leftb"),
-                onClick = {
-                    if (isRect) onToggle("ic_leftb", !isOn("ic_leftb"))
-                },
+                onClick = { onToggle("ic_leftb", !isOn("ic_leftb")) },
                 icon = safeVector(R.drawable.ic_leftb, EditorIcons.Square)
             )
 
@@ -3331,6 +3353,13 @@ private fun ContainerLevel(
                 current = (selections[key(path, "Colore")] as? String) ?: "Palette…",
                 options = listOf("Palette…"),
                 onSelected = { onPick("Colore", it) }
+            )
+            IconDropdown(
+                icon = Icons.Outlined.LinearScale, // icona qualunque
+                contentDescription = "Spessore (stub)",
+                current = (selections[key(path, "Spessore")] as? String) ?: "1dp",
+                options = listOf("0dp","1dp","2dp","3dp","4dp"),
+                onSelected = { onPick("Spessore", it) } // solo memorizzazione; niente canvas
             )
         }
         "Immagini" -> {
