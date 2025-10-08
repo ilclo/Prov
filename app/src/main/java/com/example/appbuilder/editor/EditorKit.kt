@@ -943,8 +943,14 @@ fun EditorMenusOnly(
         }
         menuSelections[(listOf("Contenitore") + "shape").joinToString(" / ")] = s
 
-        // angoli
+        // angoli (ora sotto: Contenitore / Bordi / Angoli) + scrittura legacy per retrocompatibilità
         val cr = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
+        val kAng = listOf("Contenitore","Bordi","Angoli")
+        menuSelections[(kAng + "ic_as").joinToString(" / ")] = dpToKey(cr.tl)
+        menuSelections[(kAng + "ic_ad").joinToString(" / ")] = dpToKey(cr.tr)
+        menuSelections[(kAng + "ic_bs").joinToString(" / ")] = dpToKey(cr.bl)
+        menuSelections[(kAng + "ic_bd").joinToString(" / ")] = dpToKey(cr.br)
+        // legacy keys (piatti) mantenuti per chiavi salvate in preset precedenti
         menuSelections["Contenitore / ic_as"] = dpToKey(cr.tl)
         menuSelections["Contenitore / ic_ad"] = dpToKey(cr.tr)
         menuSelections["Contenitore / ic_bs"] = dpToKey(cr.bl)
@@ -1180,10 +1186,10 @@ fun EditorMenusOnly(
                 k("Contenitore","Aggiungi album","fit") to "Cover",
                 k("Contenitore","Aggiungi album","anim") to "Slide",
                 k("Contenitore","Aggiungi album","speed") to "Media",
-                k("Contenitore","ic_as") to "0dp",  // angolo alto-sinistra
-                k("Contenitore","ic_ad") to "0dp",  // angolo alto-destra
-                k("Contenitore","ic_bs") to "0dp",  // angolo basso-sinistra
-                k("Contenitore","ic_bd") to "0dp",  // angolo basso-destra
+                k("Contenitore","Bordi","Angoli","ic_as") to "0dp",  // alto-sinistra
+                k("Contenitore","Bordi","Angoli","ic_ad") to "0dp",  // alto-destra
+                k("Contenitore","Bordi","Angoli","ic_bs") to "0dp",  // basso-sinistra
+                k("Contenitore","Bordi","Angoli","ic_bd") to "0dp",  // basso-destra
             )
             "Layout" -> listOf(
                 k("Layout","Colore","col1") to "Bianco",
@@ -2913,7 +2919,10 @@ private fun LayoutLevel(
     when (path.getOrNull(1)) {
         null -> {
 // ROOT Layout
-            ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
+            ToolbarIconButton(
+                icon = safeVector(R.drawable.ic_colors, EditorIcons.Color),
+                contentDescription = "Colore"
+            ) { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
 
 // NEW: aree che riusano i sottomenu del Layout (whitelist)
@@ -3188,10 +3197,6 @@ private fun ContainerLevel(
 
             ToolbarIconButton(EditorIcons.Color, "Colore") { onEnter("Colore") }
             ToolbarIconButton(EditorIcons.Image, "Immagini") { onEnter("Immagini") }
-            ToolbarIconButton(
-                icon = safeVector(R.drawable.ic_modify_corners, EditorIcons.Square),
-                contentDescription = "Angoli"
-            ) { onEnter("Angoli") }
 
             IconDropdown(EditorIcons.SwipeVertical, "Scrollabilità ",
                 current = get("scroll") ?: "Assente",
@@ -3304,63 +3309,106 @@ private fun ContainerLevel(
             )
         }
         "Bordi" -> {
-            // Abilita i toggle solo su rettangoli
-            val rect = selectedRect
-            val isRect = rect != null && (rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect) == com.example.appbuilder.canvas.ShapeKind.Rect
+            when (path.getOrNull(2)) {
+                // Livello "Bordi" (elenco comandi)
+                null -> {
+                    // Abilita i toggle solo su rettangoli
+                    val rect = selectedRect
+                    val isRect = rect != null && (rectShapes[rect]
+                        ?: com.example.appbuilder.canvas.ShapeKind.Rect) == com.example.appbuilder.canvas.ShapeKind.Rect
 
-            // Helper per default ON
-            fun isOn(label: String): Boolean =
-                (selections[key(path, label)] as? Boolean) ?: true
+                    fun isOn(label: String): Boolean =
+                        (selections[key(path, label)] as? Boolean) ?: true
 
-            // LEFT
-            ToggleIcon(
-                selected = isOn("ic_leftb"),
-                onClick = { onToggle("ic_leftb", !isOn("ic_leftb")) },
-                icon = safeVector(R.drawable.ic_leftb, EditorIcons.Square)
-            )
+                    // LEFT
+                    ToggleIcon(
+                        selected = isOn("ic_leftb"),
+                        onClick = { if (isRect) onToggle("ic_leftb", !isOn("ic_leftb")) },
+                        icon = safeVector(R.drawable.ic_leftb, EditorIcons.Square)
+                    )
+                    // UP
+                    ToggleIcon(
+                        selected = isOn("ic_upb"),
+                        onClick = { if (isRect) onToggle("ic_upb", !isOn("ic_upb")) },
+                        icon = safeVector(R.drawable.ic_upb, EditorIcons.Square)
+                    )
+                    // DOWN
+                    ToggleIcon(
+                        selected = isOn("ic_downb"),
+                        onClick = { if (isRect) onToggle("ic_downb", !isOn("ic_downb")) },
+                        icon = safeVector(R.drawable.ic_downb, EditorIcons.Square)
+                    )
+                    // RIGHT
+                    ToggleIcon(
+                        selected = isOn("ic_rightb"),
+                        onClick = { if (isRect) onToggle("ic_rightb", !isOn("ic_rightb")) },
+                        icon = safeVector(R.drawable.ic_rightb, EditorIcons.Square)
+                    )
 
-            // UP
-            ToggleIcon(
-                selected = isOn("ic_upb"),
-                onClick = {
-                    if (isRect) onToggle("ic_upb", !isOn("ic_upb"))
-                },
-                icon = safeVector(R.drawable.ic_upb, EditorIcons.Square)
-            )
+                    // Angoli → spostato qui dentro
+                    ToolbarIconButton(
+                        icon = safeVector(R.drawable.ic_modify_corners, EditorIcons.Square),
+                        contentDescription = "Angoli"
+                    ) { onEnter("Angoli") }
 
-            // DOWN
-            ToggleIcon(
-                selected = isOn("ic_downb"),
-                onClick = {
-                    if (isRect) onToggle("ic_downb", !isOn("ic_downb"))
-                },
-                icon = safeVector(R.drawable.ic_downb, EditorIcons.Square)
-            )
+                    // Spessore (stub) → icona aggiornata a ic_border_weight
+                    ToolbarIconButton(
+                        icon = safeVector(R.drawable.ic_border_weight, Icons.Outlined.LinearScale),
+                        contentDescription = "Spessore"
+                    ) { onEnter("Spessore") } // nessuna logica: solo referente UI
 
-            // RIGHT
-            ToggleIcon(
-                selected = isOn("ic_rightb"),
-                onClick = {
-                    if (isRect) onToggle("ic_rightb", !isOn("ic_rightb"))
-                },
-                icon = safeVector(R.drawable.ic_rightb, EditorIcons.Square)
-            )
+                    // Colore bordo (apre la palette flottante, intercettata a livello superiore)
+                    IconDropdown(
+                        icon = EditorIcons.Brush,
+                        contentDescription = "Colore",
+                        current = (selections[key(path, "Colore")] as? String) ?: "Palette…",
+                        options = listOf("Palette…"),
+                        onSelected = { onPick("Colore", it) }
+                    )
+                }
+                // Sottomenù: Bordi → Angoli
+                "Angoli" -> {
+                    val dpOpts = listOf("0dp","4dp","8dp","12dp","16dp","24dp")
+                    // Legge prima il valore sul nuovo path, fallback ai vecchi key "piatti"
+                    fun currAngle(key: String): String =
+                        (selections[key(listOf("Contenitore","Bordi","Angoli"), key)] as? String)
+                            ?: (selections["Contenitore / $key"] as? String)
+                            ?: "0dp"
 
-            // Colore bordo (riusa la palette flottante già intercettata come "Contenitore / Bordi / Colore")
-            IconDropdown(
-                icon = EditorIcons.Brush,
-                contentDescription = "Colore",
-                current = (selections[key(path, "Colore")] as? String) ?: "Palette…",
-                options = listOf("Palette…"),
-                onSelected = { onPick("Colore", it) }
-            )
-            IconDropdown(
-                icon = Icons.Outlined.LinearScale, // icona qualunque
-                contentDescription = "Spessore (stub)",
-                current = (selections[key(path, "Spessore")] as? String) ?: "1dp",
-                options = listOf("0dp","1dp","2dp","3dp","4dp"),
-                onSelected = { onPick("Spessore", it) } // solo memorizzazione; niente canvas
-            )
+                    IconDropdown(
+                        icon = safeVector(R.drawable.ic_ad, EditorIcons.Square),
+                        contentDescription = "Angolo in alto a dx",
+                        current = currAngle("ic_ad"),
+                        options = dpOpts,
+                        onSelected = { onPick("ic_ad", it) }
+                    )
+                    IconDropdown(
+                        icon = safeVector(R.drawable.ic_bd, EditorIcons.Square),
+                        contentDescription = "Angolo in basso a dx",
+                        current = currAngle("ic_bd"),
+                        options = dpOpts,
+                        onSelected = { onPick("ic_bd", it) }
+                    )
+                    IconDropdown(
+                        icon = safeVector(R.drawable.ic_bs, EditorIcons.Square),
+                        contentDescription = "Angolo in basso a sx",
+                        current = currAngle("ic_bs"),
+                        options = dpOpts,
+                        onSelected = { onPick("ic_bs", it) }
+                    )
+                    IconDropdown(
+                        icon = safeVector(R.drawable.ic_as, EditorIcons.Square),
+                        contentDescription = "Angolo in alto a sx",
+                        current = currAngle("ic_as"),
+                        options = dpOpts,
+                        onSelected = { onPick("ic_as", it) }
+                    )
+                }
+                // Sottomenù: Bordi → Spessore (stub)
+                "Spessore" -> {
+                    // Stub intenzionale: nessuna opzione per ora
+                }
+            }
         }
         "Immagini" -> {
             when (path.getOrNull(2)) {
