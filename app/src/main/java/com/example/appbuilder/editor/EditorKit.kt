@@ -145,8 +145,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import com.example.appbuilder.text.TextOverlay
 import com.example.appbuilder.text.TextEngine
+import com.example.appbuilder.text.TextLayer
+
 private val LocalIsFree = staticCompositionLocalOf { true }
 
 private const val codiceprofree = 12345
@@ -989,7 +990,6 @@ fun EditorMenusOnly(
         rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
         rectFx.remove(old)?.let         { rectFx[updated]         = it }
         textEngine.onRectReplaced(old, updated)
-
         if (selectedRect == old) {
             selectedRect = updated
             applyContainerMenuFromRect(updated) // mantiene le label coerenti
@@ -1386,15 +1386,13 @@ fun EditorMenusOnly(
                     imageStyles  = rectImages
 
                 )
+                TextLayer(
+                    active = (menuPath.firstOrNull() == "Testo"),
+                    page   = pageState,
+                    engine = textEngine
+                )
 
             }
-            com.example.appbuilder.text.TextOverlay(
-                engine = textEngine,
-                page   = pageState,
-                gridDensity = pageState?.gridDensity ?: 6,
-                enabled = (menuPath.firstOrNull() == "Testo")
-            )
-
 
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
