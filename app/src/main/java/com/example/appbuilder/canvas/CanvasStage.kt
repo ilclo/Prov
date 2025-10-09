@@ -747,47 +747,21 @@ fun CanvasStage(
                                 }
                             }
 // --- BORDO (per-lato solo se Rect) ---
-                            val stroke = Stroke(item.borderWidth.toPx())
-                            val sides = borderSides[item]
-                            val isRectShape = (shapes[item] ?: ShapeKind.Rect) == ShapeKind.Rect
+                            val strokePx = item.borderWidth.toPx()
+                            if (strokePx > 0f) {
+                                val stroke = Stroke(strokePx)
+                                val sides = borderSides[item]
+                                val isRectShape = (shapes[item] ?: ShapeKind.Rect) == ShapeKind.Rect
 
-                            if (!isRectShape || sides == null || (sides.left && sides.top && sides.right && sides.bottom)) {
-                                // Forma non-Rect → bordo intero
-                                // Nessuna preferenza registrata → bordo intero
-                                // Tutti i lati ON → bordo intero
-                                drawPath(
-                                    path = path,
-                                    color = item.borderColor,
-                                    style = stroke
-                                )
-                            } else {
-                                // Disegno per-lato con clip: ciascun lato ritaglia metà area adiacente
-                                val halfW = w / 2f
-                                val halfH = h / 2f
-
-                                // TOP
-                                if (sides.top) {
-                                    clipRect(left, top, left + w, top + halfH) {
-                                        drawPath(path = path, color = item.borderColor, style = stroke)
-                                    }
-                                }
-                                // BOTTOM
-                                if (sides.bottom) {
-                                    clipRect(left, top + halfH, left + w, top + h) {
-                                        drawPath(path = path, color = item.borderColor, style = stroke)
-                                    }
-                                }
-                                // LEFT
-                                if (sides.left) {
-                                    clipRect(left, top, left + halfW, top + h) {
-                                        drawPath(path = path, color = item.borderColor, style = stroke)
-                                    }
-                                }
-                                // RIGHT
-                                if (sides.right) {
-                                    clipRect(left + halfW, top, left + w, top + h) {
-                                        drawPath(path = path, color = item.borderColor, style = stroke)
-                                    }
+                                if (!isRectShape || sides == null || (sides.left && sides.top && sides.right && sides.bottom)) {
+                                    drawPath(path = path, color = item.borderColor, style = stroke)
+                                } else {
+                                    val halfW = w / 2f
+                                    val halfH = h / 2f
+                                    if (sides.top)    clipRect(left,           top,        left + w,     top + halfH) { drawPath(path, item.borderColor, stroke) }
+                                    if (sides.bottom) clipRect(left,           top + halfH,left + w,     top + h    ) { drawPath(path, item.borderColor, stroke) }
+                                    if (sides.left)   clipRect(left,           top,        left + halfW, top + h    ) { drawPath(path, item.borderColor, stroke) }
+                                    if (sides.right)  clipRect(left + halfW,   top,        left + w,     top + h    ) { drawPath(path, item.borderColor, stroke) }
                                 }
                             }
                         }

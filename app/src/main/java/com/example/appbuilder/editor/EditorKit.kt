@@ -955,6 +955,7 @@ fun EditorMenusOnly(
         menuSelections["Contenitore / ic_ad"] = dpToKey(cr.tr)
         menuSelections["Contenitore / ic_bs"] = dpToKey(cr.bl)
         menuSelections["Contenitore / ic_bd"] = dpToKey(cr.br)
+        menuSelections["Contenitore / Bordi / Spessore"] = dpToKey(rect.borderWidth)
 
         // colore corpo (col1) / col2 / grad (rimasti come nelle tue versioni)
         val col1 = rectFillStyles[rect]?.col1 ?: rect.fillColor
@@ -1741,7 +1742,14 @@ fun EditorMenusOnly(
                                             rectShapes[it] = s
                                         }
                                     }
-
+                                    "Spessore" -> {
+                                        rect?.let {
+                                            val newWidth = keyToDp(value as String)      // es. "4dp" -> 4.dp
+                                            if (newWidth != it.borderWidth) {
+                                                replaceRectKeepingMaps(it, it.copy(borderWidth = newWidth))
+                                            }
+                                        }
+                                    }
                                     "ic_as", "ic_ad", "ic_bs", "ic_bd" -> {
                                         val rect = selectedRect
                                         if (rect != null) {
@@ -3312,38 +3320,38 @@ private fun ContainerLevel(
             when (path.getOrNull(2)) {
                 // Livello "Bordi" (elenco comandi)
                 null -> {
-                    // Abilita i toggle solo su rettangoli
+// Abilita i toggle solo su rettangoli
                     val rect = selectedRect
-                    val isRect = rect != null && (rectShapes[rect]
-                        ?: com.example.appbuilder.canvas.ShapeKind.Rect) == com.example.appbuilder.canvas.ShapeKind.Rect
+                    val isRect = rect != null && (rectShapes[rect] ?: com.example.appbuilder.canvas.ShapeKind.Rect) == com.example.appbuilder.canvas.ShapeKind.Rect
 
                     fun isOn(label: String): Boolean =
                         (selections[key(path, label)] as? Boolean) ?: true
 
-                    // LEFT
+// LEFT
                     ToggleIcon(
                         selected = isOn("ic_leftb"),
-                        onClick = { if (isRect) onToggle("ic_leftb", !isOn("ic_leftb")) },
-                        icon = safeVector(R.drawable.ic_leftb, EditorIcons.Square)
+                        onClick  = { if (isRect) onToggle("ic_leftb", !isOn("ic_leftb")) },
+                        icon     = safeVector(R.drawable.ic_leftb, EditorIcons.Square)
                     )
-                    // UP
+// UP
                     ToggleIcon(
                         selected = isOn("ic_upb"),
-                        onClick = { if (isRect) onToggle("ic_upb", !isOn("ic_upb")) },
-                        icon = safeVector(R.drawable.ic_upb, EditorIcons.Square)
+                        onClick  = { if (isRect) onToggle("ic_upb", !isOn("ic_upb")) },
+                        icon     = safeVector(R.drawable.ic_upb, EditorIcons.Square)
                     )
-                    // DOWN
+// DOWN
                     ToggleIcon(
                         selected = isOn("ic_downb"),
-                        onClick = { if (isRect) onToggle("ic_downb", !isOn("ic_downb")) },
-                        icon = safeVector(R.drawable.ic_downb, EditorIcons.Square)
+                        onClick  = { if (isRect) onToggle("ic_downb", !isOn("ic_downb")) },
+                        icon     = safeVector(R.drawable.ic_downb, EditorIcons.Square)
                     )
-                    // RIGHT
+// RIGHT
                     ToggleIcon(
                         selected = isOn("ic_rightb"),
-                        onClick = { if (isRect) onToggle("ic_rightb", !isOn("ic_rightb")) },
-                        icon = safeVector(R.drawable.ic_rightb, EditorIcons.Square)
+                        onClick  = { if (isRect) onToggle("ic_rightb", !isOn("ic_rightb")) },
+                        icon     = safeVector(R.drawable.ic_rightb, EditorIcons.Square)
                     )
+
 
                     // Angoli → spostato qui dentro
                     ToolbarIconButton(
@@ -3404,9 +3412,17 @@ private fun ContainerLevel(
                         onSelected = { onPick("ic_as", it) }
                     )
                 }
-                // Sottomenù: Bordi → Spessore (stub)
                 "Spessore" -> {
-                    // Stub intenzionale: nessuna opzione per ora
+                    val cur = (selections[key(listOf("Contenitore","Bordi"), "Spessore")] as? String)
+                        ?: (selectedRect?.borderWidth?.let { dpToKey(it) } ?: "1dp")
+
+                    IconDropdown(
+                        icon = safeVector(R.drawable.ic_border_weight, EditorIcons.Functions),
+                        contentDescription = "Spessore bordo",
+                        current  = cur,
+                        options  = listOf("0dp","1dp","2dp","3dp","4dp","6dp","8dp","12dp"),
+                        onSelected = { value -> onPick("Spessore", value) }
+                    )
                 }
             }
         }
