@@ -217,3 +217,4 @@ private fun containsCell(r: DrawItem.RectItem, row: Int, col: Int): Boolean {
     // Inclusivo (coerente con il disegno: w = (abs(c1-c0)+1)*cell)
     return row in r0..r1 && col in c0..c1
 }
+
