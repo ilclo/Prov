@@ -28,8 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import com.example.appbuilder.canvas.ToolMode
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.derivedStateOf
 import com.example.appbuilder.overlay.GridSliderOverlay
 import com.example.appbuilder.overlay.LevelPickerOverlay
@@ -41,7 +39,6 @@ import com.example.appbuilder.canvas.CanvasStage
 import com.example.appbuilder.canvas.PageState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.ExperimentalMaterial3Api
 import com.example.appbuilder.icons.EditorIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.unit.IntOffset
@@ -57,7 +54,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -65,28 +61,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BookmarkAdd
-import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.CreateNewFolder
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.LinearScale
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.List
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Redo
 import androidx.compose.material.icons.outlined.Save
-import androidx.compose.material.icons.outlined.SwapHoriz
-import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Undo
-import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -108,10 +96,8 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.material3.Switch
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButtonDefaults
@@ -134,28 +120,23 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
-import com.example.appbuilder.canvas.CornerRadii
 import com.example.appbuilder.canvas.ImageStyle
 import com.example.appbuilder.canvas.ImageFit
 import com.example.appbuilder.canvas.ImageFilter
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.IntSize
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.snapshots.SnapshotStateMap
-import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.min
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.window.Dialog
@@ -164,8 +145,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-
-
+import com.example.appbuilder.text.TextOverlay
+import com.example.appbuilder.text.TextEngine
 private val LocalIsFree = staticCompositionLocalOf { true }
 
 private const val codiceprofree = 12345
@@ -875,6 +856,10 @@ fun EditorMenusOnly(
     var cropperVisible by remember { mutableStateOf(false) }
     var cropperImageUri by remember { mutableStateOf<Uri?>(null) }
     var cropperTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+// Motore testo (nuovo)
+    val textEngine = remember { com.example.appbuilder.text.TextEngine() }
+
+
 
     // File picker per “Aggiungi foto”
     val pickImageLauncher = rememberLauncherForActivityResult(
@@ -930,8 +915,6 @@ fun EditorMenusOnly(
     var colorPickInitial by remember { mutableStateOf(Color.Black) }
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
-// Motore testo (nuovo)
-    val textEngine = remember { com.example.appbuilder.text.TextEngine() }
 
 
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
@@ -1006,7 +989,6 @@ fun EditorMenusOnly(
         rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
         rectFx.remove(old)?.let         { rectFx[updated]         = it }
         textEngine.onRectReplaced(old, updated)
-
 
         if (selectedRect == old) {
             selectedRect = updated
@@ -1340,12 +1322,18 @@ fun EditorMenusOnly(
                 )
                 .imePadding()
         ) {
-            // 1) CANVAS — PRIMO FIGLIO del Box con gradiente
+            val inTextMenu = menuPath.firstOrNull() == "Testo"
+
             Box(
                 Modifier
                     .fillMaxSize()
-                    // quando la griglia è aperta, sfoca e abbassa l'alpha SOLO del canvas
                     .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
+                    .let { base ->
+                        if (inTextMenu) {
+                            // Solo in menù Testo: lo rendo scrollabile e con padding IME
+                            base.verticalScroll(rememberScrollState()).imePadding()
+                        } else base
+                    }
             ) {
                 CanvasStage(
                     page            = pageState,
@@ -1386,7 +1374,6 @@ fun EditorMenusOnly(
                             // (consigliato) sposta anche queste, così non perdi shape/fx durante il drag
                             rectShapes.remove(old)?.let   { rectShapes[updated]   = it }
                             rectFx.remove(old)?.let       { rectFx[updated]       = it }
-                            textEngine.onRectReplaced(old, updated)
                         }
                     },
 
@@ -1397,7 +1384,9 @@ fun EditorMenusOnly(
                     borderSides  = rectBorderSides,
                     fx           = rectFx,
                     imageStyles  = rectImages
+
                 )
+
             }
             com.example.appbuilder.text.TextOverlay(
                 engine = textEngine,
@@ -1405,6 +1394,7 @@ fun EditorMenusOnly(
                 gridDensity = pageState?.gridDensity ?: 6,
                 enabled = (menuPath.firstOrNull() == "Testo")
             )
+
 
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
@@ -2251,6 +2241,7 @@ private fun BoxScope.MainBottomBar(
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
+            .imePadding()
             .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
             .onGloballyPositioned { onMeasured(it.size.height) }
     ) {
@@ -2848,6 +2839,7 @@ private fun BoxScope.SubMenuBar(
             .padding(horizontal = 12.dp)
             .offset { IntOffset(0, -offsetY) }
             .height(TOP_BAR_HEIGHT)
+            .imePadding()
     ) {
         val scroll = rememberScrollState()
         CompositionLocalProvider(
@@ -2897,6 +2889,7 @@ private fun BoxScope.BreadcrumbBar(path: List<String>, lastChanged: String?) {
             .fillMaxWidth()
             .padding(start = 12.dp, top = 0.dp, end = 12.dp, bottom = SAFE_BOTTOM_MARGIN)
             .height(BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA)
+            .imePadding()
     ) {
         val pretty = buildString {
             append(if (path.isEmpty()) "—" else path.joinToString("  →  "))
