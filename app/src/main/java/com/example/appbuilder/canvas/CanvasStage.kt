@@ -749,26 +749,107 @@ fun CanvasStage(
 // --- BORDO (per-lato solo se Rect) ---
                             val strokePx = item.borderWidth.toPx()
                             if (strokePx > 0f) {
-                                val stroke = Stroke(strokePx)
                                 val sides = borderSides[item]
                                 val isRectShape = (shapes[item] ?: ShapeKind.Rect) == ShapeKind.Rect
 
+                                // se non ci sono preferenze o la forma non è un Rect → bordo intero come prima
                                 if (!isRectShape || sides == null || (sides.left && sides.top && sides.right && sides.bottom)) {
-                                    drawPath(path = path, color = item.borderColor, style = stroke)
+                                    drawPath(path = path, color = item.borderColor, style = Stroke(strokePx))
                                 } else {
-                                    val halfW = w / 2f
-                                    val halfH = h / 2f
-                                    if (sides.top)    clipRect(left,           top,        left + w,     top + halfH) {
-                                        drawPath(path = path, color = item.borderColor, style = stroke)
+                                    // Raggi (clamp a metà del lato più corto per sicurezza)
+                                    val rtl = kotlin.math.min(rad.tl.toPx(), kotlin.math.min(w, h) / 2f)
+                                    val rtr = kotlin.math.min(rad.tr.toPx(), kotlin.math.min(w, h) / 2f)
+                                    val rbr = kotlin.math.min(rad.br.toPx(), kotlin.math.min(w, h) / 2f)
+                                    val rbl = kotlin.math.min(rad.bl.toPx(), kotlin.math.min(w, h) / 2f)
+
+                                    val half = strokePx / 2f
+
+                                    // Helpers: dove iniziano/finiscono i segmenti quando ci sono gli archi
+                                    val topStartX    = left + if (sides.left  && rtl > 0f) rtl else half
+                                    val topEndX      = left + w - if (sides.right && rtr > 0f) rtr else half
+                                    val bottomStartX = left + if (sides.left  && rbl > 0f) rbl else half
+                                    val bottomEndX   = left + w - if (sides.right && rbr > 0f) rbr else half
+
+                                    val leftStartY   = top + if (sides.top    && rtl > 0f) rtl else half
+                                    val leftEndY     = top + h - if (sides.bottom && rbl > 0f) rbl else half
+                                    val rightStartY  = top + if (sides.top    && rtr > 0f) rtr else half
+                                    val rightEndY    = top + h - if (sides.bottom && rbr > 0f) rbr else half
+
+                                    // Segmenti rettilinei (solo il lato richiesto)
+                                    if (sides.top && topEndX > topStartX) {
+                                        val y = top + half
+                                        drawLine(
+                                            color = item.borderColor,
+                                            start = Offset(topStartX, y),
+                                            end   = Offset(topEndX,   y),
+                                            strokeWidth = strokePx
+                                        )
                                     }
-                                    if (sides.bottom) clipRect(left,           top + halfH,left + w,     top + h    ) {
-                                        drawPath(path = path, color = item.borderColor, style = stroke)
+                                    if (sides.bottom && bottomEndX > bottomStartX) {
+                                        val y = top + h - half
+                                        drawLine(
+                                            color = item.borderColor,
+                                            start = Offset(bottomStartX, y),
+                                            end   = Offset(bottomEndX,   y),
+                                            strokeWidth = strokePx
+                                        )
                                     }
-                                    if (sides.left)   clipRect(left,           top,        left + halfW, top + h    ) {
-                                        drawPath(path = path, color = item.borderColor, style = stroke)
+                                    if (sides.left && leftEndY > leftStartY) {
+                                        val x = left + half
+                                        drawLine(
+                                            color = item.borderColor,
+                                            start = Offset(x, leftStartY),
+                                            end   = Offset(x, leftEndY),
+                                            strokeWidth = strokePx
+                                        )
                                     }
-                                    if (sides.right)  clipRect(left + halfW,   top,        left + w,     top + h    ) {
-                                        drawPath(path = path, color = item.borderColor, style = stroke)
+                                    if (sides.right && rightEndY > rightStartY) {
+                                        val x = left + w - half
+                                        drawLine(
+                                            color = item.borderColor,
+                                            start = Offset(x, rightStartY),
+                                            end   = Offset(x, rightEndY),
+                                            strokeWidth = strokePx
+                                        )
+                                    }
+
+                                    // Archi d'angolo: si disegnano SOLO se entrambi i lati che convergono sono ON
+                                    fun arcSize(r: Float) = 2f * r - strokePx
+                                    if (rtl > 0f && sides.top && sides.left && arcSize(rtl) > 0f) {
+                                        drawArc(
+                                            color = item.borderColor,
+                                            startAngle = 180f, sweepAngle = 90f, useCenter = false,
+                                            topLeft = Offset(left + half, top + half),
+                                            size = Size(arcSize(rtl), arcSize(rtl)),
+                                            style = Stroke(strokePx)
+                                        )
+                                    }
+                                    if (rtr > 0f && sides.top && sides.right && arcSize(rtr) > 0f) {
+                                        drawArc(
+                                            color = item.borderColor,
+                                            startAngle = 270f, sweepAngle = 90f, useCenter = false,
+                                            topLeft = Offset(left + w - (2f * rtr) + half, top + half),
+                                            size = Size(arcSize(rtr), arcSize(rtr)),
+                                            style = Stroke(strokePx)
+                                        )
+                                    }
+                                    if (rbr > 0f && sides.bottom && sides.right && arcSize(rbr) > 0f) {
+                                        drawArc(
+                                            color = item.borderColor,
+                                            startAngle = 0f, sweepAngle = 90f, useCenter = false,
+                                            topLeft = Offset(left + w - (2f * rbr) + half, top + h - (2f * rbr) + half),
+                                            size = Size(arcSize(rbr), arcSize(rbr)),
+                                            style = Stroke(strokePx)
+                                        )
+                                    }
+                                    if (rbl > 0f && sides.bottom && sides.left && arcSize(rbl) > 0f) {
+                                        drawArc(
+                                            color = item.borderColor,
+                                            startAngle = 90f, sweepAngle = 90f, useCenter = false,
+                                            topLeft = Offset(left + half, top + h - (2f * rbl) + half),
+                                            size = Size(arcSize(rbl), arcSize(rbl)),
+                                            style = Stroke(strokePx)
+                                        )
                                     }
                                 }
                             }
