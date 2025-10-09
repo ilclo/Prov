@@ -3327,28 +3327,24 @@ private fun ContainerLevel(
                     fun isOn(label: String): Boolean =
                         (selections[key(path, label)] as? Boolean) ?: true
 
-// LEFT
                     ToggleIcon(
                         selected = isOn("ic_leftb"),
-                        onClick  = { if (isRect) onToggle("ic_leftb", !isOn("ic_leftb")) },
+                        onClick  = { onToggle("ic_leftb", !isOn("ic_leftb")) },
                         icon     = safeVector(R.drawable.ic_leftb, EditorIcons.Square)
                     )
-// UP
                     ToggleIcon(
                         selected = isOn("ic_upb"),
-                        onClick  = { if (isRect) onToggle("ic_upb", !isOn("ic_upb")) },
+                        onClick  = { onToggle("ic_upb", !isOn("ic_upb")) },
                         icon     = safeVector(R.drawable.ic_upb, EditorIcons.Square)
                     )
-// DOWN
                     ToggleIcon(
                         selected = isOn("ic_downb"),
-                        onClick  = { if (isRect) onToggle("ic_downb", !isOn("ic_downb")) },
+                        onClick  = { onToggle("ic_downb", !isOn("ic_downb")) },
                         icon     = safeVector(R.drawable.ic_downb, EditorIcons.Square)
                     )
-// RIGHT
                     ToggleIcon(
                         selected = isOn("ic_rightb"),
-                        onClick  = { if (isRect) onToggle("ic_rightb", !isOn("ic_rightb")) },
+                        onClick  = { onToggle("ic_rightb", !isOn("ic_rightb")) },
                         icon     = safeVector(R.drawable.ic_rightb, EditorIcons.Square)
                     )
 
@@ -3365,9 +3361,8 @@ private fun ContainerLevel(
                         contentDescription = "Spessore"
                     ) { onEnter("Spessore") } // nessuna logica: solo referente UI
 
-                    // Colore bordo (apre la palette flottante, intercettata a livello superiore)
                     IconDropdown(
-                        icon = EditorIcons.Brush,
+                        icon = safeVector(R.drawable.ic_colors, EditorIcons.Brush),
                         contentDescription = "Colore",
                         current = (selections[key(path, "Colore")] as? String) ?: "Palette…",
                         options = listOf("Palette…"),
