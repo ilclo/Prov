@@ -28,7 +28,7 @@ import kotlin.math.min
 import com.example.appbuilder.canvas.DrawItem
 import com.example.appbuilder.canvas.PageState
 
-/** Blocco di testo posizionato su griglia, opzionalmente “figlio” di un contenitore. */
+/** Blocco di testo posizionato su griglia, opzionalmente “figlio” di un contenitore. **/
 @Stable
 data class TextBlock(
     val id: String = java.util.UUID.randomUUID().toString(),
