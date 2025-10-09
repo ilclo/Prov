@@ -1,9 +1,10 @@
 package com.example.appbuilder.text
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
@@ -25,8 +26,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.offset as pixelOffset // per offset(IntOffset)
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -34,7 +35,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,10 +97,11 @@ fun BoxScope.TextOverlay(
     // layer che copre esattamente il Canvas
     Box(
         modifier = Modifier
-            .matchParentSize()
+            .fillMaxSize()
             .onSizeChanged { newSize -> canvasSize = newSize }
             .pointerInput(enabled, page, gridDensity, canvasSize) {
                 if (!enabled) return@pointerInput
+                // Estensione su PointerInputScope
                 detectTapGestures(
                     onTap = { p ->
                         if (canvasSize.width <= 0 || canvasSize.height <= 0 || gridDensity <= 0) return@detectTapGestures
@@ -166,15 +167,17 @@ fun BoxScope.TextOverlay(
             val yMax = canvasSize.height - bottomSafePx
             val safeTop = min(contentTop, yMax - with(density) { 32.dp.toPx() }) // 32dp margine
 
+            // Layer di clipping posizionato
             Box(
                 modifier = Modifier
-                    // offset del “clip layer” in pixel
-                    .pixelOffset { IntOffset(parentLeft.toInt(), parentTop.toInt()) }
-                    // size in dp
                     .size(
                         width = clipW.dpPxToDp(density),
                         height = clipH.dpPxToDp(density)
                     )
+                    .graphicsLayer {
+                        translationX = parentLeft
+                        translationY = parentTop
+                    }
                     .clipToBounds()
             ) {
                 val isActive = (engine.active === block)
@@ -190,11 +193,9 @@ fun BoxScope.TextOverlay(
                         textStyle = block.style,
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier
-                            // offset del campo rispetto al parent, in pixel
-                            .pixelOffset {
-                                val relX = (contentLeft - parentLeft).toInt()
-                                val relY = (safeTop - parentTop).toInt()
-                                IntOffset(relX, relY)
+                            .graphicsLayer {
+                                translationX = contentLeft - parentLeft
+                                translationY = safeTop - parentTop
                             }
                             .focusRequester(fr)
                             .onFocusChanged { st: FocusState ->
@@ -204,19 +205,16 @@ fun BoxScope.TextOverlay(
                             }
                     )
                 } else {
-                    // Testo “statico” cliccabile per riselezione
+                    // Testo “statico” cliccabile per riselezione (nessuna coord necessaria)
                     Box(
                         modifier = Modifier
-                            .pixelOffset {
-                                val relX = (contentLeft - parentLeft).toInt()
-                                val relY = (safeTop - parentTop).toInt()
-                                IntOffset(relX, relY)
+                            .graphicsLayer {
+                                translationX = contentLeft - parentLeft
+                                translationY = safeTop - parentTop
                             }
-                            .pointerInput(block.id) {
-                                detectTapGestures {
-                                    engine.active = block
-                                    kb?.show()
-                                }
+                            .clickable {
+                                engine.active = block
+                                kb?.show()
                             }
                     ) {
                         Text(
