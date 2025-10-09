@@ -165,6 +165,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 
+
 private val LocalIsFree = staticCompositionLocalOf { true }
 
 private const val codiceprofree = 12345
@@ -318,7 +319,11 @@ private fun FilterSwatch(name: String, modifier: Modifier = Modifier) {
     }
 }
 
-
+private fun dpToKey(dp: Dp): String = "${dp.value.toInt()}dp"
+private fun keyToDp(s: String): Dp {
+    val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 0f
+    return n.dp
+}
 @Composable
 private fun FilterDropdown(
     icon: ImageVector,
@@ -925,11 +930,6 @@ fun EditorMenusOnly(
     var colorPickInitial by remember { mutableStateOf(Color.Black) }
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
-    fun dpToKey(dp: Dp) = "${dp.value.toInt()}dp"
-    fun keyToDp(s: String): androidx.compose.ui.unit.Dp {
-        val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 1f
-        return n.dp
-    }
 
 
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
@@ -1681,7 +1681,7 @@ fun EditorMenusOnly(
                             if ((menuPath.firstOrNull() ?: "") == "Contenitore" && label in setOf("ic_as","ic_ad","ic_bd","ic_bs")) {
                                 val rect = selectedRect
                                 if (rect != null) {
-                                    val dpVal = keyToDp(value)
+                                    val dpVal = keyToDp(value as String)
                                     val cur = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
                                     val upd = when (label) {
                                         "ic_as" -> cur.copy(tl = dpVal)
@@ -1753,7 +1753,7 @@ fun EditorMenusOnly(
                                     "ic_as", "ic_ad", "ic_bs", "ic_bd" -> {
                                         val rect = selectedRect
                                         if (rect != null) {
-                                            val dp = keyToDp(value)
+                                            val dp = keyToDp(value as String)
                                             val current = rectCorners[rect] ?: com.example.appbuilder.canvas.CornerRadii()
                                             rectCorners[rect] = when (label) {
                                                 "ic_as" -> current.copy(tl = dp)

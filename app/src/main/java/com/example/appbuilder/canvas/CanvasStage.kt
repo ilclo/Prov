@@ -758,10 +758,18 @@ fun CanvasStage(
                                 } else {
                                     val halfW = w / 2f
                                     val halfH = h / 2f
-                                    if (sides.top)    clipRect(left,           top,        left + w,     top + halfH) { drawPath(path, item.borderColor, stroke) }
-                                    if (sides.bottom) clipRect(left,           top + halfH,left + w,     top + h    ) { drawPath(path, item.borderColor, stroke) }
-                                    if (sides.left)   clipRect(left,           top,        left + halfW, top + h    ) { drawPath(path, item.borderColor, stroke) }
-                                    if (sides.right)  clipRect(left + halfW,   top,        left + w,     top + h    ) { drawPath(path, item.borderColor, stroke) }
+                                    if (sides.top)    clipRect(left,           top,        left + w,     top + halfH) {
+                                        drawPath(path = path, color = item.borderColor, style = stroke)
+                                    }
+                                    if (sides.bottom) clipRect(left,           top + halfH,left + w,     top + h    ) {
+                                        drawPath(path = path, color = item.borderColor, style = stroke)
+                                    }
+                                    if (sides.left)   clipRect(left,           top,        left + halfW, top + h    ) {
+                                        drawPath(path = path, color = item.borderColor, style = stroke)
+                                    }
+                                    if (sides.right)  clipRect(left + halfW,   top,        left + w,     top + h    ) {
+                                        drawPath(path = path, color = item.borderColor, style = stroke)
+                                    }
                                 }
                             }
                         }
