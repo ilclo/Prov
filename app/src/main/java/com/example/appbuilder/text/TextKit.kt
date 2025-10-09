@@ -199,7 +199,7 @@ fun BoxScope.TextOverlay(
     }
 }
 
-/* —————————— utility —————————— */
+/* —————————— utility —————————— **/
 
 private fun Float.dpPxToDp(density: LocalDensity): androidx.compose.ui.unit.Dp =
     with(density) { (this@dpPxToDp / density.density).dp }
