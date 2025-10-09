@@ -1386,14 +1386,13 @@ fun EditorMenusOnly(
                     imageStyles  = rectImages
 
                 )
-                TextLayer(
-                    active = (menuPath.firstOrNull() == "Testo"),
-                    page   = pageState,
-                    engine = textEngine
-                )
 
             }
-
+            TextLayer(
+                active = (menuPath.firstOrNull() == "Testo"),
+                page   = pageState,
+                engine = textEngine
+            )
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
 // PRIMA BARRA
