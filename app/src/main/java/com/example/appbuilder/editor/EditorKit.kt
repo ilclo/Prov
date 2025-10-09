@@ -164,6 +164,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import com.example.appbuilder.text.TextOverlay
+import com.example.appbuilder.text.rememberTextEngine
 
 
 private val LocalIsFree = staticCompositionLocalOf { true }
@@ -886,7 +888,7 @@ fun EditorMenusOnly(
             cropperVisible  = true
         }
     }
-
+    val textEngine = rememberTextEngine()
     ImageCropperDialog(
         visible = cropperVisible,
         imageUri = cropperImageUri,
@@ -1003,7 +1005,7 @@ fun EditorMenusOnly(
         rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
         rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
         rectFx.remove(old)?.let         { rectFx[updated]         = it }
-
+        textEngine.onRectReplaced(old, updated)
         if (selectedRect == old) {
             selectedRect = updated
             applyContainerMenuFromRect(updated) // mantiene le label coerenti
@@ -1335,12 +1337,10 @@ fun EditorMenusOnly(
                     )
                 )
         ) {
-            // 1) CANVAS — PRIMO FIGLIO del Box con gradiente
             Box(
-                Modifier
+                modifier = Modifier
                     .fillMaxSize()
-                    // quando la griglia è aperta, sfoca e abbassa l'alpha SOLO del canvas
-                    .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
+                    .imePadding() // vedi sezione 3: fa “salire” le barre con la tastiera
             ) {
                 CanvasStage(
                     page            = pageState,
@@ -1393,6 +1393,17 @@ fun EditorMenusOnly(
                     imageStyles  = rectImages
                 )
             }
+            val enabled = menuPath.firstOrNull() == "Testo"
+            val gd = pageState?.gridDensity ?: 24
+            // se vuoi aggiungere un margine “sicuro” extra oltre alla IME (es. spazio barre):
+            val bottomSafePx = 0 // puoi passarci l’altezza combinata delle due barre in px se la tieni a disposizione
+            TextOverlay(
+                engine = textEngine,
+                page = pageState,
+                enabled = enabled,
+                gridDensity = gd,
+                bottomSafePx = bottomSafePx
+            )
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
 // PRIMA BARRA
