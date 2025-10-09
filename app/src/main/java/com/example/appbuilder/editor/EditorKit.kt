@@ -669,7 +669,7 @@ private fun tokenToColor(token: String?): Color? = when(token?.lowercase()?.trim
     else -> hexToColor(token)
 }
 
-/* ---------- AGGIUNGI ---------- */
+/* ---------- AGGIUNGI ----------- */
 
 @Composable
 private fun BoxScope.CropImageOverlay(
