@@ -1,34 +1,51 @@
 package com.example.appbuilder.text
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.offset as pixelOffset // per offset(IntOffset)
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.appbuilder.canvas.DrawItem
+import com.example.appbuilder.canvas.PageState
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
-import com.example.appbuilder.canvas.DrawItem
-import com.example.appbuilder.canvas.PageState
 
-/** Blocco di testo posizionato su griglia, opzionalmente “figlio” di un contenitore. */
+/** Blocco di testo posizionato su griglia, eventualmente figlio di un contenitore. */
 @Stable
 data class TextBlock(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -48,7 +65,7 @@ class TextEngineState {
     val blocks = mutableStateListOf<TextBlock>()
     var active: TextBlock? by mutableStateOf(null)
 
-    /** Usato dall’editor quando un RectItem viene rimpiazzato (spostato/ridimensionato). */
+    /** Chiamata quando un RectItem viene sostituito (drag/resize/replace). */
     fun onRectReplaced(old: DrawItem.RectItem, updated: DrawItem.RectItem) {
         blocks.forEach { if (it.parent === old) it.parent = updated }
     }
@@ -59,9 +76,10 @@ fun rememberTextEngine(): TextEngineState = remember { TextEngineState() }
 
 /**
  * Overlay di testo da piazzare sopra al Canvas.
- * - enabled: attivo solo quando è aperto il menù “Testo”
- * - gridDensity: numero di celle per lato (stesso di page.gridDensity)
- * - bottomSafePx: margine “di sicurezza” in px per evitare sovrapposizione con le barre e l’IME
+ *
+ * @param enabled se true intercetta il tap e mostra il caret/tastiera
+ * @param gridDensity numero di celle per lato (come page.gridDensity)
+ * @param bottomSafePx margine “sicuro” in px (es. altezza barre) per non coprire il caret
  */
 @Composable
 fun BoxScope.TextOverlay(
@@ -80,21 +98,25 @@ fun BoxScope.TextOverlay(
     Box(
         modifier = Modifier
             .matchParentSize()
-            .onSizeChanged { canvasSize = it }
+            .onSizeChanged { newSize -> canvasSize = newSize }
             .pointerInput(enabled, page, gridDensity, canvasSize) {
                 if (!enabled) return@pointerInput
                 detectTapGestures(
                     onTap = { p ->
                         if (canvasSize.width <= 0 || canvasSize.height <= 0 || gridDensity <= 0) return@detectTapGestures
-                        // 1) converto px -> cella della pagina (come computeCell)
-                        val cell = min(canvasSize.width.toFloat() / gridDensity, canvasSize.height.toFloat() / gridDensity)
+
+                        // 1) px -> cella della pagina (come nel Canvas)
+                        val cell = min(
+                            canvasSize.width.toFloat() / gridDensity,
+                            canvasSize.height.toFloat() / gridDensity
+                        )
                         val rr = floor(p.y / cell).toInt().coerceIn(0, gridDensity - 1)
                         val cc = floor(p.x / cell).toInt().coerceIn(0, gridDensity - 1)
 
-                        // 2) cerco il rettangolo in top a quella cella (stesso criterio del Canvas)
+                        // 2) rettangolo “in top” che contiene la cella
                         val parentRect = topRectAtCell(page, rr, cc)
 
-                        // 3) calcolo cella locale e offset fine nella cella
+                        // 3) cella locale e offset fine nella cella
                         val (localR, localC) = if (parentRect != null) {
                             val r0 = min(parentRect.r0, parentRect.r1)
                             val c0 = min(parentRect.c0, parentRect.c1)
@@ -104,7 +126,7 @@ fun BoxScope.TextOverlay(
                         val ox = p.x - cc * cell
                         val oy = p.y - rr * cell
 
-                        // 4) creo (o attivo) un blocco nuovo nel punto
+                        // 4) crea/attiva un blocco nel punto
                         val newBlock = TextBlock(
                             parent = parentRect,
                             localRow = localR,
@@ -118,13 +140,15 @@ fun BoxScope.TextOverlay(
                 )
             }
     ) {
-        // Rendering dei blocchi (quelli attivi come BasicTextField con caret)
+        // Rendering dei blocchi (attivo = BasicTextField con caret)
         engine.blocks.forEach { block ->
-            val cell = if (gridDensity > 0 && canvasSize.minDimension > 0) {
-                min(canvasSize.width.toFloat() / gridDensity, canvasSize.height.toFloat() / gridDensity)
-            } else 0f
+            val minSide = min(canvasSize.width, canvasSize.height)
+            if (gridDensity <= 0 || minSide <= 0) return@forEach
 
-            if (cell <= 0f) return@forEach
+            val cell = min(
+                canvasSize.width.toFloat() / gridDensity,
+                canvasSize.height.toFloat() / gridDensity
+            )
 
             // top-left del parent in px + offset locale
             val parentLeft = (block.parent?.let { min(it.c0, it.c1) } ?: 0).toFloat() * cell
@@ -132,18 +156,25 @@ fun BoxScope.TextOverlay(
             val contentLeft = parentLeft + block.localCol * cell + block.offsetInCellPx.x
             val contentTop  = parentTop  + block.localRow * cell + block.offsetInCellPx.y
 
-            // Box di clipping quando il testo appartiene a un contenitore
-            val clipW = (block.parent?.let { (abs(it.c1 - it.c0) + 1).toFloat() * cell } ?: canvasSize.width.toFloat())
-            val clipH = (block.parent?.let { (abs(it.r1 - it.r0) + 1).toFloat() * cell } ?: canvasSize.height.toFloat())
+            // Clip all’area del parent (se presente), altrimenti all’intera pagina
+            val clipW = block.parent?.let { (abs(it.c1 - it.c0) + 1).toFloat() * cell }
+                ?: canvasSize.width.toFloat()
+            val clipH = block.parent?.let { (abs(it.r1 - it.r0) + 1).toFloat() * cell }
+                ?: canvasSize.height.toFloat()
 
-            // Evito che il caret finisca sotto tastiera+barre: rialzo il campo se serve
+            // Evito caret sotto tastiera/barre
             val yMax = canvasSize.height - bottomSafePx
             val safeTop = min(contentTop, yMax - with(density) { 32.dp.toPx() }) // 32dp margine
 
             Box(
                 modifier = Modifier
-                    .offset { androidx.compose.ui.unit.IntOffset(parentLeft.toInt(), parentTop.toInt()) }
-                    .size(width = clipW.dpPxToDp(density), height = clipH.dpPxToDp(density))
+                    // offset del “clip layer” in pixel
+                    .pixelOffset { IntOffset(parentLeft.toInt(), parentTop.toInt()) }
+                    // size in dp
+                    .size(
+                        width = clipW.dpPxToDp(density),
+                        height = clipH.dpPxToDp(density)
+                    )
                     .clipToBounds()
             ) {
                 val isActive = (engine.active === block)
@@ -159,13 +190,14 @@ fun BoxScope.TextOverlay(
                         textStyle = block.style,
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier
-                            .offset {
+                            // offset del campo rispetto al parent, in pixel
+                            .pixelOffset {
                                 val relX = (contentLeft - parentLeft).toInt()
                                 val relY = (safeTop - parentTop).toInt()
-                                androidx.compose.ui.unit.IntOffset(relX, relY)
+                                IntOffset(relX, relY)
                             }
                             .focusRequester(fr)
-                            .onFocusChanged { st ->
+                            .onFocusChanged { st: FocusState ->
                                 if (!st.isFocused && engine.active === block) {
                                     engine.active = null
                                 }
@@ -175,10 +207,10 @@ fun BoxScope.TextOverlay(
                     // Testo “statico” cliccabile per riselezione
                     Box(
                         modifier = Modifier
-                            .offset {
+                            .pixelOffset {
                                 val relX = (contentLeft - parentLeft).toInt()
                                 val relY = (safeTop - parentTop).toInt()
-                                androidx.compose.ui.unit.IntOffset(relX, relY)
+                                IntOffset(relX, relY)
                             }
                             .pointerInput(block.id) {
                                 detectTapGestures {
@@ -187,7 +219,7 @@ fun BoxScope.TextOverlay(
                                 }
                             }
                     ) {
-                        androidx.compose.material3.Text(
+                        Text(
                             text = block.value.text,
                             style = block.style,
                             color = block.style.color
@@ -201,11 +233,11 @@ fun BoxScope.TextOverlay(
 
 /* —————————— utility —————————— */
 
-private fun Float.dpPxToDp(density: LocalDensity): androidx.compose.ui.unit.Dp =
-    with(density) { (this@dpPxToDp / density.density).dp }
+private fun Float.dpPxToDp(density: Density): Dp =
+    (this / density.density).dp
 
 private fun topRectAtCell(page: PageState?, row: Int, col: Int): DrawItem.RectItem? {
-    // Stesso criterio usato nel Canvas: rettangolo che contiene la cella con livello massimo
+    // rettangolo che contiene la cella con livello massimo
     val rects = page?.items?.filterIsInstance<DrawItem.RectItem>().orEmpty()
     val candidates = rects.filter { containsCell(it, row, col) }
     return candidates.maxByOrNull { it.level }
