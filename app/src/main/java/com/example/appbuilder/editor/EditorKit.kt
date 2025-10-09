@@ -164,8 +164,6 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import com.example.appbuilder.text.TextOverlay
-import com.example.appbuilder.text.rememberTextEngine
 
 
 private val LocalIsFree = staticCompositionLocalOf { true }
@@ -669,7 +667,7 @@ private fun tokenToColor(token: String?): Color? = when(token?.lowercase()?.trim
     else -> hexToColor(token)
 }
 
-/* ---------- AGGIUNGI ----------- */
+/* ---------- AGGIUNGI ---------- */
 
 @Composable
 private fun BoxScope.CropImageOverlay(
@@ -888,7 +886,7 @@ fun EditorMenusOnly(
             cropperVisible  = true
         }
     }
-    val textEngine = rememberTextEngine()
+
     ImageCropperDialog(
         visible = cropperVisible,
         imageUri = cropperImageUri,
@@ -932,6 +930,8 @@ fun EditorMenusOnly(
     var colorPickInitial by remember { mutableStateOf(Color.Black) }
     // ====== STATO CANVAS/OVERLAY ======
     var pageState by remember { mutableStateOf<PageState?>(null) }
+// Motore testo (nuovo)
+    val textEngine = remember { com.example.appbuilder.text.TextEngine() }
 
 
     fun applyContainerMenuFromRect(rect: DrawItem.RectItem) {
@@ -1006,6 +1006,8 @@ fun EditorMenusOnly(
         rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
         rectFx.remove(old)?.let         { rectFx[updated]         = it }
         textEngine.onRectReplaced(old, updated)
+
+
         if (selectedRect == old) {
             selectedRect = updated
             applyContainerMenuFromRect(updated) // mantiene le label coerenti
@@ -1336,11 +1338,14 @@ fun EditorMenusOnly(
                         listOf(Color(0xFF1A1A1A), Color(0xFF242424)) // grigi scuri
                     )
                 )
+                .imePadding()
         ) {
+            // 1) CANVAS — PRIMO FIGLIO del Box con gradiente
             Box(
-                modifier = Modifier
+                Modifier
                     .fillMaxSize()
-                    .imePadding() // vedi sezione 3: fa “salire” le barre con la tastiera
+                    // quando la griglia è aperta, sfoca e abbassa l'alpha SOLO del canvas
+                    .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
             ) {
                 CanvasStage(
                     page            = pageState,
@@ -1381,6 +1386,7 @@ fun EditorMenusOnly(
                             // (consigliato) sposta anche queste, così non perdi shape/fx durante il drag
                             rectShapes.remove(old)?.let   { rectShapes[updated]   = it }
                             rectFx.remove(old)?.let       { rectFx[updated]       = it }
+                            textEngine.onRectReplaced(old, updated)
                         }
                     },
 
@@ -1393,17 +1399,13 @@ fun EditorMenusOnly(
                     imageStyles  = rectImages
                 )
             }
-            val enabled = menuPath.firstOrNull() == "Testo"
-            val gd = pageState?.gridDensity ?: 24
-            // se vuoi aggiungere un margine “sicuro” extra oltre alla IME (es. spazio barre):
-            val bottomSafePx = 0 // puoi passarci l’altezza combinata delle due barre in px se la tieni a disposizione
-            TextOverlay(
+            com.example.appbuilder.text.TextOverlay(
                 engine = textEngine,
-                page = pageState,
-                enabled = enabled,
-                gridDensity = gd,
-                bottomSafePx = bottomSafePx
+                page   = pageState,
+                gridDensity = pageState?.gridDensity ?: 6,
+                enabled = (menuPath.firstOrNull() == "Testo")
             )
+
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
 // PRIMA BARRA
