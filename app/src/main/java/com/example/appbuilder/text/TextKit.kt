@@ -3,7 +3,7 @@ package com.example.appbuilder.text
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset // uso standard (foundation.layout)
+import androidx.compose.foundation.layout.offset   // usa SOLO foundation.layout.offset
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.*
@@ -18,7 +18,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -32,32 +35,30 @@ import kotlin.math.roundToInt
 import java.util.UUID
 
 /**
- * Motore “leggero” per i testi: conserva nodi, caret e associazione al contenitore.
+ * Motore testuale leggero: blocchi testo “flottanti” associabili a pagina o contenitore.
+ * NB: ogni valore di testo è uno State (TextFieldValue) → le lettere compaiono mentre digiti.
  */
 class TextEngine {
-    data class TextNode(
-        val id: String = UUID.randomUUID().toString(),
-        var owner: DrawItem.RectItem?,   // null = testo su pagina
-        var posPx: Offset,               // posizione assoluta in px nello spazio del Canvas
-        var text: String = ""
-    )
 
+    class TextNode(
+        val id: String = UUID.randomUUID().toString(),
+        var owner: DrawItem.RectItem?,     // null = testo su pagina
+        var posPx: Offset                  // posizione assoluta nel Canvas
+    ) {
+        var value by mutableStateOf(TextFieldValue(""))
+        // ultimi size di layout (per hit-test “dentro” al testo)
+        var layoutW by mutableStateOf(0)
+        var layoutH by mutableStateOf(0)
+    }
 
     // Stato osservabile
     val nodes = mutableStateListOf<TextNode>()
     var active: TextNode? by mutableStateOf(null)
 
-    // Ambiente per conversioni (aggiornato dalla layer)
-    var lastCanvasSize by mutableStateOf(IntSize.Zero)
-        private set
-    var gridCols by mutableStateOf(6)
-        private set
-    fun activate(node: TextNode?) { active = node }
-    fun isActive(node: TextNode): Boolean = active === node
-    fun updateEnv(size: IntSize, cols: Int) {
-        lastCanvasSize = size
-        gridCols = max(1, cols)
-    }
+    // Ambiente Canvas (per hit-test cella/rect)
+    private var lastCanvasSize: IntSize = IntSize.Zero
+    private var gridCols: Int = 6
+    fun updateEnv(size: IntSize, cols: Int) { lastCanvasSize = size; gridCols = max(1, cols) }
 
     private fun cellSize(): Float {
         val w = lastCanvasSize.width.toFloat()
@@ -72,7 +73,7 @@ class TextEngine {
         return Offset(left, top)
     }
 
-    /** Quando un rect viene sostituito (drag/resize), migro owner e posizione relativa. */
+    /** Migra owner/posizione quando un Rect viene rimpiazzato (drag/resize). */
     fun onRectReplaced(old: DrawItem.RectItem, updated: DrawItem.RectItem) {
         val delta = rectTopLeftPx(updated) - rectTopLeftPx(old)
         nodes.filter { it.owner === old }.forEach { n ->
@@ -82,26 +83,40 @@ class TextEngine {
         }
     }
 
-    /** Posiziona il caret: se vicino a un nodo esistente lo seleziona, altrimenti ne crea uno. */
-    fun placeCaret(owner: DrawItem.RectItem?, tapPx: Offset, nearPx: Float) {
-        val nearest = nodes.minByOrNull { (it.posPx - tapPx).getDistance() }
-        val picked = if (nearest != null && (nearest.posPx - tapPx).getDistance() <= nearPx) {
-            nearest
-        } else {
-            TextNode(owner = owner, posPx = tapPx).also { nodes.add(it) }
+    /** Ritorna il nodo “cliccato” (se il tap cade nel suo box testo) o il più vicino entro soglia. */
+    private fun pickNodeForTap(tapPx: Offset, nearPx: Float): TextNode? {
+        // 1) dentro il box del testo (con un piccolo margine)
+        val boxMargin = 8f
+        nodes.firstOrNull { n ->
+            val left = n.posPx.x - boxMargin
+            val top = n.posPx.y - boxMargin
+            val right = n.posPx.x + n.layoutW + boxMargin
+            val bottom = n.posPx.y + n.layoutH + boxMargin
+            tapPx.x in left..right && tapPx.y in top..bottom
+        }?.let { return it }
+
+        // 2) altrimenti il più vicino alla sua origine entro nearPx
+        return nodes.minByOrNull { (it.posPx - tapPx).getDistance() }?.takeIf {
+            (it.posPx - tapPx).getDistance() <= nearPx
         }
-        active = picked
     }
 
-    fun updateText(newValue: String) { active?.text = newValue }
+    /**
+     * Posiziona il caret: se tocchi un testo esistente lo attiva, altrimenti crea un nuovo blocco.
+     * Ritorna il nodo attivo dopo il tap.
+     */
+    fun placeCaret(owner: DrawItem.RectItem?, tapPx: Offset, nearPx: Float): TextNode {
+        val picked = pickNodeForTap(tapPx, nearPx)
+            ?: TextNode(owner = owner, posPx = tapPx).also { nodes.add(it) }
+        active = picked
+        return picked
+    }
+
+    fun replaceActiveValue(newValue: TextFieldValue) { active?.value = newValue }
 }
 
-/**
- * Layer testo sovrapposto: attivo SOLO quando il menù "Testo" è aperto.
- * - Mostra caret nel punto di tap.
- * - Apre la tastiera solo su gesto utente.
- * - Mantiene il caret visibile sopra la tastiera usando bottomSafePx.
- */
+/* -------------------------------------------------------------------------------------- */
+
 @Composable
 fun TextLayer(
     active: Boolean,
@@ -115,30 +130,31 @@ fun TextLayer(
     val kb = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
 
-    // Aggiorno ambiente per hit‑test e conversioni
+    // aggiorna ambiente di hit-test su cambi dimensioni/griglia
     LaunchedEffect(canvasSize, page?.gridDensity) {
         engine.updateEnv(canvasSize, page?.gridDensity ?: 6)
     }
 
-    // Valore “live” del nodo attivo
-    val textValue by remember(engine.active) {
-        derivedStateOf { engine.active?.text.orEmpty() }
-    }
+    // tap → attiva/crea blocco; nessun long-press/drag qui: li gestisce il BasicTextField
+    var pendingTap by remember { mutableStateOf<Offset?>(null) } // per posizionare il caret dentro il testo
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { canvasSize = it }
             .pointerInput(page?.items, page?.gridDensity, canvasSize) {
-                detectTapGestures(onTap = { ofs ->
-                    val owner = hitTestRectAt(ofs, page, canvasSize)
-                    val nearPx = with(density) { 24.dp.toPx() } // soglia vicinanza caret
-                    engine.placeCaret(owner, ofs, nearPx)
-                    kb?.show() // tastiera SOLO su gesto utente
-                })
+                detectTapGestures(
+                    onTap = { ofs ->
+                        val owner = hitTestRectAt(ofs, page, canvasSize)
+                        val nearPx = with(density) { 24.dp.toPx() }
+                        val node = engine.placeCaret(owner, ofs, nearPx)
+                        pendingTap = ofs           // posizionamento caret tra le lettere
+                        kb?.show()                 // tastiera SOLO su gesto utente
+                    }
+                )
             }
     ) {
-        // Nodo attivo: campo “flottante” ancorato alla posizione
+        // Nodo attivo: campo editabile “flottante” (caret visibile sopra la tastiera)
         engine.active?.let { node ->
             val caretMargin = with(density) { 32.dp.toPx() }
             val safeY = min(
@@ -147,36 +163,61 @@ fun TextLayer(
             ).coerceAtLeast(0f)
 
             val focusReq = remember { FocusRequester() }
+            var layout by remember(node.id) { mutableStateOf<TextLayoutResult?>(null) }
 
             BasicTextField(
-                value = textValue,
-                onValueChange = { engine.updateText(it) },
+                value = node.value,
+                onValueChange = { v -> engine.replaceActiveValue(v) },
                 textStyle = TextStyle(fontSize = 16.sp, color = Color.Black),
                 cursorBrush = SolidColor(Color.Black),
                 modifier = Modifier
                     .offset { IntOffset(node.posPx.x.roundToInt(), safeY.roundToInt()) }
                     .focusRequester(focusReq)
-                    .onFocusChanged { st ->
-                        if (st.isFocused) kb?.show()
-                    }
+                    .onFocusChanged { st -> if (st.isFocused) kb?.show() },
+                onTextLayout = { tlr ->
+                    layout = tlr
+                    // aggiorno box di hit-test (serve per capire se il prossimo tap cade “dentro”)
+                    node.layoutW = tlr.size.width
+                    node.layoutH = tlr.size.height
+                }
             )
-            // porta il focus quando cambia l’attivo -> mostra caret
+            // Porta il focus quando cambia l’attivo → caret lampeggiante + tastiera
             LaunchedEffect(node.id) { focusReq.requestFocus() }
+
+            // Se ho un tap “sopra” questo testo, posiziono il caret tra le lettere
+            LaunchedEffect(pendingTap, layout, node.posPx, node.value.text) {
+                val p = pendingTap ?: return@LaunchedEffect
+                val tlr = layout ?: return@LaunchedEffect
+                // coordinate relative al testo
+                val rel = p - node.posPx
+                val y = rel.y.coerceIn(0f, (tlr.size.height - 1).toFloat())
+                val x = rel.x.coerceIn(0f, (tlr.size.width  - 1).toFloat())
+                val caret = tlr.getOffsetForPosition(Offset(x, y))
+                engine.replaceActiveValue(
+                    node.value.copy(selection = TextRange(caret))
+                )
+                pendingTap = null
+            }
         }
 
-        // Nodi non attivi: render statico + tap per riselezionare
+        // Nodi NON attivi: rendering statico + tap singolo per riattivare (con caret nella parola cliccata)
         engine.nodes.forEach { n ->
             if (engine.active?.id == n.id) return@forEach
             BasicText(
-                text = n.text,
+                text = n.value.text,
                 style = TextStyle(fontSize = 16.sp, color = Color.Black),
                 modifier = Modifier
                     .offset { IntOffset(n.posPx.x.roundToInt(), n.posPx.y.roundToInt()) }
                     .pointerInput(n.id) {
-                        detectTapGestures {
-                            engine.activate(n)
-                            kb?.show()
-                        }
+                        detectTapGestures(
+                            onTap = { localTap ->
+                                // converto il tap locale (nel BasicText) in coordinate Canvas
+                                val canvasTap = Offset(n.posPx.x + localTap.x, n.posPx.y + localTap.y)
+                                engine.active = n          // continua a scrivere nello stesso blocco
+                                pendingTap = canvasTap     // caret preciso tra le lettere
+                                kb?.show()
+                            }
+                        )
                     }
             )
         }

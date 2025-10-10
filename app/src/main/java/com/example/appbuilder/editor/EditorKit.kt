@@ -1327,10 +1327,14 @@ fun EditorMenusOnly(
 // Valore IME per adagiare le barre sopra la tastiera
             val density = LocalDensity.current
             val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-
+            val testoAperto = (menuPath.firstOrNull() == "Testo")
             Box(
                 Modifier
                     .fillMaxSize()
+                    .let { base ->
+                        // Abilita scroll “forzato” SOLO nel menù Testo, per portare in vista il caret dietro la tastiera
+                        if (testoAperto) base.verticalScroll(rememberScrollState()) else base
+                    }
                     .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
 
             ) {
@@ -1384,7 +1388,6 @@ fun EditorMenusOnly(
                     imageStyles  = rectImages
 
                 )
-                val testoAperto = (menuPath.firstOrNull() == "Testo")
                 TextLayer(
                     active = testoAperto,
                     page   = pageState,
