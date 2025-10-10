@@ -1322,7 +1322,6 @@ fun EditorMenusOnly(
                         listOf(Color(0xFF1A1A1A), Color(0xFF242424)) // grigi scuri
                     )
                 )
-                .imePadding()
         ) {
             val inTextMenu = menuPath.firstOrNull() == "Testo"
 
@@ -1331,10 +1330,7 @@ fun EditorMenusOnly(
                     .fillMaxSize()
                     .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
                     .let { base ->
-                        if (inTextMenu) {
-                            // Solo in menù Testo: lo rendo scrollabile e con padding IME
-                            base.verticalScroll(rememberScrollState()).imePadding()
-                        } else base
+                        if (inTextMenu) base.verticalScroll(rememberScrollState()).imePadding() else base
                     }
             ) {
                 CanvasStage(

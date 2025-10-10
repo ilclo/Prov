@@ -35,7 +35,7 @@ data class TextBlock(
     var parent: DrawItem.RectItem? = null,           // null => background pagina
     var localRow: Int = 0,                           // cella (riga) locale al parent/pagina
     var localCol: Int = 0,                           // cella (colonna) locale al parent/pagina
-    var offsetInCellPx: Offset = Offset.Zero,        // offset â€œfineâ€ allâ€™interno della cella
+    var offsetInCellPx: Offset = Offset.Zero,        // offset “fine” all’interno della cella
     var value: TextFieldValue = TextFieldValue(""),
     var style: TextStyle = TextStyle(
         fontSize = 16.sp,
@@ -59,7 +59,7 @@ fun rememberTextEngine(): TextEngineState = remember { TextEngineState() }
 
 /**
  * Overlay di testo da posizionare SOPRA al Canvas.
- * Attivo solo quando [enabled] = true (cosÃ¬ non blocca il â€œCrea contenitoreâ€).
+ * Attivo solo quando [enabled] = true (così non blocca il “Crea contenitore”).
  */
 @Composable
 fun BoxScope.TextOverlay(
@@ -67,7 +67,7 @@ fun BoxScope.TextOverlay(
     page: PageState?,
     enabled: Boolean,
     gridDensity: Int,
-    bottomSafePx: Int = 0     // futuro: margine â€œsicuroâ€ sopra la tastiera / barre
+    bottomSafePx: Int = 0     // futuro: margine “sicuro” sopra la tastiera / barre
 ) {
     val kb = LocalSoftwareKeyboardController.current
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
@@ -84,7 +84,7 @@ fun BoxScope.TextOverlay(
                         detectTapGestures(onTap = { p ->
                             if (canvasSize.width <= 0 || canvasSize.height <= 0 || gridDensity <= 0) return@detectTapGestures
 
-                            // 1) px â†’ cella della pagina
+                            // 1) px → cella della pagina
                             val cell = min(
                                 canvasSize.width.toFloat() / gridDensity,
                                 canvasSize.height.toFloat() / gridDensity
@@ -92,7 +92,7 @@ fun BoxScope.TextOverlay(
                             val rr = floor(p.y / cell).toInt().coerceIn(0, gridDensity - 1)
                             val cc = floor(p.x / cell).toInt().coerceIn(0, gridDensity - 1)
 
-                            // 2) trova lâ€™eventuale rettangolo top-most che contiene la cella
+                            // 2) trova l’eventuale rettangolo top-most che contiene la cella
                             val parentRect = topRectAtCell(page, rr, cc)
 
                             // 3) coord locali + offset fine nella cella
@@ -120,7 +120,7 @@ fun BoxScope.TextOverlay(
                 } else Modifier
             )
     ) {
-        // 5) render di tutti i blocchi; quello attivo Ã¨ un BasicTextField (con caret)
+        // 5) render di tutti i blocchi; quello attivo è un BasicTextField (con caret)
         engine.blocks.forEach { block ->
             if (gridDensity <= 0 || canvasSize.minDimension() <= 0) return@forEach
 
@@ -146,8 +146,6 @@ fun BoxScope.TextOverlay(
                         .focusRequester(focusRequester)
                         .onFocusChanged { st -> if (st.isFocused) kb?.show() }
                 )
-                // porta il focus appena cambia il blocco attivo => mostra caret + tastiera
-                LaunchedEffect(block.id) { focusRequester.requestFocus() }
             } else {
                 Text(
                     text = block.value.text,
@@ -161,7 +159,7 @@ fun BoxScope.TextOverlay(
 
 /* ============================ Helpers ============================ */
 
-/** Ritorna il rettangolo con level piÃ¹ alto che contiene la cella (row,col). */
+/** Ritorna il rettangolo con level più alto che contiene la cella (row,col). */
 private fun topRectAtCell(page: PageState?, row: Int, col: Int): DrawItem.RectItem? {
     if (page == null) return null
     return page.items.asSequence()
@@ -171,7 +169,7 @@ private fun topRectAtCell(page: PageState?, row: Int, col: Int): DrawItem.RectIt
             val c0 = min(r.c0, r.c1); val c1 = max(r.c0, r.c1)
             row in r0..r1 && col in c0..c1
         }
-        .maxByOrNull { it.level } // â€œtop-mostâ€ per level
+        .maxByOrNull { it.level } // “top-most” per level
 }
 
 /** Piccola utility per IntSize: minimo lato in px. */
