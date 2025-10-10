@@ -1312,16 +1312,17 @@ fun EditorMenusOnly(
         ),
         LocalIsFree provides (codiceprofree == 12345)
     ) {
+        val inTextMenu = (menuPath.firstOrNull() == "Testo")
         Box(
             Modifier
                 .fillMaxSize()
+                .let { base -> if (inTextMenu) base.imePadding() else base } // ⬅️ IME anche per le barre
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color(0xFF1A1A1A), Color(0xFF242424)) // grigi scuri
+                        listOf(Color(0xFF1A1A1A), Color(0xFF242424))
                     )
                 )
         ) {
-            val inTextMenu = (menuPath.firstOrNull() == "Testo")
 
 // Valore IME per adagiare le barre sopra la tastiera
             val density = LocalDensity.current

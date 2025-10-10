@@ -4,7 +4,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset // <-- FIX offset
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.*
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.appbuilder.canvas.DrawItem
 import com.example.appbuilder.canvas.PageState
 import kotlin.math.*
+import androidx.compose.foundation.text.BasicText
 
 /** Blocco testuale posizionato su griglia e (opzionalmente) figlio di un contenitore. */
 @Stable
@@ -74,10 +74,11 @@ fun BoxScope.TextOverlay(
                 if (enabled) {
                     Modifier.pointerInput(page, gridDensity, canvasSize) {
                         detectTapGestures(
-                            onTap = { p -> // <-- QUI l'onTap che mi chiedevi
+                            onTap = { p ->   // ⬅️ QUI
+                                // 1) guard-rails
                                 if (canvasSize.width <= 0 || canvasSize.height <= 0 || gridDensity <= 0) return@detectTapGestures
 
-                                // 1) px → cella della pagina
+                                // 2) px -> cella
                                 val cell = min(
                                     canvasSize.width.toFloat() / gridDensity,
                                     canvasSize.height.toFloat() / gridDensity
@@ -85,10 +86,10 @@ fun BoxScope.TextOverlay(
                                 val rr = floor(p.y / cell).toInt().coerceIn(0, gridDensity - 1)
                                 val cc = floor(p.x / cell).toInt().coerceIn(0, gridDensity - 1)
 
-                                // 2) trova l’eventuale rettangolo top-most che contiene la cella
+                                // 3) top-most rect che include la cella
                                 val parentRect = topRectAtCell(page, rr, cc)
 
-                                // 3) coord locali + offset fine nella cella
+                                // 4) coordinate locali + offset fine nella cella
                                 val (localR, localC) = if (parentRect != null) {
                                     val r0 = min(parentRect.r0, parentRect.r1)
                                     val c0 = min(parentRect.c0, parentRect.c1)
@@ -98,7 +99,7 @@ fun BoxScope.TextOverlay(
                                 val ox = p.x - cc * cell
                                 val oy = p.y - rr * cell
 
-                                // 4) crea/attiva blocco nel punto
+                                // 5) crea/attiva blocco in quel punto
                                 val newBlock = TextBlock(
                                     parent = parentRect,
                                     localRow = localR,
@@ -108,57 +109,19 @@ fun BoxScope.TextOverlay(
                                 engine.blocks.add(newBlock)
                                 engine.active = newBlock
 
-                                // 5) focus + tastiera
+                                // 6) focus + tastiera (dopo aver reso attivo il blocco)
                                 keyboard?.show()
                                 focusRequester.requestFocus()
                             }
                         )
                     }
                 } else {
-                    Modifier // NON intercetta input quando il menù Testo non è aperto
+                    Modifier // non intercetta input quando il menu Testo è chiuso
                 }
             )
-    ) {
-        // Render di tutti i blocchi; quello attivo è un BasicTextField (con caret)
-        engine.blocks.forEach { block ->
-            if (gridDensity <= 0 || canvasSize.minDimension() <= 0) return@forEach
-
-            val cell = min(
-                canvasSize.width.toFloat() / gridDensity,
-                canvasSize.height.toFloat() / gridDensity
-            )
-
-            // offset assoluto in px = offset del parent + cella locale + offset fine
-            val parentLeft = block.parent?.let { min(it.c0, it.c1) * cell } ?: 0f
-            val parentTop  = block.parent?.let { min(it.r0, it.r1) * cell } ?: 0f
-            val absX = parentLeft + block.localCol * cell + block.offsetInCellPx.x
-            val absY = parentTop  + block.localRow * cell + block.offsetInCellPx.y
-
-            if (engine.active === block) {
-                BasicTextField(
-                    value = block.value,
-                    onValueChange = { block.value = it },
-                    textStyle = block.style,
-                    cursorBrush = SolidColor(Color.Black),
-                    modifier = Modifier
-                        .offset { IntOffset(absX.roundToInt(), absY.roundToInt()) } // <-- FIX offset
-                        .focusRequester(focusRequester)
-                        .onFocusChanged { st ->
-                            if (st.isFocused) keyboard?.show()
-                        }
-                )
-                // porta il focus appena cambia il blocco attivo => mostra caret + tastiera
-                LaunchedEffect(block.id) { focusRequester.requestFocus() }
-            } else {
-                BasicText( // <-- niente import Material, evita 'Text' unresolved
-                    text = block.value.text,
-                    style = block.style,
-                    modifier = Modifier.offset { IntOffset(absX.roundToInt(), absY.roundToInt()) }
-                )
-            }
-        }
-    }
+    ) { /* …vedi 1.3… */ }
 }
+
 
 /* ============================ Helpers ============================ */
 
