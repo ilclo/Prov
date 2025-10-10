@@ -146,9 +146,6 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import com.example.appbuilder.text.TextOverlay
-import com.example.appbuilder.text.rememberTextEngine
-import com.example.appbuilder.text.TextEngineState
-
 private val LocalIsFree = staticCompositionLocalOf { true }
 
 private const val codiceprofree = 12345
@@ -858,8 +855,9 @@ fun EditorMenusOnly(
     var cropperVisible by remember { mutableStateOf(false) }
     var cropperImageUri by remember { mutableStateOf<Uri?>(null) }
     var cropperTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
-// Motore testo (nuovo)
-    val textEngine: TextEngineState = rememberTextEngine()
+
+    val textEngine = remember { com.example.appbuilder.text.TextEngine() }
+
 
 
 
@@ -1323,7 +1321,11 @@ fun EditorMenusOnly(
                     )
                 )
         ) {
-            val inTextMenu = menuPath.firstOrNull() == "Testo"
+            val inTextMenu = (menuPath.firstOrNull() == "Testo")
+
+// Valore IME per adagiare le barre sopra la tastiera
+            val density = LocalDensity.current
+            val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
 
             Box(
                 Modifier
@@ -1383,12 +1385,12 @@ fun EditorMenusOnly(
                     imageStyles  = rectImages
 
                 )
-
+                val testoAperto = menuPath.firstOrNull() == "Testo"
                 TextOverlay(
-                    engine      = textEngine,
-                    page        = pageState,
-                    gridDensity = pageState?.gridDensity ?: 6,
-                    enabled     = (menuPath.firstOrNull() == "Testo")
+                    engine = textEngine,
+                    page = pageState,
+                    enabled = testoAperto,
+                    gridDensity = pageState?.gridDensity ?: 6
                 )
 
             }

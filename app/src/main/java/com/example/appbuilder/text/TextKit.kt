@@ -4,9 +4,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.offset // <-- FIX offset
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
@@ -32,19 +31,17 @@ import kotlin.math.*
 @Stable
 data class TextBlock(
     val id: String = java.util.UUID.randomUUID().toString(),
-    var parent: DrawItem.RectItem? = null,           // null => background pagina
-    var localRow: Int = 0,                           // cella (riga) locale al parent/pagina
-    var localCol: Int = 0,                           // cella (colonna) locale al parent/pagina
-    var offsetInCellPx: Offset = Offset.Zero,        // offset “fine” all’interno della cella
+    var parent: DrawItem.RectItem? = null,     // null => background pagina
+    var localRow: Int = 0,                     // cella (riga) locale al parent/pagina
+    var localCol: Int = 0,                     // cella (colonna) locale al parent/pagina
+    var offsetInCellPx: Offset = Offset.Zero,  // offset “fine” all’interno della cella
     var value: TextFieldValue = TextFieldValue(""),
-    var style: TextStyle = TextStyle(
-        fontSize = 16.sp,
-        color = Color.Black
-    )
+    var style: TextStyle = TextStyle(fontSize = 16.sp, color = Color.Black)
 )
 
+/** Motore “semplice” per i testi, pensato per EditorKit che usa TextOverlay + TextEngine. */
 @Stable
-class TextEngineState {
+class TextEngine {
     val blocks = mutableStateListOf<TextBlock>()
     var active: TextBlock? by mutableStateOf(null)
 
@@ -54,26 +51,21 @@ class TextEngineState {
     }
 }
 
-@Composable
-fun rememberTextEngine(): TextEngineState = remember { TextEngineState() }
-
 /**
  * Overlay di testo da posizionare SOPRA al Canvas.
  * Attivo solo quando [enabled] = true (così non blocca il “Crea contenitore”).
  */
 @Composable
 fun BoxScope.TextOverlay(
-    engine: TextEngineState,
+    engine: TextEngine,
     page: PageState?,
     enabled: Boolean,
-    gridDensity: Int,
-    bottomSafePx: Int = 0     // futuro: margine “sicuro” sopra la tastiera / barre
+    gridDensity: Int
 ) {
-    val kb = LocalSoftwareKeyboardController.current
+    val keyboard = LocalSoftwareKeyboardController.current
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val focusRequester = remember { FocusRequester() }
 
-    // Layer a tutta area, ma intercetta i tap SOLO se enabled = true
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -81,46 +73,53 @@ fun BoxScope.TextOverlay(
             .then(
                 if (enabled) {
                     Modifier.pointerInput(page, gridDensity, canvasSize) {
-                        detectTapGestures(onTap = { p ->
-                            if (canvasSize.width <= 0 || canvasSize.height <= 0 || gridDensity <= 0) return@detectTapGestures
+                        detectTapGestures(
+                            onTap = { p -> // <-- QUI l'onTap che mi chiedevi
+                                if (canvasSize.width <= 0 || canvasSize.height <= 0 || gridDensity <= 0) return@detectTapGestures
 
-                            // 1) px → cella della pagina
-                            val cell = min(
-                                canvasSize.width.toFloat() / gridDensity,
-                                canvasSize.height.toFloat() / gridDensity
-                            )
-                            val rr = floor(p.y / cell).toInt().coerceIn(0, gridDensity - 1)
-                            val cc = floor(p.x / cell).toInt().coerceIn(0, gridDensity - 1)
+                                // 1) px → cella della pagina
+                                val cell = min(
+                                    canvasSize.width.toFloat() / gridDensity,
+                                    canvasSize.height.toFloat() / gridDensity
+                                )
+                                val rr = floor(p.y / cell).toInt().coerceIn(0, gridDensity - 1)
+                                val cc = floor(p.x / cell).toInt().coerceIn(0, gridDensity - 1)
 
-                            // 2) trova l’eventuale rettangolo top-most che contiene la cella
-                            val parentRect = topRectAtCell(page, rr, cc)
+                                // 2) trova l’eventuale rettangolo top-most che contiene la cella
+                                val parentRect = topRectAtCell(page, rr, cc)
 
-                            // 3) coord locali + offset fine nella cella
-                            val (localR, localC) = if (parentRect != null) {
-                                val r0 = min(parentRect.r0, parentRect.r1)
-                                val c0 = min(parentRect.c0, parentRect.c1)
-                                (rr - r0) to (cc - c0)
-                            } else rr to cc
+                                // 3) coord locali + offset fine nella cella
+                                val (localR, localC) = if (parentRect != null) {
+                                    val r0 = min(parentRect.r0, parentRect.r1)
+                                    val c0 = min(parentRect.c0, parentRect.c1)
+                                    (rr - r0) to (cc - c0)
+                                } else rr to cc
 
-                            val ox = p.x - cc * cell
-                            val oy = p.y - rr * cell
+                                val ox = p.x - cc * cell
+                                val oy = p.y - rr * cell
 
-                            // 4) crea/attiva blocco nel punto
-                            val newBlock = TextBlock(
-                                parent = parentRect,
-                                localRow = localR,
-                                localCol = localC,
-                                offsetInCellPx = Offset(ox, oy)
-                            )
-                            engine.blocks.add(newBlock)
-                            engine.active = newBlock
-                            kb?.show()
-                        })
+                                // 4) crea/attiva blocco nel punto
+                                val newBlock = TextBlock(
+                                    parent = parentRect,
+                                    localRow = localR,
+                                    localCol = localC,
+                                    offsetInCellPx = Offset(ox, oy)
+                                )
+                                engine.blocks.add(newBlock)
+                                engine.active = newBlock
+
+                                // 5) focus + tastiera
+                                keyboard?.show()
+                                focusRequester.requestFocus()
+                            }
+                        )
                     }
-                } else Modifier
+                } else {
+                    Modifier // NON intercetta input quando il menù Testo non è aperto
+                }
             )
     ) {
-        // 5) render di tutti i blocchi; quello attivo è un BasicTextField (con caret)
+        // Render di tutti i blocchi; quello attivo è un BasicTextField (con caret)
         engine.blocks.forEach { block ->
             if (gridDensity <= 0 || canvasSize.minDimension() <= 0) return@forEach
 
@@ -129,7 +128,7 @@ fun BoxScope.TextOverlay(
                 canvasSize.height.toFloat() / gridDensity
             )
 
-            // offset assoluto in px (pagina) = offset del parent + cella locale + offset fine
+            // offset assoluto in px = offset del parent + cella locale + offset fine
             val parentLeft = block.parent?.let { min(it.c0, it.c1) * cell } ?: 0f
             val parentTop  = block.parent?.let { min(it.r0, it.r1) * cell } ?: 0f
             val absX = parentLeft + block.localCol * cell + block.offsetInCellPx.x
@@ -142,12 +141,16 @@ fun BoxScope.TextOverlay(
                     textStyle = block.style,
                     cursorBrush = SolidColor(Color.Black),
                     modifier = Modifier
-                        .offset { IntOffset(absX.roundToInt(), absY.roundToInt()) }
+                        .offset { IntOffset(absX.roundToInt(), absY.roundToInt()) } // <-- FIX offset
                         .focusRequester(focusRequester)
-                        .onFocusChanged { st -> if (st.isFocused) kb?.show() }
+                        .onFocusChanged { st ->
+                            if (st.isFocused) keyboard?.show()
+                        }
                 )
+                // porta il focus appena cambia il blocco attivo => mostra caret + tastiera
+                LaunchedEffect(block.id) { focusRequester.requestFocus() }
             } else {
-                Text(
+                BasicText( // <-- niente import Material, evita 'Text' unresolved
                     text = block.value.text,
                     style = block.style,
                     modifier = Modifier.offset { IntOffset(absX.roundToInt(), absY.roundToInt()) }
@@ -158,6 +161,8 @@ fun BoxScope.TextOverlay(
 }
 
 /* ============================ Helpers ============================ */
+
+private fun IntSize.minDimension(): Int = min(width, height)
 
 /** Ritorna il rettangolo con level più alto che contiene la cella (row,col). */
 private fun topRectAtCell(page: PageState?, row: Int, col: Int): DrawItem.RectItem? {
@@ -171,6 +176,3 @@ private fun topRectAtCell(page: PageState?, row: Int, col: Int): DrawItem.RectIt
         }
         .maxByOrNull { it.level } // “top-most” per level
 }
-
-/** Piccola utility per IntSize: minimo lato in px. */
-private fun IntSize.minDimension(): Int = min(width, height)
