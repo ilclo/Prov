@@ -145,8 +145,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import com.example.appbuilder.text.TextEngine
-import com.example.appbuilder.text.TextLayer
+import com.example.appbuilder.text.TextOverlay
+import com.example.appbuilder.text.rememberTextEngine
+import com.example.appbuilder.text.TextEngineState
 
 private val LocalIsFree = staticCompositionLocalOf { true }
 
@@ -858,7 +859,8 @@ fun EditorMenusOnly(
     var cropperImageUri by remember { mutableStateOf<Uri?>(null) }
     var cropperTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
 // Motore testo (nuovo)
-    val textEngine = remember { com.example.appbuilder.text.TextEngine() }
+    val textEngine: TextEngineState = rememberTextEngine()
+
 
 
 
@@ -1359,21 +1361,20 @@ fun EditorMenusOnly(
                         if (ix >= 0) {
                             items[ix] = updated
 
-                            // 1) Aggiorna SUBITO la selezione per evitare ghost del bordo
+                            // 🔽 1) migra subito la selezione e le tue mappe (come già fai)
                             if (selectedRect == old) {
                                 selectedRect = updated
                                 applyContainerMenuFromRect(updated)
                             }
-
-                            // 2) Sposta le decorazioni SOLO se esistono (niente early return)
                             rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
                             rectImages.remove(old)?.let     { rectImages[updated]     = it }
-                            rectBorderSides.remove(old)?.let { rectBorderSides[updated] = it }
+                            rectBorderSides.remove(old)?.let{ rectBorderSides[updated]= it }
                             rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
+                            rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
+                            rectFx.remove(old)?.let         { rectFx[updated]         = it }
 
-                            // (consigliato) sposta anche queste, così non perdi shape/fx durante il drag
-                            rectShapes.remove(old)?.let   { rectShapes[updated]   = it }
-                            rectFx.remove(old)?.let       { rectFx[updated]       = it }
+                            // 🔽 2) informa il motore di testo del replace
+                            textEngine.onRectReplaced(old, updated)
                         }
                     },
 
@@ -1386,13 +1387,15 @@ fun EditorMenusOnly(
                     imageStyles  = rectImages
 
                 )
-                TextLayer(
-                    active = (menuPath.firstOrNull() == "Testo"),
-                    page   = pageState,
-                    engine = textEngine
-                )
-            }
 
+                TextOverlay(
+                    engine      = textEngine,
+                    page        = pageState,
+                    gridDensity = pageState?.gridDensity ?: 6,
+                    enabled     = (menuPath.firstOrNull() == "Testo")
+                )
+
+            }
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
 // PRIMA BARRA
