@@ -145,10 +145,10 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import com.example.appbuilder.text.TextOverlay
+import com.example.appbuilder.text.TextLayer
 private val LocalIsFree = staticCompositionLocalOf { true }
 
-private const val codiceprofree = 12345
+private const val codiceprofree = 123456
 private val LocalDeckItems =
     staticCompositionLocalOf<Map<DeckRoot, List<String>>> { emptyMap() }
 
@@ -1332,9 +1332,7 @@ fun EditorMenusOnly(
                 Modifier
                     .fillMaxSize()
                     .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
-                    .let { base ->
-                        if (inTextMenu) base.verticalScroll(rememberScrollState()).imePadding() else base
-                    }
+
             ) {
                 CanvasStage(
                     page            = pageState,
@@ -1386,13 +1384,16 @@ fun EditorMenusOnly(
                     imageStyles  = rectImages
 
                 )
-                val testoAperto = menuPath.firstOrNull() == "Testo"
-                TextOverlay(
+                val testoAperto = (menuPath.firstOrNull() == "Testo")
+                TextLayer(
+                    active = testoAperto,
+                    page   = pageState,
                     engine = textEngine,
-                    page = pageState,
-                    enabled = testoAperto,
-                    gridDensity = pageState?.gridDensity ?: 6
+                    bottomSafePx = with(LocalDensity.current) {
+                        WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
+                    }
                 )
+
 
             }
             var idError by remember { mutableStateOf(false) }
