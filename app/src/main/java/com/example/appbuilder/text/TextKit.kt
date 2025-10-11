@@ -4,9 +4,13 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset // <-- usa SOLO questo offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -33,12 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.appbuilder.canvas.DrawItem
 import com.example.appbuilder.canvas.PageState
+import java.util.UUID
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import java.util.UUID
-import androidx.compose.foundation.layout.padding
 
 /* =========================================================================================
  * MOTORE TESTO
@@ -125,14 +128,24 @@ fun TextLayer(
     engine: TextEngine,
     bottomSafePx: Int = 0   // spazio IME (px) per non coprire il caret
 ) {
-    if (!active) return
-
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val kb = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
     val clipboard = LocalClipboardManager.current
 
-    // Disattiva la toolbar di sistema: useremo una “barra nera” custom.
+    // aggiorna ambiente di hit-test su cambi dimensioni/griglia
+    LaunchedEffect(canvasSize, page?.gridDensity) {
+        engine.updateEnv(canvasSize, page?.gridDensity ?: 6)
+    }
+
+    // tap → attiva/crea blocco, caret preciso tra le lettere (solo quando attivo)
+    var pendingTap by remember { mutableStateOf<Offset?>(null) }
+
+    // stato “barra nera” (solo quando attivo)
+    var showTextBar by remember { mutableStateOf(false) }
+    var textBarAnchor by remember { mutableStateOf(IntOffset.Zero) }
+
+    // Toolbar di sistema nascosta SOLO in modalità attiva (usiamo la barra nera custom)
     val emptyToolbar = remember {
         object : TextToolbar {
             override val status: TextToolbarStatus get() = TextToolbarStatus.Hidden
@@ -147,38 +160,47 @@ fun TextLayer(
         }
     }
 
-    // aggiorna ambiente di hit-test su cambi dimensioni/griglia
-    LaunchedEffect(canvasSize, page?.gridDensity) {
-        engine.updateEnv(canvasSize, page?.gridDensity ?: 6)
-    }
-
-    // tap → attiva/crea blocco, caret preciso tra le lettere
-    var pendingTap by remember { mutableStateOf<Offset?>(null) }
-
-    // stato “barra nera”
-    var showTextBar by remember { mutableStateOf(false) }
-    var textBarAnchor by remember { mutableStateOf(IntOffset.Zero) }
-
-    CompositionLocalProvider(LocalTextToolbar provides emptyToolbar) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { canvasSize = it }
-                .pointerInput(page?.items, page?.gridDensity, canvasSize) {
-                    // ATTENZIONE: SOLO onTap → il drag non sposta il caret.
-                    detectTapGestures(
-                        onTap = { ofs ->
-                            val owner = hitTestRectAt(ofs, page, canvasSize)
-                            val nearPx = with(density) { 24.dp.toPx() }
-                            val node = engine.placeCaret(owner, ofs, nearPx)
-                            pendingTap = ofs             // posizionamento caret fra le lettere
-                            showTextBar = false          // chiudi eventuale barra
-                            kb?.show()                   // tastiera SOLO su gesto utente
-                        }
-                    )
+    val pointerMod = if (active) {
+        Modifier.pointerInput(page?.items, page?.gridDensity, canvasSize) {
+            // SOLO onTap → il drag non sposta il caret
+            detectTapGestures(
+                onTap = { ofs ->
+                    val owner = hitTestRectAt(ofs, page, canvasSize)
+                    val nearPx = with(density) { 24.dp.toPx() }
+                    val node = engine.placeCaret(owner, ofs, nearPx)
+                    pendingTap = ofs
+                    showTextBar = false
+                    kb?.show() // tastiera SOLO su gesto utente
                 }
-        ) {
-            // Nodo attivo: campo editabile “flottante”
+            )
+        }
+    } else Modifier
+
+    val content = @Composable {
+        // --- 1) Nodi NON attivi: sempre visibili, anche a menù Testo chiuso
+        engine.nodes.forEach { n ->
+            if (engine.active?.id == n.id && active) return@forEach // se attivo e editing, il testo attivo lo rende il BTF
+            BasicText(
+                text = n.value.text,
+                style = TextStyle(fontSize = 16.sp, color = Color.Black),
+                modifier = Modifier
+                    .offset { IntOffset(n.posPx.x.roundToInt(), n.posPx.y.roundToInt()) }
+                    // Tap sui blocchi statici per riattivare SOLO quando active=true
+                    .then(
+                        if (active) Modifier.pointerInput(n.id) {
+                            detectTapGestures(onTap = { localTap ->
+                                val canvasTap = Offset(n.posPx.x + localTap.x, n.posPx.y + localTap.y)
+                                engine.active = n
+                                pendingTap = canvasTap
+                                kb?.show()
+                            })
+                        } else Modifier
+                    )
+            )
+        }
+
+        // --- 2) Overlay di editing: visibile solo quando active=true
+        if (active) {
             engine.active?.let { node ->
                 val caretMargin = with(density) { 32.dp.toPx() }
                 val safeY = min(
@@ -189,14 +211,14 @@ fun TextLayer(
                 val focusReq = remember { FocusRequester() }
                 var layout by remember(node.id) { mutableStateOf<TextLayoutResult?>(null) }
 
-                // Mostra la barra nera quando c’è una selezione non-collassata
+                // Barra nera quando c’è selezione
                 LaunchedEffect(node.value.selection, layout) {
                     val sel = node.value.selection
                     if (layout != null && !sel.collapsed) {
                         val box = layout!!.getBoundingBox(sel.min.coerceIn(0, node.value.text.length))
                         val anchorX = node.posPx.x + box.left
                         val anchorY = safeY + box.top
-                        val barH = with(density) { 38.dp.toPx() } // altezza indicativa della barra
+                        val barH = with(density) { 38.dp.toPx() }
                         textBarAnchor = IntOffset(
                             anchorX.roundToInt(),
                             (anchorY - barH - with(density){8.dp.toPx()}).roundToInt()
@@ -207,36 +229,37 @@ fun TextLayer(
                     }
                 }
 
-                BasicTextField(
-                    value = node.value,
-                    onValueChange = { v ->
-                        engine.replaceActiveValue(v)
-                        // digitando, se la selezione diventa caret singolo, nascondi la barra
-                        if (showTextBar && v.selection.collapsed) showTextBar = false
-                    },
-                    textStyle = TextStyle(fontSize = 16.sp, color = Color.Black),
-                    cursorBrush = SolidColor(Color.Black),
-                    modifier = Modifier
-                        .offset { IntOffset(node.posPx.x.roundToInt(), safeY.roundToInt()) }
-                        .focusRequester(focusReq)
-                        .onFocusChanged { st -> if (st.isFocused) kb?.show() },
-                    onTextLayout = { tlr ->
-                        layout = tlr
-                        node.layoutW = tlr.size.width
-                        node.layoutH = tlr.size.height
-                    }
-                )
+                // Disattiva la toolbar di sistema SOLO qui
+                CompositionLocalProvider(LocalTextToolbar provides emptyToolbar) {
+                    BasicTextField(
+                        value = node.value,
+                        onValueChange = { v ->
+                            engine.replaceActiveValue(v)
+                            if (showTextBar && v.selection.collapsed) showTextBar = false
+                        },
+                        textStyle = TextStyle(fontSize = 16.sp, color = Color.Black),
+                        cursorBrush = SolidColor(Color.Black),
+                        modifier = Modifier
+                            .offset { IntOffset(node.posPx.x.roundToInt(), safeY.roundToInt()) }
+                            .focusRequester(focusReq)
+                            .onFocusChanged { st -> if (st.isFocused) kb?.show() },
+                        onTextLayout = { tlr ->
+                            layout = tlr
+                            node.layoutW = tlr.size.width
+                            node.layoutH = tlr.size.height
+                        }
+                    )
+                }
 
                 // Porta focus quando cambia l’attivo → caret visibile
                 LaunchedEffect(node.id) { focusReq.requestFocus(); kb?.show() }
 
-                // Dopo un tap sul testo (anche non attivo), posiziona il caret nel punto preciso
+                // Dopo un tap, posiziona il caret tra le lettere
                 LaunchedEffect(pendingTap, layout, node.posPx, node.value.text) {
                     val p = pendingTap ?: return@LaunchedEffect
                     val tlr = layout ?: return@LaunchedEffect
-                    // coordinate relative al testo (rispetto al posizionamento “sicuro”)
                     val relX = (p.x - node.posPx.x).coerceIn(0f, (tlr.size.width  - 1).toFloat())
-                    val relY = (p.y - safeY).coerceIn(0f, (tlr.size.height - 1).toFloat())
+                    val relY = (p.y - safeY       ).coerceIn(0f, (tlr.size.height - 1).toFloat())
                     val caret = tlr.getOffsetForPosition(Offset(relX, relY))
                     engine.replaceActiveValue(
                         node.value.copy(selection = TextRange(caret))
@@ -244,7 +267,7 @@ fun TextLayer(
                     pendingTap = null
                 }
 
-                // Barra nera stile GitHub: Copia / Seleziona tutto / Incolla
+                // Barra nera stile GitHub
                 TextContextBar(
                     visible = showTextBar,
                     anchor = textBarAnchor,
@@ -283,27 +306,16 @@ fun TextLayer(
                     onDismiss = { showTextBar = false }
                 )
             }
-
-            // Nodi NON attivi: render statico + tap singolo per riattivare
-            engine.nodes.forEach { n ->
-                if (engine.active?.id == n.id) return@forEach
-                BasicText(
-                    text = n.value.text,
-                    style = TextStyle(fontSize = 16.sp, color = Color.Black),
-                    modifier = Modifier
-                        .offset { IntOffset(n.posPx.x.roundToInt(), n.posPx.y.roundToInt()) }
-                        .pointerInput(n.id) {
-                            detectTapGestures(onTap = { localTap ->
-                                // tap in coordinate Canvas
-                                val canvasTap = Offset(n.posPx.x + localTap.x, n.posPx.y + localTap.y)
-                                engine.active = n      // continua nello stesso blocco
-                                pendingTap = canvasTap // caret preciso tra le lettere
-                                kb?.show()
-                            })
-                        }
-                )
-            }
         }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { canvasSize = it }
+            .then(pointerMod) // input attivo SOLO in modalità Testo
+    ) {
+        content()
     }
 }
 
@@ -318,7 +330,6 @@ private fun TextContextBar(
     onDismiss: () -> Unit
 ) {
     if (!visible) return
-    // pannellino leggero, nessun Material necessario
     Box(Modifier.fillMaxSize()) {
         // chiusura su tap fuori
         Box(
@@ -332,7 +343,7 @@ private fun TextContextBar(
                 .offset { anchor }
                 .pointerInput(Unit) { detectTapGestures(onTap = { /* assorbi */ }) }
         ) {
-            androidx.compose.material3.Surface(
+            Surface(
                 color = Color(0xFF0D1117),
                 contentColor = Color.White,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
@@ -344,11 +355,11 @@ private fun TextContextBar(
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp)
                 ) {
-                    androidx.compose.material3.Text("Copia",
+                    Text("Copia",
                         modifier = Modifier.pointerInput(Unit){ detectTapGestures(onTap = { onCopy() }) })
-                    androidx.compose.material3.Text("Seleziona tutto",
+                    Text("Seleziona tutto",
                         modifier = Modifier.pointerInput(Unit){ detectTapGestures(onTap = { onSelectAll() }) })
-                    androidx.compose.material3.Text("Incolla",
+                    Text("Incolla",
                         modifier = Modifier.pointerInput(Unit){ detectTapGestures(onTap = { onPaste() }) })
                 }
             }

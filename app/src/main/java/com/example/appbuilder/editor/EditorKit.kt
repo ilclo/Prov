@@ -1315,14 +1315,10 @@ fun EditorMenusOnly(
         val inTextMenu = (menuPath.firstOrNull() == "Testo")
         Box(
             Modifier
-                .fillMaxSize()
-                .let { base -> if (inTextMenu) base.imePadding() else base } // ⬅️ IME anche per le barre
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF1A1A1A), Color(0xFF242424))
-                    )
-                )
+                .fillMaxSize() // ⬅️ niente imePadding qui
+                .background(Brush.verticalGradient(listOf(Color(0xFF1A1A1A), Color(0xFF242424))))
         ) {
+
 
 // Valore IME per adagiare le barre sopra la tastiera
             val density = LocalDensity.current
@@ -1334,25 +1330,24 @@ fun EditorMenusOnly(
                     .fillMaxSize()
                     .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
             ) {
-                // ⬅️ maxHeight è disponibile QUI dentro
                 val viewportH = maxHeight
+                val testoAperto = (menuPath.firstOrNull() == "Testo")
                 val scroll = rememberScrollState()
 
-                // Spazio extra per sollevare il contenuto sopra seconda barra + tastiera
-                val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+                // SOLO barre (nessuna IME): quanto posso “sollevare” la pagina
                 val extraBottomDp =
                     if (testoAperto)
                         SAFE_BOTTOM_MARGIN + BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA +
-                                BARS_GAP + TOP_BAR_HEIGHT + imeBottomDp + 24.dp
+                                BARS_GAP + TOP_BAR_HEIGHT + 24.dp
                     else 0.dp
 
                 Column(
                     Modifier
                         .fillMaxSize()
-                        // ⚠️ SOLO scroll, NIENTE imePadding in questa zona (evita schermo nero)
+                        // ⚠️ SOLO scroll, nessun imePadding in questa colonna
                         .let { base -> if (testoAperto) base.verticalScroll(scroll) else base }
                 ) {
-                    // Contenuto alla dimensione della viewport
+                    // Contenuto a misura viewport (evita misurazioni “infinite” nello scroll)
                     Box(Modifier.height(viewportH)) {
                         CanvasStage(
                             page            = pageState,
@@ -1387,7 +1382,6 @@ fun EditorMenusOnly(
                                     rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
                                     rectFx.remove(old)?.let         { rectFx[updated]         = it }
 
-                                    // 🔽 informa il motore di testo
                                     textEngine.onRectReplaced(old, updated)
                                 }
                             },
@@ -1399,18 +1393,19 @@ fun EditorMenusOnly(
                             imageStyles  = rectImages
                         )
 
-                        // Sovrapposizione testo
+                        // L’overlay testo decide da solo dove mettere il caret rispetto alla tastiera
                         TextLayer(
                             active = testoAperto,
                             page   = pageState,
                             engine = textEngine,
                             bottomSafePx = with(LocalDensity.current) {
+                                // questo serve SOLO al caret, non allo scroll!
                                 WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
                             }
                         )
                     }
 
-                    // ⬇️ Metti lo Spacer FUORI dal Box(height = viewportH), così aggiunge altezza vera allo scroll
+                    // Spazio extra per poter sollevare il bordo inferiore della pagina sopra la seconda barra
                     if (testoAperto) Spacer(Modifier.height(extraBottomDp))
                 }
             }
