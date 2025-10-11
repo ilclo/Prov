@@ -146,7 +146,11 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import com.example.appbuilder.text.TextLayer
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import android.content.Context
+import android.graphics.Typeface
+import java.util.Locale
 
 
 
@@ -303,6 +307,112 @@ private fun FilterSwatch(name: String, modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
+private fun FontDropdown(
+    icon: ImageVector,
+    contentDescription: String,
+    current: String?,
+    onSelected: (String) -> Unit,
+    locked: Boolean,
+    onLockedAttempt: (() -> Unit)? = null
+) {
+    val repo = rememberFontRepo()
+    val density = LocalDensity.current
+    var expanded by remember { mutableStateOf(false) }
+    var anchorPos by remember { mutableStateOf(IntOffset.Zero) }
+    var anchorSize by remember { mutableStateOf(IntSize.Zero) }
+
+    // Ancora (icona)
+    Box(modifier = Modifier.onGloballyPositioned { c ->
+        val p = c.positionInRoot()
+        anchorPos = IntOffset(p.x.roundToInt(), p.y.roundToInt())
+        anchorSize = c.size
+    }) {
+        ToolbarIconButton(
+            icon = icon,
+            contentDescription = contentDescription,
+            locked = locked,
+            onLockedAttempt = onLockedAttempt
+        ) { expanded = true }
+
+        if (!current.isNullOrBlank()) {
+            Surface(
+                color = Color(0xFF22304B),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset { IntOffset(0, 14) }
+            ) {
+                Text(current, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp)
+            }
+        }
+    }
+
+    if (expanded) {
+        val y = anchorPos.y + anchorSize.height + with(density) { 8.dp.toPx().roundToInt() }
+        Popup(
+            alignment = Alignment.TopStart,
+            offset = IntOffset(anchorPos.x, y),
+            onDismissRequest = { expanded = false },
+            properties = PopupProperties(focusable = true)
+        ) {
+            Surface(color = Color.Transparent) {
+                LazyColumn(
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)      // poche voci visibili, poi scroll
+                        .background(Color.Transparent)
+                        .padding(vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
+                ) {
+                    val items = repo.listFamilies()
+                    items(items) { name ->
+                        Surface(
+                            color = Color(0xF5FFFFFF),
+                            contentColor = Color.Black,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Color(0x14000000)),
+                            shadowElevation = 4.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSelected(name)
+                                    expanded = false
+                                }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+                            ) {
+                                // Anteprima: il nome scritto col suo font (Regular)
+                                Text(
+                                    text = name,
+                                    style = TextStyle(
+                                        fontFamily = repo.familyFor(name, italic = false),
+                                        fontSize = 16.sp,
+                                        color = Color.Black
+                                    ),
+                                )
+                                Spacer(Modifier.weight(1f))
+                                // Badge "Italic" se presente anche la variante corsiva
+                                if (repo.hasItalic(name)) {
+                                    Surface(
+                                        color = Color(0xFF0F141E),
+                                        contentColor = Color.White,
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) { Text("Italic", fontSize = 10.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun dpToKey(dp: Dp): String = "${dp.value.toInt()}dp"
 private fun keyToDp(s: String): Dp {
     val n = s.trim().lowercase().removeSuffix("dp").toFloatOrNull() ?: 0f
@@ -407,6 +517,66 @@ private fun FilterDropdown(
     }
 }
 
+private data class FontEntry(
+    val name: String,             // es. "Aleo"
+    val regularAssetPath: String, // es. "font-regular/Aleo-Regular.ttf"
+    val italicAssetPath: String?  // es. "font-italic/Aleo-Italic.ttf" (se presente)
+)
+
+private fun normalizeKey(s: String) =
+    s.lowercase(Locale.ROOT).replace("-", "").replace("_", "").replace(" ", "")
+
+private fun prettyName(raw: String): String =
+    raw.replace('_',' ').replace('-',' ').replace(Regex("\\s{2,}")," ").trim()
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+
+private fun Context.scanFontEntries(): List<FontEntry> {
+    fun isFontFile(name: String) =
+        name.endsWith(".ttf", true) || name.endsWith(".otf", true) || name.endsWith(".tff", true)
+
+    val reg = assets.list("font-regular")?.filter(::isFontFile).orEmpty()
+    val ita = assets.list("font-italic")?.filter(::isFontFile).orEmpty()
+
+    val regMap = reg.associate { file ->
+        val base = file.substringBeforeLast('.')
+        val familyRaw = base.replace(Regex("(?i)[_-]?regular$"), "")
+        val family = familyRaw.ifBlank { base }
+        val key = normalizeKey(family)
+        key to ("font-regular/$file" to family)
+    }
+    val itaMap = ita.associate { file ->
+        val base = file.substringBeforeLast('.')
+        val familyRaw = base.replace(Regex("(?i)[_-]?italic$"), "")
+        val family = familyRaw.ifBlank { base }
+        normalizeKey(family) to "font-italic/$file"
+    }
+
+    return regMap.map { (key, pair) ->
+        val (regPath, rawName) = pair
+        val display = prettyName(rawName)
+        val itaPath = itaMap[key]
+        FontEntry(display, regPath, itaPath)
+    }.sortedBy { it.name.lowercase() }
+}
+
+class FontRepo(private val context: Context) {
+    private val entries: List<FontEntry> = context.scanFontEntries()
+    private val cache = mutableMapOf<String, Typeface>()
+
+    fun listFamilies(): List<String> = entries.map { it.name }  // solo quelli con Regular
+    fun hasItalic(name: String): Boolean =
+        entries.firstOrNull { it.name.equals(name, true) }?.italicAssetPath != null
+
+    fun familyFor(name: String, italic: Boolean): FontFamily {
+        val e = entries.firstOrNull { it.name.equals(name, true) }
+            ?: entries.firstOrNull { it.name.equals("Aleo", true) } // fallback
+            ?: throw IllegalStateException("Nessun font disponibile in assets.")
+        val asset = if (italic && e.italicAssetPath != null) e.italicAssetPath else e.regularAssetPath
+        val key = "${asset}@$italic"
+        val tf = cache.getOrPut(key) { Typeface.createFromAsset(context.assets, asset) }
+        return FontFamily(tf)
+    }
+}
 
 
 
@@ -1324,7 +1494,7 @@ fun EditorMenusOnly(
         ) {
             // Altezza del viewport (BoxWithConstraints scope)
             val viewportH = maxHeight
-
+            val testoAperto = (menuPath.firstOrNull() == "Testo")
             // Scroll: sempre attivo
             val scroll = rememberScrollState()
 
@@ -1394,15 +1564,39 @@ fun EditorMenusOnly(
                         imageStyles  = rectImages
                     )
 
-                    // ⬇️ L’overlay testo gestisce SOLO il caret rispetto all’IME (non lo scroll)
+                    val isFreeUser = LocalIsFree.current
+                    val context = LocalContext.current
+                    val fontRepo = remember(context) { FontRepo(context) }
+
+
+                    // valori menù Testo (con fallback)
+                    fun sel(keyLeaf: String) = menuSelections[key(listOf("Testo"), keyLeaf)]
+                    val chosenName = if (isFreeUser) "Aleo" else (sel("Font") as? String ?: "Aleo")
+                    val italicOn   = if (isFreeUser) false else (sel("Corsivo") as? Boolean == true)
+
+                    val weight = when ((sel("Weight") as? String)?.lowercase()) {
+                        "light"   -> androidx.compose.ui.text.font.FontWeight.Light
+                        "medium"  -> androidx.compose.ui.text.font.FontWeight.Medium
+                        "bold"    -> androidx.compose.ui.text.font.FontWeight.Bold
+                        else      -> androidx.compose.ui.text.font.FontWeight.Normal
+                    }
+                    val sizeSp = ((sel("Size") as? String)?.removeSuffix("sp")?.toFloatOrNull() ?: 16f).sp
+                    val color  = tokenToColor(sel("Colore") as? String) ?: Color.Black
+
+                    val editorTextStyle = androidx.compose.ui.text.TextStyle(
+                        fontFamily = fontRepo.familyFor(chosenName, italic = italicOn),
+                        fontWeight = weight,
+                        fontSize   = sizeSp,
+                        color      = color
+                    )
                     TextLayer(
-                        editEnabled = (menuPath.firstOrNull() == "Testo"),
-                        page        = pageState,
-                        engine      = textEngine,
+                        editEnabled  = testoAperto,     // sempre montato: edit ON/OFF con questo flag
+                        page         = pageState,
+                        engine       = textEngine,
                         bottomSafePx = with(LocalDensity.current) {
-                            // questo serve SOLO al caret, non allo scroll!
                             WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
-                        }
+                        },
+                        textStyle    = editorTextStyle  // ⬅️ nuovo parametro
                     )
                 }
 
@@ -3538,10 +3732,11 @@ private fun TextLevel(
         onClick = { onToggle("Sottolinea", !((selections[uKey] as? Boolean) == true)) },
         icon = EditorIcons.Underline
     )
-// Corsivo
     ToggleIcon(
         selected = (selections[iKey] as? Boolean) == true,
-        onClick = { onToggle("Corsivo", !((selections[iKey] as? Boolean) == true)) },
+        onClick = {
+            if (isFree) onFreeGate() else onToggle("Corsivo", !((selections[iKey] as? Boolean) == true))
+        },
         icon = EditorIcons.Italic
     )
 
@@ -3551,10 +3746,13 @@ private fun TextLevel(
         options = listOf("Nessuna", "Marker", "Oblique", "Scribble"),
         onSelected = { onPick("Evidenzia", it) }
     )
-    IconDropdown(EditorIcons.CustomTypography, "Font",
-        current = (selections[key(path, "Font")] as? String) ?: "System",
-        options = listOf("System", "Inter", "Roboto", "SF Pro"),
-        onSelected = { onPick("Font", it) }
+    FontDropdown(
+        icon = EditorIcons.CustomTypography,
+        contentDescription = "Font",
+        current = (selections[key(path, "Font")] as? String) ?: "Aleo",
+        onSelected = { onPick("Font", it) },
+        locked = LocalIsFree.current,           // free → apre upsell
+        onLockedAttempt = onFreeGate
     )
     IconDropdown(EditorIcons.Bold, "Peso",
         current = (selections[key(path, "Weight")] as? String) ?: "Regular",
