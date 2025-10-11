@@ -316,7 +316,8 @@ private fun FontDropdown(
     locked: Boolean,
     onLockedAttempt: (() -> Unit)? = null
 ) {
-    val repo = rememberFontRepo()
+    val context = LocalContext.current
+    val repo = remember(context) { FontRepo(context) }
     val density = LocalDensity.current
     var expanded by remember { mutableStateOf(false) }
     var anchorPos by remember { mutableStateOf(IntOffset.Zero) }
@@ -366,8 +367,8 @@ private fun FontDropdown(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = 6.dp)
                 ) {
-                    val items = repo.listFamilies()
-                    items(items) { name ->
+                    val fontNames = repo.listFamilies()
+                    items(fontNames) { name ->
                         Surface(
                             color = Color(0xF5FFFFFF),
                             contentColor = Color.Black,
@@ -377,7 +378,7 @@ private fun FontDropdown(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    onSelected(name)
+                                    onSelected(name)  //Argument type mismatch: actual type is 'Int', but 'String' was expected.
                                     expanded = false
                                 }
                         ) {
@@ -386,14 +387,11 @@ private fun FontDropdown(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
                             ) {
-                                // Anteprima: il nome scritto col suo font (Regular)
                                 Text(
                                     text = name,
-                                    style = TextStyle(
-                                        fontFamily = repo.familyFor(name, italic = false),
-                                        fontSize = 16.sp,
-                                        color = Color.Black
-                                    ),
+                                    fontFamily = repo.familyFor(name, italic = false),
+                                    fontSize = 16.sp,
+                                    color = Color.Black
                                 )
                                 Spacer(Modifier.weight(1f))
                                 // Badge "Italic" se presente anche la variante corsiva
