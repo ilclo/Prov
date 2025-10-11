@@ -128,7 +128,8 @@ fun TextLayer(
     editEnabled: Boolean,
     page: PageState?,
     engine: TextEngine,
-    bottomSafePx: Int = 0   // spazio IME (px) per non coprire il caret — solo per l’editor
+    bottomSafePx: Int = 0,  // spazio IME (px) per non coprire il caret — solo per l’editor
+    textStyle: TextStyle = TextStyle(fontSize = 16.sp, color = Color.Black)
 ) {
     // NIENTE early-return: i testi statici devono restare visibili anche fuori dal menù Testo.
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
@@ -223,8 +224,8 @@ fun TextLayer(
                             engine.replaceActiveValue(v)
                             if (showTextBar && v.selection.collapsed) showTextBar = false
                         },
-                        textStyle = TextStyle(fontSize = 16.sp, color = Color.Black),
-                        cursorBrush = SolidColor(Color.Black),
+                        textStyle = textStyle,
+                        cursorBrush = SolidColor(if (textStyle.color != Color.Unspecified) textStyle.color else Color.Black),
                         modifier = Modifier
                             .offset { IntOffset(node.posPx.x.roundToInt(), safeY.roundToInt()) }
                             .focusRequester(focusReq)
@@ -315,7 +316,7 @@ fun TextLayer(
 
                 BasicText(
                     text = n.value.text,
-                    style = TextStyle(fontSize = 16.sp, color = Color.Black),
+                    style = textStyle,
                     modifier = mod.offset {
                         IntOffset(n.posPx.x.roundToInt(), n.posPx.y.roundToInt())
                     }
