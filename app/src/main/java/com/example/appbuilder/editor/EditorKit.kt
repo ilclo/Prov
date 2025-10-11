@@ -1317,36 +1317,40 @@ fun EditorMenusOnly(
         LocalIsFree provides (codiceprofree == 12345)
     ) {
         val inTextMenu = (menuPath.firstOrNull() == "Testo")
-        Box(
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
         ) {
-            val conf = LocalConfiguration.current
-            val screenH = conf.screenHeightDp.dp           // altezza fisica dello schermo (ignora IME)
-            val halfScreen = screenH * 0.5f                // buffer nero “rigido” sopra/sotto
-            val testoAperto = (menuPath.firstOrNull() == "Testo")
+            // Altezza del viewport (BoxWithConstraints scope)
+            val viewportH = maxHeight
+
+            // Scroll: sempre attivo
             val scroll = rememberScrollState()
 
-            // Colonna di scorrimento SOLO nel menù Testo.
+            // Mezzo schermo nero sopra e mezzo sotto
+            val halfPagePad = viewportH / 2
+
+            // All'avvio: mostra la pagina bianca a schermo pieno (i neri fuori vista)
+            val density = LocalDensity.current
+            LaunchedEffect(viewportH) {
+                if (scroll.value == 0) {
+                    val target = with(density) { halfPagePad.roundToPx() }
+                    scroll.scrollTo(target)
+                }
+            }
+
             Column(
                 Modifier
                     .fillMaxSize()
-                    .background(Color.Black)              // nero pieno per i buffer sopra/sotto
-                    .let { base -> if (testoAperto) base.verticalScroll(scroll) else base }
+                    // ⚠️ nessun imePadding: la tastiera non spinge il contenuto
+                    .verticalScroll(scroll)
             ) {
-                // ↑ mezzo schermo nero “non modificabile”
-                Spacer(Modifier.height(halfScreen))
+                // Nero sopra (mezzo schermo)
+                Box(Modifier.height(halfPagePad).fillMaxWidth().background(Color.Black))
 
-                // Pagina bianca che occupa ESATTAMENTE uno schermo
-                Box(
-                    Modifier
-                        .height(screenH)
-                        .fillMaxWidth()
-                ) {
-                    // fondo pagina bianco
-                    Box(Modifier.matchParentSize().background(Color.White))
-
+                // Pagina: sempre alta esattamente come il viewport
+                Box(Modifier.height(viewportH)) {
                     CanvasStage(
                         page            = pageState,
                         gridDensity     = pageState?.gridDensity ?: 6,
@@ -1390,21 +1394,22 @@ fun EditorMenusOnly(
                         imageStyles  = rectImages
                     )
 
-                    // ⬇️ L’overlay testo decide solo il caret rispetto all’IME (il contenuto non scrolla per l’IME)
+                    // ⬇️ L’overlay testo gestisce SOLO il caret rispetto all’IME (non lo scroll)
                     TextLayer(
-                        editEnabled  = testoAperto,      // <— vedi punto 3
-                        page         = pageState,
-                        engine       = textEngine,
+                        editEnabled = (menuPath.firstOrNull() == "Testo"),
+                        page        = pageState,
+                        engine      = textEngine,
                         bottomSafePx = with(LocalDensity.current) {
+                            // questo serve SOLO al caret, non allo scroll!
                             WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
                         }
                     )
                 }
 
-                // ↓ mezzo schermo nero “non modificabile”
-                Spacer(Modifier.height(halfScreen))
+                // Nero sotto (mezzo schermo)
+                Box(Modifier.height(halfPagePad).fillMaxWidth().background(Color.Black))
             }
-        
+
 
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
