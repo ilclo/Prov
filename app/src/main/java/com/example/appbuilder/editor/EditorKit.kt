@@ -146,6 +146,10 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import com.example.appbuilder.text.TextLayer
+import androidx.compose.ui.platform.LocalConfiguration
+
+
+
 private val LocalIsFree = staticCompositionLocalOf { true }
 
 private const val codiceprofree = 123456
@@ -1316,98 +1320,91 @@ fun EditorMenusOnly(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color(0xFF1A1A1A), Color(0xFF242424))))
+                .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
         ) {
-            // ⬇️ Area contenuto NON influenzata dall’IME
-            BoxWithConstraints(
+            val conf = LocalConfiguration.current
+            val screenH = conf.screenHeightDp.dp           // altezza fisica dello schermo (ignora IME)
+            val halfScreen = screenH * 0.5f                // buffer nero “rigido” sopra/sotto
+            val testoAperto = (menuPath.firstOrNull() == "Testo")
+            val scroll = rememberScrollState()
+
+            // Colonna di scorrimento SOLO nel menù Testo.
+            Column(
                 Modifier
                     .fillMaxSize()
-                    .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
+                    .background(Color.Black)              // nero pieno per i buffer sopra/sotto
+                    .let { base -> if (testoAperto) base.verticalScroll(scroll) else base }
             ) {
-                val viewportH = maxHeight
-                val testoAperto = (menuPath.firstOrNull() == "Testo")
-                val scroll = rememberScrollState()
+                // ↑ mezzo schermo nero “non modificabile”
+                Spacer(Modifier.height(halfScreen))
 
-                // SOLO barre (nessuna IME) — per far salire la pagina sopra la seconda barra
-                val barsOnlyExtra =
-                    if (testoAperto)
-                        SAFE_BOTTOM_MARGIN + BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA +
-                                BARS_GAP + TOP_BAR_HEIGHT + 24.dp
-                    else 0.dp
-
-                // ➕ Aggiungi anche l’altezza IME per poter scendere "dentro" la tastiera
-                val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-                val extraBottomDp = if (testoAperto) barsOnlyExtra + imeBottomDp else 0.dp
-
-                Column(
+                // Pagina bianca che occupa ESATTAMENTE uno schermo
+                Box(
                     Modifier
-                        .fillMaxSize()
-                        // ⚠️ SOLO scroll, nessun imePadding in questa colonna
-                        .let { base -> if (testoAperto) base.verticalScroll(scroll) else base }
+                        .height(screenH)
+                        .fillMaxWidth()
                 ) {
-                    // Contenuto a misura viewport (evita misure “infinite” nello scroll)
-                    Box(Modifier.height(viewportH)) {
-                        CanvasStage(
-                            page            = pageState,
-                            gridDensity     = pageState?.gridDensity ?: 6,
-                            gridPreviewOnly = gridPanelOpen && gridIsDragging,
-                            showFullGrid    = gridPanelOpen && showGridLines,
-                            currentLevel    = currentLevel,
-                            creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
-                            toolMode        = toolMode,
-                            selected        = selectedRect,
-                            onAddItem       = { item -> pageState?.items?.add(item) },
-                            onRequestEdit   = { rect ->
-                                selectedRect = rect
-                                if (rect != null) {
-                                    if (menuPath.firstOrNull() != "Contenitore") menuPath = listOf("Contenitore")
-                                    applyContainerMenuFromRect(rect)
-                                }
-                            },
-                            onUpdateItem = { old, updated ->
-                                val items = pageState?.items ?: return@CanvasStage
-                                val ix = items.indexOf(old)
-                                if (ix >= 0) {
-                                    items[ix] = updated
-                                    if (selectedRect == old) {
-                                        selectedRect = updated
-                                        applyContainerMenuFromRect(updated)
-                                    }
-                                    rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
-                                    rectImages.remove(old)?.let     { rectImages[updated]     = it }
-                                    rectBorderSides.remove(old)?.let { rectBorderSides[updated]= it }
-                                    rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
-                                    rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
-                                    rectFx.remove(old)?.let         { rectFx[updated]         = it }
-                                    textEngine.onRectReplaced(old, updated)
-                                }
-                            },
-                            fillStyles   = rectFillStyles,
-                            shapes       = rectShapes,
-                            corners      = rectCorners,
-                            borderSides  = rectBorderSides,
-                            fx           = rectFx,
-                            imageStyles  = rectImages
-                        )
+                    // fondo pagina bianco
+                    Box(Modifier.matchParentSize().background(Color.White))
 
-                        // ⬇️ L’overlay testo gestisce da solo il caret rispetto all’IME
-                        TextLayer(
-                            editEnabled = testoAperto, // <— nuova firma
-                            page        = pageState,
-                            engine      = textEngine,
-                            bottomSafePx = with(LocalDensity.current) {
-                                // serve SOLO al caret, non allo scroll
-                                WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
+                    CanvasStage(
+                        page            = pageState,
+                        gridDensity     = pageState?.gridDensity ?: 6,
+                        gridPreviewOnly = gridPanelOpen && gridIsDragging,
+                        showFullGrid    = gridPanelOpen && showGridLines,
+                        currentLevel    = currentLevel,
+                        creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
+                        toolMode        = toolMode,
+                        selected        = selectedRect,
+                        onAddItem       = { item -> pageState?.items?.add(item) },
+                        onRequestEdit   = { rect ->
+                            selectedRect = rect
+                            if (rect != null) {
+                                if (menuPath.firstOrNull() != "Contenitore") menuPath = listOf("Contenitore")
+                                applyContainerMenuFromRect(rect)
                             }
-                        )
-                    }
+                        },
+                        onUpdateItem = { old, updated ->
+                            val items = pageState?.items ?: return@CanvasStage
+                            val ix = items.indexOf(old)
+                            if (ix >= 0) {
+                                items[ix] = updated
+                                if (selectedRect == old) {
+                                    selectedRect = updated
+                                    applyContainerMenuFromRect(updated)
+                                }
+                                rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
+                                rectImages.remove(old)?.let     { rectImages[updated]     = it }
+                                rectBorderSides.remove(old)?.let{ rectBorderSides[updated]= it }
+                                rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
+                                rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
+                                rectFx.remove(old)?.let         { rectFx[updated]         = it }
+                                textEngine.onRectReplaced(old, updated)
+                            }
+                        },
+                        fillStyles   = rectFillStyles,
+                        shapes       = rectShapes,
+                        corners      = rectCorners,
+                        borderSides  = rectBorderSides,
+                        fx           = rectFx,
+                        imageStyles  = rectImages
+                    )
 
-                    // Spazio extra: ora = barre + IME → il bordo inferiore può scendere sotto il top tastiera
-                    if (testoAperto) Spacer(Modifier.height(extraBottomDp))
+                    // ⬇️ L’overlay testo decide solo il caret rispetto all’IME (il contenuto non scrolla per l’IME)
+                    TextLayer(
+                        editEnabled  = testoAperto,      // <— vedi punto 3
+                        page         = pageState,
+                        engine       = textEngine,
+                        bottomSafePx = with(LocalDensity.current) {
+                            WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
+                        }
+                    )
                 }
+
+                // ↓ mezzo schermo nero “non modificabile”
+                Spacer(Modifier.height(halfScreen))
             }
-
-
+        
 
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
