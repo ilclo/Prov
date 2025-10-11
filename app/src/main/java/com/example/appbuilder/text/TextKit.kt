@@ -39,20 +39,11 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import java.util.UUID
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.input.pointer.consume
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.ui.zIndex
 
 /* =========================================================================================
  * MOTORE TESTO
