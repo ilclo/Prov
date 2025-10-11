@@ -125,7 +125,7 @@ fun TextLayer(
                 BasicTextField(
                     value = node.text,
                     onValueChange = { engine.updateText(it) },
-                    textStyle = textStyle, // ⬅️ applico font/size/colore
+                    textStyle = textStyle, // ⬅️  applico font/size/colore
                     cursorBrush = SolidColor(textStyle.color),
                     modifier = Modifier
                         .offset { IntOffset(node.posPx.x.roundToInt(), safeY.roundToInt()) }
