@@ -1318,7 +1318,6 @@ fun EditorMenusOnly(
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(Color(0xFF1A1A1A), Color(0xFF242424))))
         ) {
-
             // ⬇️ Area contenuto NON influenzata dall’IME
             BoxWithConstraints(
                 Modifier
@@ -1329,12 +1328,16 @@ fun EditorMenusOnly(
                 val testoAperto = (menuPath.firstOrNull() == "Testo")
                 val scroll = rememberScrollState()
 
-                // SOLO barre: quanto posso “sollevare” la pagina (nessuna IME qui)
-                val extraBottomDp =
+                // SOLO barre (nessuna IME) — per far salire la pagina sopra la seconda barra
+                val barsOnlyExtra =
                     if (testoAperto)
                         SAFE_BOTTOM_MARGIN + BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA +
                                 BARS_GAP + TOP_BAR_HEIGHT + 24.dp
                     else 0.dp
+
+                // ➕ Aggiungi anche l’altezza IME per poter scendere "dentro" la tastiera
+                val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+                val extraBottomDp = if (testoAperto) barsOnlyExtra + imeBottomDp else 0.dp
 
                 Column(
                     Modifier
@@ -1372,7 +1375,7 @@ fun EditorMenusOnly(
                                     }
                                     rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
                                     rectImages.remove(old)?.let     { rectImages[updated]     = it }
-                                    rectBorderSides.remove(old)?.let{ rectBorderSides[updated]= it }
+                                    rectBorderSides.remove(old)?.let { rectBorderSides[updated]= it }
                                     rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
                                     rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
                                     rectFx.remove(old)?.let         { rectFx[updated]         = it }
@@ -1389,19 +1392,22 @@ fun EditorMenusOnly(
 
                         // ⬇️ L’overlay testo gestisce da solo il caret rispetto all’IME
                         TextLayer(
-                            editEnabled = testoAperto,   // <— vedi sezione 2 per la nuova firma
+                            editEnabled = testoAperto, // <— nuova firma
                             page        = pageState,
                             engine      = textEngine,
                             bottomSafePx = with(LocalDensity.current) {
+                                // serve SOLO al caret, non allo scroll
                                 WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
                             }
                         )
                     }
 
-                    // Spazio extra di scroll: il bordo inferiore della pagina può salire sopra la seconda barra
+                    // Spazio extra: ora = barre + IME → il bordo inferiore può scendere sotto il top tastiera
                     if (testoAperto) Spacer(Modifier.height(extraBottomDp))
                 }
             }
+
+
 
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
