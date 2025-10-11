@@ -180,6 +180,8 @@ sealed class ColorTarget {
     data class ContainerFill(val slot: Int) : ColorTarget() // 1 o 2
     data class LayoutFill(val slot: Int) : ColorTarget()     // 1 o 2
     object Text : ColorTarget()
+    object TextUnderline : ColorTarget()
+
 }
 
 private fun androidx.compose.ui.graphics.Color.toHex(): String {
@@ -1027,6 +1029,7 @@ fun EditorMenusOnly(
     var cropperVisible by remember { mutableStateOf(false) }
     var cropperImageUri by remember { mutableStateOf<Uri?>(null) }
     var cropperTarget by remember { mutableStateOf<DrawItem.RectItem?>(null) }
+    var pendingUnderlineRange by remember { mutableStateOf<IntRange?>(null) }
 
     val textEngine = remember { com.example.appbuilder.text.TextEngine() }
 
@@ -1323,7 +1326,7 @@ fun EditorMenusOnly(
                 k("Testo","Corsivo") to false,
                 k("Testo","Evidenzia") to "Nessuna",
                 k("Testo","Font") to "System",
-                k("Testo","Weight") to "Regular",
+                k("Testo","Weight") to "w400",
                 k("Testo","Size") to "16sp",
                 k("Testo","Colore") to "Nero",
             )
@@ -1572,12 +1575,19 @@ fun EditorMenusOnly(
                     val chosenName = if (isFreeUser) "Aleo" else (sel("Font") as? String ?: "Aleo")
                     val italicOn   = if (isFreeUser) false else (sel("Corsivo") as? Boolean == true)
 
-                    val weight = when ((sel("Weight") as? String)?.lowercase()) {
-                        "light"   -> androidx.compose.ui.text.font.FontWeight.Light
-                        "medium"  -> androidx.compose.ui.text.font.FontWeight.Medium
-                        "bold"    -> androidx.compose.ui.text.font.FontWeight.Bold
-                        else      -> androidx.compose.ui.text.font.FontWeight.Normal
+                    val weightStr = (sel("Weight") as? String)?.trim()?.lowercase()
+                    val weight = when {
+                        weightStr?.startsWith("w") == true -> {
+                            val n = weightStr.removePrefix("w").toIntOrNull()?.coerceIn(100, 900) ?: 400
+                            androidx.compose.ui.text.font.FontWeight(n)
+                        }
+                        // retrocompatibilità con eventuali valori precedenti
+                        weightStr == "light"   -> androidx.compose.ui.text.font.FontWeight.Light
+                        weightStr == "medium"  -> androidx.compose.ui.text.font.FontWeight.Medium
+                        weightStr == "bold"    -> androidx.compose.ui.text.font.FontWeight.Bold
+                        else                   -> androidx.compose.ui.text.font.FontWeight.Normal
                     }
+
                     val sizeSp = ((sel("Size") as? String)?.removeSuffix("sp")?.toFloatOrNull() ?: 16f).sp
                     val color  = tokenToColor(sel("Colore") as? String) ?: Color.Black
 
@@ -1814,6 +1824,15 @@ fun EditorMenusOnly(
                                 showColorPicker = true
                                 return@SubMenuBar
                             }
+                            // Testo → Colore: apri palette (ic_colors)
+                            if (fullPath.endsWith("Testo / Colore")) {
+                                colorPickTarget = ColorTarget.Text
+                                val hex = (menuSelections[key(listOf("Testo"), "Colore")] as? String)
+                                colorPickInitial = tokenToColor(hex) ?: Color.Black
+                                showColorPicker = true
+                                return@SubMenuBar
+                            }
+
                         },
                         onToggle = { label, value ->
                             val root = menuPath.firstOrNull() ?: "Contenitore"
@@ -1848,6 +1867,24 @@ fun EditorMenusOnly(
                                     rectBorderSides[rect] = upd
                                 }
                             }
+                            // Testo → Sottolinea: se passi da OFF→ON, apri palette e memorizza il range selezionato
+                            val inTextRoot = (menuPath.firstOrNull() == "Testo")
+                            if (inTextRoot && label == "Sottolinea") {
+                                val turningOn = (value == true)
+                                if (turningOn) {
+                                    val node = textEngine.active
+                                    val sel = node?.value?.selection
+                                    if (sel == null || sel.collapsed) {
+                                        infoCard = "Seleziona il testo" to "Evidenzia una porzione di testo prima di attivare la sottolineatura."
+                                    } else {
+                                        pendingUnderlineRange = (sel.min..sel.max)
+                                        colorPickTarget = ColorTarget.TextUnderline   // ⬅️ nuovo target
+                                        colorPickInitial = Color.Black
+                                        showColorPicker = true
+                                    }
+                                }
+                            }
+
                         },
 
                         onPick = pick@{ label, value ->
@@ -2145,6 +2182,21 @@ fun EditorMenusOnly(
                 onPick = { picked: Color ->    // ⬅️ tipo esplicito
                     val hex = picked.toHex()
                     when (val tgt = colorPickTarget) {
+                        ColorTarget.Text -> {
+                            val hex = picked.toHex()
+                            menuSelections[key(listOf("Testo"), "Colore")] = hex
+                        }
+
+                        ColorTarget.TextUnderline -> {
+                            val range = pendingUnderlineRange
+                            if (range != null) {
+                                textEngine.addUnderlineToActive(range.first, range.last, picked)
+                            } else {
+                                infoCard = "Nessuna selezione" to "Seleziona una porzione di testo e riprova."
+                            }
+                            pendingUnderlineRange = null
+                        }
+
                         ColorTarget.Border -> {
                             selectedRect?.let { rect ->
                                 pageState?.let { ps ->

@@ -59,6 +59,9 @@ class TextEngine {
         // info layout per hit-test
         var layoutW by mutableStateOf(0)
         var layoutH by mutableStateOf(0)
+        // sottolineature per-range (start..end, colore)
+        data class UnderlineRun(val start: Int, val end: Int, val color: Color)
+        val underlineRuns = mutableStateListOf<UnderlineRun>()
     }
 
     val nodes = mutableStateListOf<TextNode>()
@@ -118,6 +121,13 @@ class TextEngine {
     }
 
     fun replaceActiveValue(newValue: TextFieldValue) { active?.value = newValue }
+
+    fun addUnderlineToActive(start: Int, end: Int, color: Color) {
+        val n = active ?: return
+        val s = start.coerceAtLeast(0).coerceAtMost(n.value.text.length)
+        val e = end.coerceAtLeast(0).coerceAtMost(n.value.text.length)
+        if (e > s) n.underlineRuns.add(TextNode.UnderlineRun(s, e, color))
+    }
 }
 
 /* =========================================================================================
@@ -218,14 +228,33 @@ fun TextLayer(
                         }
                     }
 
+// 1) trasf. visiva per applicare le sottolineature con colore
+                    val vt = remember(node.underlineRuns, node.value.text) {
+                        VisualTransformation { input ->
+                            val b = AnnotatedString.Builder(input.text)
+                            node.underlineRuns.forEach { run ->
+                                val s = run.start.coerceIn(0, input.text.length)
+                                val e = run.end.coerceIn(s, input.text.length)
+                                if (e > s) {
+                                    b.addStyle(
+                                        SpanStyle(color = run.color, textDecoration = TextDecoration.Underline),
+                                        s, e
+                                    )
+                                }
+                            }
+                            TransformedText(b.toAnnotatedString(), OffsetMapping.Identity)
+                        }
+                    }
+
                     BasicTextField(
                         value = node.value,
                         onValueChange = { v ->
                             engine.replaceActiveValue(v)
                             if (showTextBar && v.selection.collapsed) showTextBar = false
                         },
-                        textStyle = textStyle,
-                        cursorBrush = SolidColor(if (textStyle.color != Color.Unspecified) textStyle.color else Color.Black),
+                        textStyle = TextStyle(fontSize = 16.sp, color = Color.Black),
+                        cursorBrush = SolidColor(Color.Black),
+                        visualTransformation = vt,  // ⬅️ AGGIUNTO
                         modifier = Modifier
                             .offset { IntOffset(node.posPx.x.roundToInt(), safeY.roundToInt()) }
                             .focusRequester(focusReq)
@@ -238,6 +267,7 @@ fun TextLayer(
                             }
                         }
                     )
+
 
                     // Porta focus quando cambia l’attivo → caret visibile
                     LaunchedEffect(node.id) { focusReq.requestFocus(); kb?.show() }
@@ -314,9 +344,25 @@ fun TextLayer(
                     }
                 } else Modifier
 
+                val plain = n.value.text
+                val asb = remember(plain, n.underlineRuns) {
+                    AnnotatedString.Builder(plain).apply {
+                        n.underlineRuns.forEach { run ->
+                            val s = run.start.coerceIn(0, plain.length)
+                            val e = run.end.coerceIn(s, plain.length)
+                            if (e > s) {
+                                addStyle(
+                                    SpanStyle(color = run.color, textDecoration = TextDecoration.Underline),
+                                    s, e
+                                )
+                            }
+                        }
+                    }.toAnnotatedString()
+                }
+
                 BasicText(
-                    text = n.value.text,
-                    style = textStyle,
+                    text = asb,
+                    style = TextStyle(fontSize = 16.sp, color = Color.Black),
                     modifier = mod.offset {
                         IntOffset(n.posPx.x.roundToInt(), n.posPx.y.roundToInt())
                     }
