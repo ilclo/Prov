@@ -1328,76 +1328,91 @@ fun EditorMenusOnly(
             val density = LocalDensity.current
             val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
             val testoAperto = (menuPath.firstOrNull() == "Testo")
-            Box(
+
+            BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
-                    .let { base ->
-                        // Abilita scroll “forzato” SOLO nel menù Testo, per portare in vista il caret dietro la tastiera
-                        if (testoAperto) base.verticalScroll(rememberScrollState()) else base
-                    }
                     .let { if (gridPanelOpen) it.blur(16.dp).graphicsLayer(alpha = 0.40f) else it }
-
             ) {
-                CanvasStage(
-                    page            = pageState,
-                    gridDensity     = pageState?.gridDensity ?: 6,
-                    gridPreviewOnly = gridPanelOpen && gridIsDragging,
-                    showFullGrid    = gridPanelOpen && showGridLines,
-                    currentLevel    = currentLevel,
-                    creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
-                    toolMode        = toolMode,
-                    selected        = selectedRect,
-                    onAddItem       = { item -> pageState?.items?.add(item) },
+                // ⬅️ maxHeight è disponibile QUI dentro
+                val viewportH = maxHeight
+                val scroll = rememberScrollState()
 
-                    onRequestEdit   = { rect ->
-                        selectedRect = rect
-                        if (rect != null) {
-                            if (menuPath.firstOrNull() != "Contenitore") menuPath = listOf("Contenitore")
-                            applyContainerMenuFromRect(rect)
-                        }
-                    },
-                    onUpdateItem = { old, updated ->
-                        val items = pageState?.items ?: return@CanvasStage
-                        val ix = items.indexOf(old)
-                        if (ix >= 0) {
-                            items[ix] = updated
+                // Spazio extra per sollevare il contenuto sopra seconda barra + tastiera
+                val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+                val extraBottomDp =
+                    if (testoAperto)
+                        SAFE_BOTTOM_MARGIN + BOTTOM_BAR_HEIGHT + BOTTOM_BAR_EXTRA +
+                                BARS_GAP + TOP_BAR_HEIGHT + imeBottomDp + 24.dp
+                    else 0.dp
 
-                            // 🔽 1) migra subito la selezione e le tue mappe (come già fai)
-                            if (selectedRect == old) {
-                                selectedRect = updated
-                                applyContainerMenuFromRect(updated)
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        // ⚠️ SOLO scroll, NIENTE imePadding in questa zona (evita schermo nero)
+                        .let { base -> if (testoAperto) base.verticalScroll(scroll) else base }
+                ) {
+                    // Contenuto alla dimensione della viewport
+                    Box(Modifier.height(viewportH)) {
+                        CanvasStage(
+                            page            = pageState,
+                            gridDensity     = pageState?.gridDensity ?: 6,
+                            gridPreviewOnly = gridPanelOpen && gridIsDragging,
+                            showFullGrid    = gridPanelOpen && showGridLines,
+                            currentLevel    = currentLevel,
+                            creationEnabled = (canCreateContainer && toolMode == ToolMode.Create),
+                            toolMode        = toolMode,
+                            selected        = selectedRect,
+                            onAddItem       = { item -> pageState?.items?.add(item) },
+                            onRequestEdit   = { rect ->
+                                selectedRect = rect
+                                if (rect != null) {
+                                    if (menuPath.firstOrNull() != "Contenitore") menuPath = listOf("Contenitore")
+                                    applyContainerMenuFromRect(rect)
+                                }
+                            },
+                            onUpdateItem = { old, updated ->
+                                val items = pageState?.items ?: return@CanvasStage
+                                val ix = items.indexOf(old)
+                                if (ix >= 0) {
+                                    items[ix] = updated
+                                    if (selectedRect == old) {
+                                        selectedRect = updated
+                                        applyContainerMenuFromRect(updated)
+                                    }
+                                    rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
+                                    rectImages.remove(old)?.let     { rectImages[updated]     = it }
+                                    rectBorderSides.remove(old)?.let{ rectBorderSides[updated]= it }
+                                    rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
+                                    rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
+                                    rectFx.remove(old)?.let         { rectFx[updated]         = it }
+
+                                    // 🔽 informa il motore di testo
+                                    textEngine.onRectReplaced(old, updated)
+                                }
+                            },
+                            fillStyles   = rectFillStyles,
+                            shapes       = rectShapes,
+                            corners      = rectCorners,
+                            borderSides  = rectBorderSides,
+                            fx           = rectFx,
+                            imageStyles  = rectImages
+                        )
+
+                        // Sovrapposizione testo
+                        TextLayer(
+                            active = testoAperto,
+                            page   = pageState,
+                            engine = textEngine,
+                            bottomSafePx = with(LocalDensity.current) {
+                                WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
                             }
-                            rectFillStyles.remove(old)?.let { rectFillStyles[updated] = it }
-                            rectImages.remove(old)?.let     { rectImages[updated]     = it }
-                            rectBorderSides.remove(old)?.let{ rectBorderSides[updated]= it }
-                            rectCorners.remove(old)?.let    { rectCorners[updated]    = it }
-                            rectShapes.remove(old)?.let     { rectShapes[updated]     = it }
-                            rectFx.remove(old)?.let         { rectFx[updated]         = it }
-
-                            // 🔽 2) informa il motore di testo del replace
-                            textEngine.onRectReplaced(old, updated)
-                        }
-                    },
-
-                    // mappe
-                    fillStyles   = rectFillStyles,
-                    shapes       = rectShapes,
-                    corners      = rectCorners,
-                    borderSides  = rectBorderSides,
-                    fx           = rectFx,
-                    imageStyles  = rectImages
-
-                )
-                TextLayer(
-                    active = testoAperto,
-                    page   = pageState,
-                    engine = textEngine,
-                    bottomSafePx = with(LocalDensity.current) {
-                        WindowInsets.ime.asPaddingValues().calculateBottomPadding().toPx().roundToInt()
+                        )
                     }
-                )
 
-
+                    // ⬇️ Metti lo Spacer FUORI dal Box(height = viewportH), così aggiunge altezza vera allo scroll
+                    if (testoAperto) Spacer(Modifier.height(extraBottomDp))
+                }
             }
             var idError by remember { mutableStateOf(false) }
             if (menuPath.isEmpty()) {
@@ -2098,26 +2113,22 @@ fun FloatingColorPickerOverlay(
                     .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
                     .padding(14.dp)
             ) {
-                // anello di chip circolari
-                BoxWithConstraints(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize()) {
                     val n = ring.size
-                    val radius = 88.dp
+                    val r = 88.dp          // raggio dell’anello
                     val chip = 32.dp
-                    val centerX = maxWidth / 2
-                    val centerY = maxHeight / 2
-                    val r = radius
                     val step = 360f / n
 
                     ring.forEachIndexed { i, c ->
-                        val ang = Math.toRadians((i * step - 90f).toDouble()) // parte da alto
-                        val dx = ((cos(ang) * r.value).toFloat()).dp
-                        val dy = ((sin(ang) * r.value).toFloat()).dp
+                        val ang = Math.toRadians((i * step - 90f).toDouble())
+                        val dx = (cos(ang) * r.value).toFloat().dp
+                        val dy = (sin(ang) * r.value).toFloat().dp
 
                         Box(
                             Modifier
                                 .size(chip)
-                                .offset(x = dx, y = dy)
-                                .align(Alignment.Center)
+                                .align(Alignment.Center)          // centro assoluto del contenitore
+                                .offset(x = dx, y = dy)           // traslazione rispetto al centro
                                 .clip(CircleShape)
                                 .background(c)
                                 .border(2.dp, Color.White.copy(alpha = 0.70f), CircleShape)

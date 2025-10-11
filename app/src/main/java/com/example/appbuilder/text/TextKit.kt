@@ -36,7 +36,7 @@ import java.util.UUID
 
 /**
  * Motore testuale leggero: blocchi testo “flottanti” associabili a pagina o contenitore.
- * NB: ogni valore di testo è uno State (TextFieldValue) → le lettere compaiono mentre digiti.
+ * Ogni blocco usa TextFieldValue → caret/selection nativi (copy/paste/select-all via toolbar di sistema).
  */
 class TextEngine {
 
@@ -95,7 +95,7 @@ class TextEngine {
             tapPx.x in left..right && tapPx.y in top..bottom
         }?.let { return it }
 
-        // 2) altrimenti il più vicino alla sua origine entro nearPx
+        // 2) il più vicino alla sua origine entro nearPx
         return nodes.minByOrNull { (it.posPx - tapPx).getDistance() }?.takeIf {
             (it.posPx - tapPx).getDistance() <= nearPx
         }
@@ -135,7 +135,7 @@ fun TextLayer(
         engine.updateEnv(canvasSize, page?.gridDensity ?: 6)
     }
 
-    // tap → attiva/crea blocco; nessun long-press/drag qui: li gestisce il BasicTextField
+    // tap → attiva/crea blocco; nessun long-press/drag qui: li gestisce BasicTextField (selection nativa)
     var pendingTap by remember { mutableStateOf<Offset?>(null) } // per posizionare il caret dentro il testo
 
     Box(
@@ -176,7 +176,7 @@ fun TextLayer(
                     .onFocusChanged { st -> if (st.isFocused) kb?.show() },
                 onTextLayout = { tlr ->
                     layout = tlr
-                    // aggiorno box di hit-test (serve per capire se il prossimo tap cade “dentro”)
+                    // aggiorna box di hit-test (serve per capire se un prossimo tap cade “dentro”)
                     node.layoutW = tlr.size.width
                     node.layoutH = tlr.size.height
                 }
@@ -200,7 +200,7 @@ fun TextLayer(
             }
         }
 
-        // Nodi NON attivi: rendering statico + tap singolo per riattivare (con caret nella parola cliccata)
+        // Nodi NON attivi: rendering statico + tap singolo per riattivare (caret nella parola cliccata)
         engine.nodes.forEach { n ->
             if (engine.active?.id == n.id) return@forEach
             BasicText(
@@ -211,7 +211,7 @@ fun TextLayer(
                     .pointerInput(n.id) {
                         detectTapGestures(
                             onTap = { localTap ->
-                                // converto il tap locale (nel BasicText) in coordinate Canvas
+                                // converte il tap locale (nel BasicText) in coordinate Canvas
                                 val canvasTap = Offset(n.posPx.x + localTap.x, n.posPx.y + localTap.y)
                                 engine.active = n          // continua a scrivere nello stesso blocco
                                 pendingTap = canvasTap     // caret preciso tra le lettere
