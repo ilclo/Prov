@@ -3,7 +3,7 @@ package com.example.appbuilder.text
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset   // usa SOLO foundation.layout.offset
+import androidx.compose.foundation.layout.offset // <-- usa SOLO questo offset
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.*
@@ -16,8 +16,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -33,29 +38,28 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import java.util.UUID
+import androidx.compose.foundation.layout.padding
 
-/**
- * Motore testuale leggero: blocchi testo “flottanti” associabili a pagina o contenitore.
- * Ogni blocco usa TextFieldValue → caret/selection nativi (copy/paste/select-all via toolbar di sistema).
- */
+/* =========================================================================================
+ * MOTORE TESTO
+ * ========================================================================================= */
 class TextEngine {
 
     class TextNode(
         val id: String = UUID.randomUUID().toString(),
-        var owner: DrawItem.RectItem?,     // null = testo su pagina
+        var owner: DrawItem.RectItem?,     // null = testo libero su pagina
         var posPx: Offset                  // posizione assoluta nel Canvas
     ) {
         var value by mutableStateOf(TextFieldValue(""))
-        // ultimi size di layout (per hit-test “dentro” al testo)
+        // info layout per hit-test
         var layoutW by mutableStateOf(0)
         var layoutH by mutableStateOf(0)
     }
 
-    // Stato osservabile
     val nodes = mutableStateListOf<TextNode>()
     var active: TextNode? by mutableStateOf(null)
 
-    // Ambiente Canvas (per hit-test cella/rect)
+    // ambiente Canvas (x hit-test contenitori)
     private var lastCanvasSize: IntSize = IntSize.Zero
     private var gridCols: Int = 6
     fun updateEnv(size: IntSize, cols: Int) { lastCanvasSize = size; gridCols = max(1, cols) }
@@ -65,7 +69,6 @@ class TextEngine {
         val h = lastCanvasSize.height.toFloat()
         return min(w / gridCols, h / gridCols)
     }
-
     private fun rectTopLeftPx(r: DrawItem.RectItem): Offset {
         val cell = cellSize()
         val left = min(r.c0, r.c1) * cell
@@ -73,19 +76,19 @@ class TextEngine {
         return Offset(left, top)
     }
 
-    /** Migra owner/posizione quando un Rect viene rimpiazzato (drag/resize). */
+    /** Migra owner/posizioni quando un Rect viene rimpiazzato (drag/resize). */
     fun onRectReplaced(old: DrawItem.RectItem, updated: DrawItem.RectItem) {
         val delta = rectTopLeftPx(updated) - rectTopLeftPx(old)
         nodes.filter { it.owner === old }.forEach { n ->
             n.owner = updated
             n.posPx = n.posPx + delta
-            if (active === n) active = n // notifica recomposition
+            if (active === n) active = n
         }
     }
 
-    /** Ritorna il nodo “cliccato” (se il tap cade nel suo box testo) o il più vicino entro soglia. */
+    /** Nodo “cliccato” o il più vicino entro soglia. */
     private fun pickNodeForTap(tapPx: Offset, nearPx: Float): TextNode? {
-        // 1) dentro il box del testo (con un piccolo margine)
+        // dentro al box del testo (margine piccolo)
         val boxMargin = 8f
         nodes.firstOrNull { n ->
             val left = n.posPx.x - boxMargin
@@ -95,16 +98,13 @@ class TextEngine {
             tapPx.x in left..right && tapPx.y in top..bottom
         }?.let { return it }
 
-        // 2) il più vicino alla sua origine entro nearPx
+        // altrimenti il più vicino all'origine
         return nodes.minByOrNull { (it.posPx - tapPx).getDistance() }?.takeIf {
             (it.posPx - tapPx).getDistance() <= nearPx
         }
     }
 
-    /**
-     * Posiziona il caret: se tocchi un testo esistente lo attiva, altrimenti crea un nuovo blocco.
-     * Ritorna il nodo attivo dopo il tap.
-     */
+    /** Tap: attiva un blocco esistente o ne crea uno nuovo. */
     fun placeCaret(owner: DrawItem.RectItem?, tapPx: Offset, nearPx: Float): TextNode {
         val picked = pickNodeForTap(tapPx, nearPx)
             ?: TextNode(owner = owner, posPx = tapPx).also { nodes.add(it) }
@@ -115,116 +115,248 @@ class TextEngine {
     fun replaceActiveValue(newValue: TextFieldValue) { active?.value = newValue }
 }
 
-/* -------------------------------------------------------------------------------------- */
-
+/* =========================================================================================
+ * LAYER TESTO
+ * ========================================================================================= */
 @Composable
 fun TextLayer(
     active: Boolean,
     page: PageState?,
     engine: TextEngine,
-    bottomSafePx: Int = 0
+    bottomSafePx: Int = 0   // spazio IME (px) per non coprire il caret
 ) {
     if (!active) return
 
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val kb = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
+    val clipboard = LocalClipboardManager.current
+
+    // Disattiva la toolbar di sistema: useremo una “barra nera” custom.
+    val emptyToolbar = remember {
+        object : TextToolbar {
+            override val status: TextToolbarStatus get() = TextToolbarStatus.Hidden
+            override fun showMenu(
+                rect: androidx.compose.ui.geometry.Rect,
+                onCopyRequested: (() -> Unit)?,
+                onPasteRequested: (() -> Unit)?,
+                onCutRequested: (() -> Unit)?,
+                onSelectAllRequested: (() -> Unit)?,
+            ) { /* no-op */ }
+            override fun hide() {}
+        }
+    }
 
     // aggiorna ambiente di hit-test su cambi dimensioni/griglia
     LaunchedEffect(canvasSize, page?.gridDensity) {
         engine.updateEnv(canvasSize, page?.gridDensity ?: 6)
     }
 
-    // tap → attiva/crea blocco; nessun long-press/drag qui: li gestisce BasicTextField (selection nativa)
-    var pendingTap by remember { mutableStateOf<Offset?>(null) } // per posizionare il caret dentro il testo
+    // tap → attiva/crea blocco, caret preciso tra le lettere
+    var pendingTap by remember { mutableStateOf<Offset?>(null) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .onSizeChanged { canvasSize = it }
-            .pointerInput(page?.items, page?.gridDensity, canvasSize) {
-                detectTapGestures(
-                    onTap = { ofs ->
-                        val owner = hitTestRectAt(ofs, page, canvasSize)
-                        val nearPx = with(density) { 24.dp.toPx() }
-                        val node = engine.placeCaret(owner, ofs, nearPx)
-                        pendingTap = ofs           // posizionamento caret tra le lettere
-                        kb?.show()                 // tastiera SOLO su gesto utente
-                    }
-                )
-            }
-    ) {
-        // Nodo attivo: campo editabile “flottante” (caret visibile sopra la tastiera)
-        engine.active?.let { node ->
-            val caretMargin = with(density) { 32.dp.toPx() }
-            val safeY = min(
-                node.posPx.y,
-                (canvasSize.height - bottomSafePx).toFloat() - caretMargin
-            ).coerceAtLeast(0f)
+    // stato “barra nera”
+    var showTextBar by remember { mutableStateOf(false) }
+    var textBarAnchor by remember { mutableStateOf(IntOffset.Zero) }
 
-            val focusReq = remember { FocusRequester() }
-            var layout by remember(node.id) { mutableStateOf<TextLayoutResult?>(null) }
-
-            BasicTextField(
-                value = node.value,
-                onValueChange = { v -> engine.replaceActiveValue(v) },
-                textStyle = TextStyle(fontSize = 16.sp, color = Color.Black),
-                cursorBrush = SolidColor(Color.Black),
-                modifier = Modifier
-                    .offset { IntOffset(node.posPx.x.roundToInt(), safeY.roundToInt()) }
-                    .focusRequester(focusReq)
-                    .onFocusChanged { st -> if (st.isFocused) kb?.show() },
-                onTextLayout = { tlr ->
-                    layout = tlr
-                    // aggiorna box di hit-test (serve per capire se un prossimo tap cade “dentro”)
-                    node.layoutW = tlr.size.width
-                    node.layoutH = tlr.size.height
+    CompositionLocalProvider(LocalTextToolbar provides emptyToolbar) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { canvasSize = it }
+                .pointerInput(page?.items, page?.gridDensity, canvasSize) {
+                    // ATTENZIONE: SOLO onTap → il drag non sposta il caret.
+                    detectTapGestures(
+                        onTap = { ofs ->
+                            val owner = hitTestRectAt(ofs, page, canvasSize)
+                            val nearPx = with(density) { 24.dp.toPx() }
+                            val node = engine.placeCaret(owner, ofs, nearPx)
+                            pendingTap = ofs             // posizionamento caret fra le lettere
+                            showTextBar = false          // chiudi eventuale barra
+                            kb?.show()                   // tastiera SOLO su gesto utente
+                        }
+                    )
                 }
-            )
-            // Porta il focus quando cambia l’attivo → caret lampeggiante + tastiera
-            LaunchedEffect(node.id) { focusReq.requestFocus() }
+        ) {
+            // Nodo attivo: campo editabile “flottante”
+            engine.active?.let { node ->
+                val caretMargin = with(density) { 32.dp.toPx() }
+                val safeY = min(
+                    node.posPx.y,
+                    (canvasSize.height - bottomSafePx).toFloat() - caretMargin
+                ).coerceAtLeast(0f)
 
-            // Se ho un tap “sopra” questo testo, posiziono il caret tra le lettere
-            LaunchedEffect(pendingTap, layout, node.posPx, node.value.text) {
-                val p = pendingTap ?: return@LaunchedEffect
-                val tlr = layout ?: return@LaunchedEffect
-                // coordinate relative al testo
-                val rel = p - node.posPx
-                val y = rel.y.coerceIn(0f, (tlr.size.height - 1).toFloat())
-                val x = rel.x.coerceIn(0f, (tlr.size.width  - 1).toFloat())
-                val caret = tlr.getOffsetForPosition(Offset(x, y))
-                engine.replaceActiveValue(
-                    node.value.copy(selection = TextRange(caret))
-                )
-                pendingTap = null
-            }
-        }
+                val focusReq = remember { FocusRequester() }
+                var layout by remember(node.id) { mutableStateOf<TextLayoutResult?>(null) }
 
-        // Nodi NON attivi: rendering statico + tap singolo per riattivare (caret nella parola cliccata)
-        engine.nodes.forEach { n ->
-            if (engine.active?.id == n.id) return@forEach
-            BasicText(
-                text = n.value.text,
-                style = TextStyle(fontSize = 16.sp, color = Color.Black),
-                modifier = Modifier
-                    .offset { IntOffset(n.posPx.x.roundToInt(), n.posPx.y.roundToInt()) }
-                    .pointerInput(n.id) {
-                        detectTapGestures(
-                            onTap = { localTap ->
-                                // converte il tap locale (nel BasicText) in coordinate Canvas
-                                val canvasTap = Offset(n.posPx.x + localTap.x, n.posPx.y + localTap.y)
-                                engine.active = n          // continua a scrivere nello stesso blocco
-                                pendingTap = canvasTap     // caret preciso tra le lettere
-                                kb?.show()
-                            }
+                // Mostra la barra nera quando c’è una selezione non-collassata
+                LaunchedEffect(node.value.selection, layout) {
+                    val sel = node.value.selection
+                    if (layout != null && !sel.collapsed) {
+                        val box = layout!!.getBoundingBox(sel.min.coerceIn(0, node.value.text.length))
+                        val anchorX = node.posPx.x + box.left
+                        val anchorY = safeY + box.top
+                        val barH = with(density) { 38.dp.toPx() } // altezza indicativa della barra
+                        textBarAnchor = IntOffset(
+                            anchorX.roundToInt(),
+                            (anchorY - barH - with(density){8.dp.toPx()}).roundToInt()
                         )
+                        showTextBar = true
+                    } else {
+                        showTextBar = false
                     }
-            )
+                }
+
+                BasicTextField(
+                    value = node.value,
+                    onValueChange = { v ->
+                        engine.replaceActiveValue(v)
+                        // digitando, se la selezione diventa caret singolo, nascondi la barra
+                        if (showTextBar && v.selection.collapsed) showTextBar = false
+                    },
+                    textStyle = TextStyle(fontSize = 16.sp, color = Color.Black),
+                    cursorBrush = SolidColor(Color.Black),
+                    modifier = Modifier
+                        .offset { IntOffset(node.posPx.x.roundToInt(), safeY.roundToInt()) }
+                        .focusRequester(focusReq)
+                        .onFocusChanged { st -> if (st.isFocused) kb?.show() },
+                    onTextLayout = { tlr ->
+                        layout = tlr
+                        node.layoutW = tlr.size.width
+                        node.layoutH = tlr.size.height
+                    }
+                )
+
+                // Porta focus quando cambia l’attivo → caret visibile
+                LaunchedEffect(node.id) { focusReq.requestFocus(); kb?.show() }
+
+                // Dopo un tap sul testo (anche non attivo), posiziona il caret nel punto preciso
+                LaunchedEffect(pendingTap, layout, node.posPx, node.value.text) {
+                    val p = pendingTap ?: return@LaunchedEffect
+                    val tlr = layout ?: return@LaunchedEffect
+                    // coordinate relative al testo (rispetto al posizionamento “sicuro”)
+                    val relX = (p.x - node.posPx.x).coerceIn(0f, (tlr.size.width  - 1).toFloat())
+                    val relY = (p.y - safeY).coerceIn(0f, (tlr.size.height - 1).toFloat())
+                    val caret = tlr.getOffsetForPosition(Offset(relX, relY))
+                    engine.replaceActiveValue(
+                        node.value.copy(selection = TextRange(caret))
+                    )
+                    pendingTap = null
+                }
+
+                // Barra nera stile GitHub: Copia / Seleziona tutto / Incolla
+                TextContextBar(
+                    visible = showTextBar,
+                    anchor = textBarAnchor,
+                    onCopy = {
+                        val sel = node.value.selection
+                        if (!sel.collapsed) {
+                            val txt = node.value.text.substring(sel.min, sel.max)
+                            clipboard.setText(AnnotatedString(txt))
+                        }
+                        showTextBar = false
+                    },
+                    onSelectAll = {
+                        engine.replaceActiveValue(
+                            node.value.copy(selection = TextRange(0, node.value.text.length))
+                        )
+                        // resta visibile
+                    },
+                    onPaste = {
+                        val paste = clipboard.getText()?.text.orEmpty()
+                        if (paste.isNotEmpty()) {
+                            val sel = node.value.selection
+                            val t = node.value.text
+                            val start = sel.min.coerceIn(0, t.length)
+                            val end = sel.max.coerceIn(0, t.length)
+                            val newText = t.substring(0, start) + paste + t.substring(end)
+                            val newCaret = (start + paste.length)
+                            engine.replaceActiveValue(
+                                TextFieldValue(
+                                    text = newText,
+                                    selection = TextRange(newCaret)
+                                )
+                            )
+                        }
+                        showTextBar = false
+                    },
+                    onDismiss = { showTextBar = false }
+                )
+            }
+
+            // Nodi NON attivi: render statico + tap singolo per riattivare
+            engine.nodes.forEach { n ->
+                if (engine.active?.id == n.id) return@forEach
+                BasicText(
+                    text = n.value.text,
+                    style = TextStyle(fontSize = 16.sp, color = Color.Black),
+                    modifier = Modifier
+                        .offset { IntOffset(n.posPx.x.roundToInt(), n.posPx.y.roundToInt()) }
+                        .pointerInput(n.id) {
+                            detectTapGestures(onTap = { localTap ->
+                                // tap in coordinate Canvas
+                                val canvasTap = Offset(n.posPx.x + localTap.x, n.posPx.y + localTap.y)
+                                engine.active = n      // continua nello stesso blocco
+                                pendingTap = canvasTap // caret preciso tra le lettere
+                                kb?.show()
+                            })
+                        }
+                )
+            }
         }
     }
 }
 
-/* ------------------------- helpers privati ------------------------- */
+/* ---------- Toolbar nera “GitHub-like” ---------- */
+@Composable
+private fun TextContextBar(
+    visible: Boolean,
+    anchor: IntOffset,                // posizione schermo dove ancorare (sopra selezione)
+    onCopy: () -> Unit,
+    onSelectAll: () -> Unit,
+    onPaste: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+    // pannellino leggero, nessun Material necessario
+    Box(Modifier.fillMaxSize()) {
+        // chiusura su tap fuori
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) }
+        )
+        // barra
+        Box(
+            Modifier
+                .offset { anchor }
+                .pointerInput(Unit) { detectTapGestures(onTap = { /* assorbi */ }) }
+        ) {
+            androidx.compose.material3.Surface(
+                color = Color(0xFF0D1117),
+                contentColor = Color.White,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp
+            ) {
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp)
+                ) {
+                    androidx.compose.material3.Text("Copia",
+                        modifier = Modifier.pointerInput(Unit){ detectTapGestures(onTap = { onCopy() }) })
+                    androidx.compose.material3.Text("Seleziona tutto",
+                        modifier = Modifier.pointerInput(Unit){ detectTapGestures(onTap = { onSelectAll() }) })
+                    androidx.compose.material3.Text("Incolla",
+                        modifier = Modifier.pointerInput(Unit){ detectTapGestures(onTap = { onPaste() }) })
+                }
+            }
+        }
+    }
+}
+
+/* ------------------------- helpers ------------------------- */
 
 private fun hitTestRectAt(
     ofs: Offset,
